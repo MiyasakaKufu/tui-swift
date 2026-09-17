@@ -42,14 +42,14 @@ final class DemoComponent: Component {
         }
     }
 
-    private func header() -> any View {
+    private func header() -> some View {
         Text(" TUIKit デモ ", style: Style(foreground: .black, background: .cyan).bold)
             .frame(height: 1)
             .background(style: Style(background: .cyan))
             .flexible(horizontal: 1, vertical: 0)
     }
 
-    private func detail() -> any View {
+    private func detail() -> some View {
         let selected = items.indices.contains(listState.selectedIndex)
             ? items[listState.selectedIndex]
             : "-"
@@ -76,7 +76,7 @@ final class DemoComponent: Component {
         .padding(horizontal: 1)
     }
 
-    private func footer() -> any View {
+    private func footer() -> some View {
         HStack(spacing: 2) {
             Text(" ↑↓/jk 選択 ").styled(Style(foreground: .black, background: .white))
             Text(" Tab 切り替え ").styled(Style(foreground: .black, background: .white))
