@@ -1,10 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-/// モディファイアが存在型ではなく具体型を返すことを確認する。
-///
-/// 型注釈が実際の戻り値と食い違えばビルドが通らないため、検査の本体はコンパイル時に行われる。
-/// 実行時のアサーションは、包んだ内容へ型を落とさずに辿れることを示すためのもの。
+/// 型注釈と戻り値が食い違えばビルドが通らないので、検査の本体はコンパイル時に行われる。
 final class ModifierGenericsTests: XCTestCase {
 
     func testModifiersReturnConcreteTypes() {
@@ -26,7 +23,6 @@ final class ModifierGenericsTests: XCTestCase {
     func testChainedModifiersKeepContentType() {
         let view: BorderView<PaddingView<Text>> = Text("x").padding(1).border(.ascii)
 
-        // 途中に存在型の箱詰めが無いので、内容の型が最後まで残る。
         XCTAssertEqual(view.content.content.content, "x")
     }
 
