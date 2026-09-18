@@ -22,10 +22,8 @@ final class ApplicationBugReproductionTests: XCTestCase {
     func testResizeDuringEventHandlingIsReported() throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
-        try XCTSkipIf(
-            ctui_test_open_pty(&masterDescriptor, &slaveDescriptor) != 0,
-            "疑似端末を開けない環境のため飛ばす"
-        )
+        let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
+        try XCTSkipIf(openResult != 0, "疑似端末を開けない環境のため飛ばす")
         let master = masterDescriptor
         let slave = slaveDescriptor
         defer {
