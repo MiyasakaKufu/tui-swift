@@ -15,6 +15,6 @@ let package = Package(
         .target(name: "CTUIShim"),
         .target(name: "TUIKit", dependencies: ["CTUIShim"]),
         .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),
-        .testTarget(name: "TUIKitTests", dependencies: ["TUIKit"]),
+        .testTarget(name: "TUIKitTests", dependencies: ["TUIKit", "CTUIShim"]),
     ]
 )

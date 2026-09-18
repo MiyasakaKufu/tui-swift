@@ -41,6 +41,9 @@ public final class Application<Root: Component> {
         defer { terminal.restore() }
 
         SignalWatcher.install()
+        // シグナルが届いたらイベント待ちを起こせるようにする。
+        reader.wakeupDescriptor = SignalWatcher.wakeupDescriptor
+
         if options.usesAlternateScreen { terminal.enterAlternateScreen() }
         terminal.setMouseTrackingEnabled(options.tracksMouse)
         terminal.setBracketedPasteEnabled(options.usesBracketedPaste)
@@ -56,6 +59,19 @@ public final class Application<Root: Component> {
         var lastFrame = monotonicSeconds()
 
         while isRunning {
+            // フラグは合図にすぎないので、実際のサイズを見て判断する。
+            // SIGWINCH を取りこぼしても、次のフレームでサイズ変更に気づける。
+            _ = SignalWatcher.consumeWindowResize()
+            let size = terminal.size()
+            if size != buffer.size {
+                buffer.resize(to: size)
+                renderer.invalidate()
+                if root.handle(.resize(size)) == .quit {
+                    isRunning = false
+                    break
+                }
+            }
+
             draw()
 
             let events = reader.wait(timeout: options.frameInterval)
@@ -63,18 +79,6 @@ public final class Application<Root: Component> {
             if SignalWatcher.consumeTermination() {
                 isRunning = false
                 break
-            }
-
-            if SignalWatcher.consumeWindowResize() {
-                let newSize = terminal.size()
-                if newSize != buffer.size {
-                    buffer.resize(to: newSize)
-                    renderer.invalidate()
-                    if root.handle(.resize(newSize)) == .quit {
-                        isRunning = false
-                        break
-                    }
-                }
             }
 
             for event in events {
@@ -107,11 +111,6 @@ public final class Application<Root: Component> {
 
     /// 1 フレーム分を描画する。
     private func draw() {
-        let size = terminal.size()
-        if size != buffer.size {
-            buffer.resize(to: size)
-            renderer.invalidate()
-        }
         buffer.clear()
 
         let view = root.body
