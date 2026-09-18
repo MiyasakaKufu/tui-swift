@@ -1,13 +1,16 @@
 /// 枠線に使う文字の組み合わせ。
+///
+/// 枠線は 1 セルずつ書き込まれるので、どの文字も表示幅が 1 桁でなければならない。
+/// 全角文字や絵文字を渡した場合は、対応する位置の既定の文字（細い実線）へ置き換える。
 public struct BorderStyle: Hashable, Sendable {
-    public var topLeft: Character
-    public var top: Character
-    public var topRight: Character
-    public var left: Character
-    public var right: Character
-    public var bottomLeft: Character
-    public var bottom: Character
-    public var bottomRight: Character
+    public private(set) var topLeft: Character
+    public private(set) var top: Character
+    public private(set) var topRight: Character
+    public private(set) var left: Character
+    public private(set) var right: Character
+    public private(set) var bottomLeft: Character
+    public private(set) var bottom: Character
+    public private(set) var bottomRight: Character
 
     public init(
         topLeft: Character,
@@ -19,14 +22,19 @@ public struct BorderStyle: Hashable, Sendable {
         bottom: Character,
         bottomRight: Character
     ) {
-        self.topLeft = topLeft
-        self.top = top
-        self.topRight = topRight
-        self.left = left
-        self.right = right
-        self.bottomLeft = bottomLeft
-        self.bottom = bottom
-        self.bottomRight = bottomRight
+        self.topLeft = Self.singleWidth(topLeft, fallback: "┌")
+        self.top = Self.singleWidth(top, fallback: "─")
+        self.topRight = Self.singleWidth(topRight, fallback: "┐")
+        self.left = Self.singleWidth(left, fallback: "│")
+        self.right = Self.singleWidth(right, fallback: "│")
+        self.bottomLeft = Self.singleWidth(bottomLeft, fallback: "└")
+        self.bottom = Self.singleWidth(bottom, fallback: "─")
+        self.bottomRight = Self.singleWidth(bottomRight, fallback: "┘")
+    }
+
+    /// 表示幅が 1 桁の文字だけを通し、そうでなければ `fallback` を返す。
+    private static func singleWidth(_ character: Character, fallback: Character) -> Character {
+        DisplayWidth.width(of: character) == 1 ? character : fallback
     }
 
     /// 細い実線。

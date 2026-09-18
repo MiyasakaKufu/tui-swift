@@ -64,7 +64,7 @@ public struct Fill: View {
     public func sizeThatFits(_ proposal: Size) -> Size { proposal }
 
     public func render(into buffer: inout Buffer, rect: Rect) {
-        buffer.fill(rect, with: Cell(character: character, style: style))
+        buffer.fill(rect, repeating: character, style: style)
     }
 }
 
@@ -113,6 +113,6 @@ public struct Divider: View {
     }
 
     public func render(into buffer: inout Buffer, rect: Rect) {
-        buffer.fill(rect, with: Cell(character: character, style: style))
+        buffer.fill(rect, repeating: character, style: style)
     }
 }

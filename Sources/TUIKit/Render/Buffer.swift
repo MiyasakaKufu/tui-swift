@@ -55,6 +55,45 @@ public struct Buffer: Hashable, Sendable {
         fill(rect, with: Cell(character: " ", style: style))
     }
 
+    /// 矩形領域を 1 文字の繰り返しで埋める。
+    ///
+    /// 全角文字は 2 桁を占めるので、先頭のセルに文字を置き、次のセルを継続セルにする。
+    /// 行の末尾に幅が足りずに半端な桁が残る場合は、そこを空白で埋める。
+    /// 幅 0 の文字は繰り返せないため、領域全体を空白で埋める。
+    public mutating func fill(_ rect: Rect, repeating character: Character, style: Style = .plain) {
+        let region = rect.intersection(bounds)
+        guard !region.isEmpty else { return }
+
+        let characterWidth = DisplayWidth.width(of: character)
+        guard characterWidth >= 1 else {
+            fill(region, with: Cell(character: " ", style: style))
+            return
+        }
+        guard characterWidth > 1 else {
+            fill(region, with: Cell(character: character, style: style))
+            return
+        }
+
+        let head = Cell(character: character, style: style)
+        let continuation = Cell(character: " ", style: style, isContinuation: true)
+        let blank = Cell(character: " ", style: style)
+
+        for y in region.minY..<region.maxY {
+            var x = region.minX
+            while x + characterWidth <= region.maxX {
+                self[x, y] = head
+                for offset in 1..<characterWidth {
+                    self[x + offset, y] = continuation
+                }
+                x += characterWidth
+            }
+            while x < region.maxX {
+                self[x, y] = blank
+                x += 1
+            }
+        }
+    }
+
     /// 1 行分の文字列を描画する。
     ///
     /// - Parameters:
