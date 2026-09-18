@@ -1,9 +1,9 @@
 /// 内容の周囲に余白を取るビュー。
-public struct PaddingView: View {
-    public var content: any View
+public struct PaddingView<Content: View>: View {
+    public var content: Content
     public var insets: EdgeInsets
 
-    public init(content: any View, insets: EdgeInsets) {
+    public init(content: Content, insets: EdgeInsets) {
         self.content = content
         self.insets = insets
     }
@@ -30,15 +30,15 @@ public struct PaddingView: View {
 }
 
 /// 内容を枠線で囲むビュー。
-public struct BorderView: View {
-    public var content: any View
+public struct BorderView<Content: View>: View {
+    public var content: Content
     public var borderStyle: BorderStyle
     public var style: Style
     public var title: String?
     public var titleStyle: Style?
 
     public init(
-        content: any View,
+        content: Content,
         borderStyle: BorderStyle = .single,
         style: Style = .plain,
         title: String? = nil,
@@ -113,11 +113,11 @@ public struct BorderView: View {
 }
 
 /// 背景を塗るビュー。
-public struct BackgroundView: View {
-    public var content: any View
+public struct BackgroundView<Content: View>: View {
+    public var content: Content
     public var style: Style
 
-    public init(content: any View, style: Style) {
+    public init(content: Content, style: Style) {
         self.content = content
         self.style = style
     }
@@ -136,15 +136,15 @@ public struct BackgroundView: View {
 }
 
 /// サイズを固定するビュー。
-public struct FrameView: View {
-    public var content: any View
+public struct FrameView<Content: View>: View {
+    public var content: Content
     public var width: Int?
     public var height: Int?
     public var horizontalAlignment: HorizontalAlignment
     public var verticalAlignment: VerticalAlignment
 
     public init(
-        content: any View,
+        content: Content,
         width: Int? = nil,
         height: Int? = nil,
         horizontalAlignment: HorizontalAlignment = .leading,
@@ -183,11 +183,11 @@ public struct FrameView: View {
 }
 
 /// 余白の分配ルールだけを差し替えるビュー。
-public struct FlexibleView: View {
-    public var content: any View
+public struct FlexibleView<Content: View>: View {
+    public var content: Content
     public var traits: LayoutTraits
 
-    public init(content: any View, traits: LayoutTraits) {
+    public init(content: Content, traits: LayoutTraits) {
         self.content = content
         self.traits = traits
     }
@@ -204,12 +204,12 @@ public struct FlexibleView: View {
 }
 
 /// 与えられた領域の中で内容を寄せるビュー。
-public struct AlignedView: View {
-    public var content: any View
+public struct AlignedView<Content: View>: View {
+    public var content: Content
     public var horizontal: HorizontalAlignment
     public var vertical: VerticalAlignment
 
-    public init(content: any View, horizontal: HorizontalAlignment, vertical: VerticalAlignment) {
+    public init(content: Content, horizontal: HorizontalAlignment, vertical: VerticalAlignment) {
         self.content = content
         self.horizontal = horizontal
         self.vertical = vertical
@@ -230,15 +230,15 @@ public struct AlignedView: View {
 
 extension View {
     /// 周囲に余白を取る。
-    public func padding(_ insets: EdgeInsets) -> PaddingView {
+    public func padding(_ insets: EdgeInsets) -> PaddingView<Self> {
         PaddingView(content: self, insets: insets)
     }
 
-    public func padding(_ amount: Int) -> PaddingView {
+    public func padding(_ amount: Int) -> PaddingView<Self> {
         PaddingView(content: self, insets: EdgeInsets(all: amount))
     }
 
-    public func padding(horizontal: Int = 0, vertical: Int = 0) -> PaddingView {
+    public func padding(horizontal: Int = 0, vertical: Int = 0) -> PaddingView<Self> {
         PaddingView(content: self, insets: EdgeInsets(horizontal: horizontal, vertical: vertical))
     }
 
@@ -248,16 +248,16 @@ extension View {
         style: Style = .plain,
         title: String? = nil,
         titleStyle: Style? = nil
-    ) -> BorderView {
+    ) -> BorderView<Self> {
         BorderView(content: self, borderStyle: borderStyle, style: style, title: title, titleStyle: titleStyle)
     }
 
     /// 背景色を塗る。
-    public func background(_ color: Color) -> BackgroundView {
+    public func background(_ color: Color) -> BackgroundView<Self> {
         BackgroundView(content: self, style: Style(background: color))
     }
 
-    public func background(style: Style) -> BackgroundView {
+    public func background(style: Style) -> BackgroundView<Self> {
         BackgroundView(content: self, style: style)
     }
 
@@ -267,7 +267,7 @@ extension View {
         height: Int? = nil,
         horizontalAlignment: HorizontalAlignment = .leading,
         verticalAlignment: VerticalAlignment = .top
-    ) -> FrameView {
+    ) -> FrameView<Self> {
         FrameView(
             content: self,
             width: width,
@@ -278,7 +278,7 @@ extension View {
     }
 
     /// 余った領域を引き取るようにする。
-    public func flexible(horizontal: Int = 1, vertical: Int = 1) -> FlexibleView {
+    public func flexible(horizontal: Int = 1, vertical: Int = 1) -> FlexibleView<Self> {
         FlexibleView(
             content: self,
             traits: LayoutTraits(horizontalFlex: horizontal, verticalFlex: vertical)
@@ -289,7 +289,7 @@ extension View {
     public func aligned(
         horizontal: HorizontalAlignment = .center,
         vertical: VerticalAlignment = .center
-    ) -> AlignedView {
+    ) -> AlignedView<Self> {
         AlignedView(content: self, horizontal: horizontal, vertical: vertical)
     }
 }
