@@ -45,6 +45,13 @@ public final class ListState {
     public func handle(_ event: InputEvent) -> Bool {
         guard case .key(let keyEvent) = event else {
             if case .mouse(let mouseEvent) = event {
+                // 1 列の選択リストなので、扱うのは縦方向のみ。横スクロールは
+                // トラックパッドの斜めの動きで混ざってくるが、このビューの
+                // 責務ではないので false を返して親に委ねる。
+                //
+                // `default` を置かずに全ケースを列挙している。`MouseAction` が
+                // 増えたときにコンパイルエラーとなり、この場で方針を決めることを
+                // 強制するため。
                 switch mouseEvent.action {
                 case .scrollUp:
                     moveUp()
@@ -52,7 +59,9 @@ public final class ListState {
                 case .scrollDown:
                     moveDown()
                     return true
-                default:
+                case .scrollLeft, .scrollRight:
+                    return false
+                case .press, .release, .drag:
                     return false
                 }
             }

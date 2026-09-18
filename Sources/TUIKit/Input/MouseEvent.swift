@@ -3,6 +3,14 @@ public enum MouseButton: Hashable, Sendable {
     case left
     case middle
     case right
+    /// 拡張ボタン 8（「戻る」に割り当てられることが多い）。
+    case backward
+    /// 拡張ボタン 9（「進む」に割り当てられることが多い）。
+    case forward
+    /// 拡張ボタン 10。
+    case button10
+    /// 拡張ボタン 11。
+    case button11
     case none
 }
 
@@ -13,6 +21,8 @@ public enum MouseAction: Hashable, Sendable {
     case drag
     case scrollUp
     case scrollDown
+    case scrollLeft
+    case scrollRight
 }
 
 /// マウスイベント。座標は 0 起点。

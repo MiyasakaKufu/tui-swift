@@ -64,6 +64,38 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.selectedIndex, 1)
     }
 
+    /// 縦方向のリストは横スクロールを扱わない（親に委ねる）。
+    func testListStateDoesNotHandleHorizontalScroll() {
+        let state = ListState(itemCount: 5)
+        state.visibleRows = 5
+        for action in [MouseAction.scrollLeft, .scrollRight] {
+            let event = MouseEvent(position: .zero, button: .none, action: action)
+            XCTAssertFalse(state.handle(.mouse(event)), "\(action) は扱わないこと")
+            XCTAssertEqual(state.selectedIndex, 0, "\(action) で選択が動かないこと")
+        }
+    }
+
+    /// トラックパッドで斜めに動かすと横スクロールのコードが混ざる。
+    /// 縦のノッチ数ぶんだけ選択が動き、横スクロールは無視されること。
+    func testListStateIgnoresHorizontalWheelInDiagonalStream() {
+        let state = ListState(itemCount: 10)
+        state.visibleRows = 5
+
+        var parser = InputParser()
+        let stream = "\u{1B}[<65;1;1M"   // 下
+            + "\u{1B}[<67;1;1M"          // 右（斜めの動きで混ざる）
+            + "\u{1B}[<65;1;1M"          // 下
+            + "\u{1B}[<66;1;1M"          // 左（斜めの動きで混ざる）
+            + "\u{1B}[<65;1;1M"          // 下
+        let events = parser.feed(Array(stream.utf8))
+        XCTAssertEqual(events.count, 5)
+
+        var handledCount = 0
+        for event in events where state.handle(event) { handledCount += 1 }
+        XCTAssertEqual(handledCount, 3, "縦の 3 ノッチだけが処理されること")
+        XCTAssertEqual(state.selectedIndex, 3)
+    }
+
     func testListViewRendersSelectionMarker() {
         let state = ListState()
         let list = ListView(items: ["a", "b", "c"], state: state)

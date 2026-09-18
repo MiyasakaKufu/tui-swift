@@ -115,6 +115,69 @@ final class InputParserTests: XCTestCase {
         ])
     }
 
+    func testMouseWheelFourDirections() {
+        XCTAssertEqual(events(bytes("\u{1B}[<64;3;4M")), [
+            .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .scrollUp))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<65;3;4M")), [
+            .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .scrollDown))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<66;3;4M")), [
+            .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .scrollLeft))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<67;3;4M")), [
+            .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .scrollRight))
+        ])
+    }
+
+    func testHorizontalWheelIsNotReportedAsVerticalScroll() {
+        for text in ["\u{1B}[<66;10;5M", "\u{1B}[<67;10;5M"] {
+            guard case .mouse(let mouseEvent)? = events(bytes(text)).first else {
+                return XCTFail("マウスイベントが得られなかった: \(text)")
+            }
+            XCTAssertNotEqual(mouseEvent.action, .scrollUp)
+            XCTAssertNotEqual(mouseEvent.action, .scrollDown)
+        }
+    }
+
+    func testMouseWheelWithModifiers() {
+        XCTAssertEqual(events(bytes("\u{1B}[<70;3;4M")), [
+            .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .scrollLeft, modifiers: [.shift]))
+        ])
+    }
+
+    func testExtraMouseButtons() {
+        XCTAssertEqual(events(bytes("\u{1B}[<128;1;1M")), [
+            .mouse(MouseEvent(position: .zero, button: .backward, action: .press))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<129;1;1M")), [
+            .mouse(MouseEvent(position: .zero, button: .forward, action: .press))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<130;1;1M")), [
+            .mouse(MouseEvent(position: .zero, button: .button10, action: .press))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<131;1;1M")), [
+            .mouse(MouseEvent(position: .zero, button: .button11, action: .press))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<128;1;1m")), [
+            .mouse(MouseEvent(position: .zero, button: .backward, action: .release))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<160;2;2M")), [
+            .mouse(MouseEvent(position: Point(x: 1, y: 1), button: .backward, action: .drag))
+        ])
+    }
+
+    func testExtraMouseButtonsAreNotReportedAsPrimaryButtons() {
+        for text in ["\u{1B}[<128;1;1M", "\u{1B}[<129;1;1M"] {
+            guard case .mouse(let mouseEvent)? = events(bytes(text)).first else {
+                return XCTFail("マウスイベントが得られなかった: \(text)")
+            }
+            XCTAssertNotEqual(mouseEvent.button, .left)
+            XCTAssertNotEqual(mouseEvent.button, .middle)
+            XCTAssertNotEqual(mouseEvent.button, .right)
+        }
+    }
+
     func testBracketedPaste() {
         XCTAssertEqual(
             events(bytes("\u{1B}[200~hi\u{1B}[201~")),

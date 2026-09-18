@@ -141,7 +141,12 @@ final class DemoApp: TerminalApp {
             parts.append(name(of: keyEvent.key))
             return parts.joined(separator: "+")
         case .mouse(let mouseEvent):
-            return "マウス \(mouseEvent.action) (\(mouseEvent.position.x), \(mouseEvent.position.y))"
+            var parts = ["マウス", "\(mouseEvent.action)"]
+            // ボタンを伴うイベントでは種類も出す。拡張ボタン（戻る・進む）を
+            // 左ボタンと見分けるために必要。ホイールは `.none` なので出ない。
+            if mouseEvent.button != .none { parts.append("\(mouseEvent.button)") }
+            parts.append("(\(mouseEvent.position.x), \(mouseEvent.position.y))")
+            return parts.joined(separator: " ")
         case .resize(let size):
             return "リサイズ \(size.width)x\(size.height)"
         case .paste(let text):

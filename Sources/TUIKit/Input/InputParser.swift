@@ -228,17 +228,32 @@ public struct InputParser {
 
         let position = Point(x: max(0, column - 1), y: max(0, row - 1))
 
-        if code & 64 != 0 {
-            let action: MouseAction = (code & 1) == 0 ? .scrollUp : .scrollDown
-            return MouseEvent(position: position, button: .none, action: action, modifiers: modifiers)
-        }
-
+        // ビット 128（拡張ボタン）→ ビット 64（ホイール）→ 下位 2 ビット（通常ボタン）の順に判定する。
+        // ビット 128 を先に見ないと、拡張ボタンを左・中・右ボタンと誤認する。
         let button: MouseButton
-        switch code & 3 {
-        case 0: button = .left
-        case 1: button = .middle
-        case 2: button = .right
-        default: button = .none
+        if code & 128 != 0 {
+            switch code & 3 {
+            case 0: button = .backward
+            case 1: button = .forward
+            case 2: button = .button10
+            default: button = .button11
+            }
+        } else if code & 64 != 0 {
+            let action: MouseAction
+            switch code & 3 {
+            case 0: action = .scrollUp
+            case 1: action = .scrollDown
+            case 2: action = .scrollLeft
+            default: action = .scrollRight
+            }
+            return MouseEvent(position: position, button: .none, action: action, modifiers: modifiers)
+        } else {
+            switch code & 3 {
+            case 0: button = .left
+            case 1: button = .middle
+            case 2: button = .right
+            default: button = .none
+            }
         }
 
         let action: MouseAction
