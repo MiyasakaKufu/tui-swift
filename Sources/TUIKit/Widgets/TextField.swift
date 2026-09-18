@@ -1,4 +1,8 @@
 /// 1 行のテキスト入力の状態。
+///
+/// 内容は書記素クラスタ（Swift の `Character`）単位で持つ。端末からは 🇯🇵 や
+/// 👨‍👩‍👧 が Unicode スカラーごとに届く（パーサがスカラーごとにキーイベントを出す）
+/// ため、変更のたびに区切り直して 1 文字として扱えるようにする。
 public final class TextFieldState {
     private var characters: [Character]
     /// カーソルの文字インデックス（0 〜 文字数）。
@@ -26,34 +30,59 @@ public final class TextFieldState {
     }
 
     public func insert(_ character: Character) {
-        characters.insert(character, at: cursor)
-        cursor += 1
+        replace(cursor..<cursor, with: String(character))
     }
 
     public func insert(contentsOf text: String) {
-        for character in text where character != "\n" {
-            insert(character)
-        }
+        let inserted = String(text.filter { $0 != "\n" })
+        guard !inserted.isEmpty else { return }
+        replace(cursor..<cursor, with: inserted)
     }
 
     @discardableResult
     public func deleteBackward() -> Bool {
         guard cursor > 0 else { return false }
-        characters.remove(at: cursor - 1)
-        cursor -= 1
+        replace((cursor - 1)..<cursor, with: "")
         return true
     }
 
     @discardableResult
     public func deleteForward() -> Bool {
         guard cursor < characters.count else { return false }
-        characters.remove(at: cursor)
+        replace(cursor..<(cursor + 1), with: "")
         return true
     }
 
     public func deleteToStart() {
-        characters.removeFirst(cursor)
-        cursor = 0
+        replace(0..<cursor, with: "")
+    }
+
+    public func deleteToEnd() {
+        replace(cursor..<characters.count, with: "")
+    }
+
+    /// `range` の文字を `text` に置き換え、書記素クラスタを区切り直す。
+    ///
+    /// カーソルは `text` の末尾に置く。挿入した文字が前後と 1 つの書記素クラスタに
+    /// 結合した場合は、そのクラスタの後ろに置く。
+    private func replace(_ range: Range<Int>, with text: String) {
+        let head = String(characters[..<range.lowerBound]) + text
+        let tail = String(characters[range.upperBound...])
+        characters = Array(head + tail)
+        cursor = TextFieldState.characterIndex(in: characters, afterUTF8Length: head.utf8.count)
+    }
+
+    /// 先頭から数えて UTF-8 で `length` バイトの位置にあたる文字インデックス。
+    ///
+    /// その位置が書記素クラスタの内部に来る場合は、そのクラスタの後ろを返す。
+    private static func characterIndex(in characters: [Character], afterUTF8Length length: Int) -> Int {
+        var consumed = 0
+        var index = 0
+        while index < characters.count && consumed < length {
+            consumed += String(characters[index]).utf8.count
+            index += 1
+        }
+        return index
     }
 
     public func moveLeft() {
@@ -98,7 +127,7 @@ public final class TextFieldState {
             case .character("h"):
                 deleteBackward()
             case .character("k"):
-                characters.removeLast(characters.count - cursor)
+                deleteToEnd()
             default:
                 return false
             }
