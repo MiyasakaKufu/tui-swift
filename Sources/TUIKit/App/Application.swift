@@ -14,6 +14,8 @@ public final class Application<Root: Component> {
     private let renderer: Renderer
 
     private var buffer = Buffer(size: .zero)
+    /// 最後に `.resize` として通知したサイズ。サイズ変化の判定はこれと比べる。
+    private var reportedSize = Size.zero
     private var isRunning = false
 
     public init(
@@ -50,12 +52,18 @@ public final class Application<Root: Component> {
         renderer.invalidate()
 
         // 起動直後の画面サイズもリサイズイベントとして通知する。
+        reportedSize = buffer.size
         _ = root.handle(.resize(buffer.size))
 
         isRunning = true
         var lastFrame = monotonicSeconds()
 
         while isRunning {
+            // 描画の前にサイズを確かめる。SIGWINCH を取りこぼしていてもここで気づける。
+            if !synchronizeSize() {
+                isRunning = false
+                break
+            }
             draw()
 
             let events = reader.wait(timeout: options.frameInterval)
@@ -65,16 +73,9 @@ public final class Application<Root: Component> {
                 break
             }
 
-            if SignalWatcher.consumeWindowResize() {
-                let newSize = terminal.size()
-                if newSize != buffer.size {
-                    buffer.resize(to: newSize)
-                    renderer.invalidate()
-                    if root.handle(.resize(newSize)) == .quit {
-                        isRunning = false
-                        break
-                    }
-                }
+            if SignalWatcher.consumeWindowResize(), !synchronizeSize() {
+                isRunning = false
+                break
             }
 
             for event in events {
@@ -105,13 +106,27 @@ public final class Application<Root: Component> {
         }
     }
 
-    /// 1 フレーム分を描画する。
-    private func draw() {
+    /// 端末サイズの変化を検出し、バッファを作り直したうえで `.resize` を通知する。
+    ///
+    /// 比べる相手をバッファのサイズではなく「最後に通知したサイズ」にしてあるため、
+    /// フレームの先頭と SIGWINCH の処理のどちらが先に変化へ気づいても通知は 1 回だけ行われる。
+    /// バッファを先に作り直したせいで差分が消え、通知が落ちることはない。
+    ///
+    /// - Returns: ループを続けるなら `true`。
+    private func synchronizeSize() -> Bool {
         let size = terminal.size()
+        guard size != reportedSize else { return true }
+
+        reportedSize = size
         if size != buffer.size {
             buffer.resize(to: size)
             renderer.invalidate()
         }
+        return root.handle(.resize(size)) != .quit
+    }
+
+    /// 1 フレーム分を描画する。サイズの追従は `synchronizeSize()` が済ませている。
+    private func draw() {
         buffer.clear()
 
         let view = root.body
