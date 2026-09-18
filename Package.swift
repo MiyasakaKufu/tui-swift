@@ -15,6 +15,8 @@ let package = Package(
         .target(name: "CTUIShim"),
         .target(name: "TUIKit", dependencies: ["CTUIShim"]),
         .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),
-        .testTarget(name: "TUIKitTests", dependencies: ["TUIKit", "CTUIShim"]),
+        // テストからだけ使う C の補助（疑似端末の操作）。
+        .target(name: "CTUITestSupport", path: "Tests/CTUITestSupport"),
+        .testTarget(name: "TUIKitTests", dependencies: ["TUIKit", "CTUITestSupport"]),
     ]
 )

@@ -17,17 +17,3 @@ int ctui_terminal_size(int fd, int *columns, int *rows) {
     }
     return 0;
 }
-
-int ctui_set_terminal_size(int fd, int columns, int rows) {
-    struct winsize ws;
-
-    ws.ws_col = (unsigned short)columns;
-    ws.ws_row = (unsigned short)rows;
-    ws.ws_xpixel = 0;
-    ws.ws_ypixel = 0;
-
-    if (ioctl(fd, TIOCSWINSZ, &ws) != 0) {
-        return -1;
-    }
-    return 0;
-}

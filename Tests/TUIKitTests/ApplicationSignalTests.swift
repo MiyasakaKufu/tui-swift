@@ -1,6 +1,6 @@
 import XCTest
 import Foundation
-import CTUIShim
+import CTUITestSupport
 @testable import TUIKit
 
 #if canImport(Darwin)
@@ -175,18 +175,10 @@ private final class PseudoTerminal {
     private var isClosed = false
 
     init() throws {
-        let master = posix_openpt(O_RDWR | O_NOCTTY)
-        guard master >= 0 else { throw Failure.unavailable(errno: errno) }
-        guard grantpt(master) == 0, unlockpt(master) == 0, let name = ptsname(master) else {
-            let code = errno
-            closeDescriptor(master)
-            throw Failure.unavailable(errno: code)
-        }
-        let slave = open(name, O_RDWR | O_NOCTTY)
-        guard slave >= 0 else {
-            let code = errno
-            closeDescriptor(master)
-            throw Failure.unavailable(errno: code)
+        var master: Int32 = -1
+        var slave: Int32 = -1
+        guard ctui_open_pty(&master, &slave) == 0 else {
+            throw Failure.unavailable(errno: errno)
         }
         self.master = master
         self.slave = slave
