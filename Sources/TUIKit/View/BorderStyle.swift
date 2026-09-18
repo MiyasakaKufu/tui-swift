@@ -29,6 +29,19 @@ public struct BorderStyle: Hashable, Sendable {
         self.bottomRight = bottomRight
     }
 
+    /// 枠線に使う 8 文字。
+    public var characters: [Character] {
+        [topLeft, top, topRight, left, right, bottomLeft, bottom, bottomRight]
+    }
+
+    /// すべての文字が 1 桁に収まるか。
+    ///
+    /// 罫線素片は East Asian Width が Ambiguous なので、`DisplayWidth.ambiguousWidth`
+    /// が `.wide` のときは 2 桁になり、1 セル 1 文字で描く枠線が崩れる。
+    public var fitsInSingleColumn: Bool {
+        characters.allSatisfy { DisplayWidth.width(of: $0) == 1 }
+    }
+
     /// 細い実線。
     public static let single = BorderStyle(
         topLeft: "┌", top: "─", topRight: "┐",
