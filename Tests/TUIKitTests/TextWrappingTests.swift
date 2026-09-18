@@ -8,6 +8,26 @@ final class TextWrappingTests: XCTestCase {
         XCTAssertEqual(lines, ["a", "b"])
     }
 
+    func testCRLFSplitsLines() {
+        let lines = TextWrapping.wrap("ab\r\ncd", width: 10, mode: .none)
+        XCTAssertEqual(lines, ["ab", "cd"])
+    }
+
+    func testLoneCarriageReturnSplitsLines() {
+        let lines = TextWrapping.wrap("ab\rcd", width: 10, mode: .none)
+        XCTAssertEqual(lines, ["ab", "cd"])
+    }
+
+    func testCRLFSplitsLinesInWordMode() {
+        let lines = TextWrapping.wrap("the quick\r\nbrown fox", width: 10, mode: .word)
+        XCTAssertEqual(lines, ["the quick", "brown fox"])
+    }
+
+    func testTrailingCRLFProducesEmptyLastLine() {
+        XCTAssertEqual(TextWrapping.wrap("ab\r\n", width: 10, mode: .none), ["ab", ""])
+        XCTAssertEqual(TextWrapping.wrap("ab\r", width: 10, mode: .none), ["ab", ""])
+    }
+
     func testNoneModeTruncates() {
         let lines = TextWrapping.wrap("abcdef", width: 3, mode: .none)
         XCTAssertEqual(lines, ["abc"])

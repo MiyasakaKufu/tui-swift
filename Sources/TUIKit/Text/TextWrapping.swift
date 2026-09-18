@@ -15,9 +15,12 @@ public enum TextWrapping {
 
     /// `text` を幅 `width` に収まる行の配列へ分割する。
     ///
-    /// 改行文字は常に行の区切りとして扱う。
+    /// 改行文字は常に行の区切りとして扱う。LF（`\n`）だけでなく、
+    /// CRLF（`\r\n`）・単独の CR（`\r`）も 1 つの改行として扱う。
     public static func wrap(_ text: String, width: Int, mode: WrapMode) -> [String] {
-        let paragraphs = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        let paragraphs = text
+            .split(omittingEmptySubsequences: false, whereSeparator: { $0.isNewline })
+            .map(String.init)
         if width <= 0 { return paragraphs.map { _ in "" } }
 
         var lines: [String] = []

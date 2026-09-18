@@ -78,7 +78,7 @@ public struct Buffer: Hashable, Sendable {
 
         var x = position.x
         for character in text {
-            if character == "\n" { break }
+            if character.isNewline { break }
 
             let characterWidth = DisplayWidth.width(of: character)
             if characterWidth == 0 { continue }

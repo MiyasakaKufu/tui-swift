@@ -64,6 +64,18 @@ final class BufferTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), "   ")
     }
 
+    func testWriteStopsAtCRLF() {
+        var buffer = Buffer(size: Size(width: 5, height: 1))
+        buffer.write("ab\r\ncd", at: Point(x: 0, y: 0))
+        XCTAssertEqual(buffer.text(ofRow: 0), "ab   ")
+    }
+
+    func testWriteStopsAtLoneCarriageReturn() {
+        var buffer = Buffer(size: Size(width: 5, height: 1))
+        buffer.write("ab\rcd", at: Point(x: 0, y: 0))
+        XCTAssertEqual(buffer.text(ofRow: 0), "ab   ")
+    }
+
     func testWriteLinesWithAlignment() {
         var buffer = Buffer(size: Size(width: 7, height: 2))
         let bounds = buffer.bounds
