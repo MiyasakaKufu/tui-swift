@@ -17,8 +17,12 @@ public struct Point: Hashable, Sendable {
 
 /// 桁数・行数で表したサイズ。負の値は 0 に丸められる。
 public struct Size: Hashable, Sendable {
-    public var width: Int
-    public var height: Int
+    public var width: Int {
+        didSet { width = max(0, width) }
+    }
+    public var height: Int {
+        didSet { height = max(0, height) }
+    }
 
     public init(width: Int, height: Int) {
         self.width = max(0, width)
@@ -27,7 +31,7 @@ public struct Size: Hashable, Sendable {
 
     public static let zero = Size(width: 0, height: 0)
 
-    public var isEmpty: Bool { width == 0 || height == 0 }
+    public var isEmpty: Bool { width <= 0 || height <= 0 }
 
     /// 各辺を `other` 以下に切り詰めたサイズ。
     public func clamped(to other: Size) -> Size {
@@ -75,7 +79,8 @@ public struct Rect: Hashable, Sendable {
         return Rect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
     }
 
-    /// 内側に余白を取った矩形。余白が大きすぎる場合は幅・高さが 0 になる。
+    /// 内側に余白を取った矩形。余白は負にならないため、矩形が広がることはない。
+    /// 余白が大きすぎる場合は幅・高さが 0 になる。
     public func inset(by insets: EdgeInsets) -> Rect {
         Rect(
             x: minX + insets.leading,
@@ -90,18 +95,26 @@ public struct Rect: Hashable, Sendable {
     }
 }
 
-/// 上下左右の余白。
+/// 上下左右の余白。負の値は 0 に丸められる。
 public struct EdgeInsets: Hashable, Sendable {
-    public var top: Int
-    public var leading: Int
-    public var bottom: Int
-    public var trailing: Int
+    public var top: Int {
+        didSet { top = max(0, top) }
+    }
+    public var leading: Int {
+        didSet { leading = max(0, leading) }
+    }
+    public var bottom: Int {
+        didSet { bottom = max(0, bottom) }
+    }
+    public var trailing: Int {
+        didSet { trailing = max(0, trailing) }
+    }
 
     public init(top: Int = 0, leading: Int = 0, bottom: Int = 0, trailing: Int = 0) {
-        self.top = top
-        self.leading = leading
-        self.bottom = bottom
-        self.trailing = trailing
+        self.top = max(0, top)
+        self.leading = max(0, leading)
+        self.bottom = max(0, bottom)
+        self.trailing = max(0, trailing)
     }
 
     public init(all: Int) {

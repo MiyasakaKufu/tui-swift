@@ -135,11 +135,15 @@ public struct BackgroundView<Content: View>: View {
     }
 }
 
-/// サイズを固定するビュー。
+/// サイズを固定するビュー。負の幅・高さは 0 に丸められる。
 public struct FrameView<Content: View>: View {
     public var content: Content
-    public var width: Int?
-    public var height: Int?
+    public var width: Int? {
+        didSet { width = width.map { max(0, $0) } }
+    }
+    public var height: Int? {
+        didSet { height = height.map { max(0, $0) } }
+    }
     public var horizontalAlignment: HorizontalAlignment
     public var verticalAlignment: VerticalAlignment
 
@@ -151,8 +155,8 @@ public struct FrameView<Content: View>: View {
         verticalAlignment: VerticalAlignment = .top
     ) {
         self.content = content
-        self.width = width
-        self.height = height
+        self.width = width.map { max(0, $0) }
+        self.height = height.map { max(0, $0) }
         self.horizontalAlignment = horizontalAlignment
         self.verticalAlignment = verticalAlignment
     }
