@@ -38,15 +38,17 @@ targets: [
 ]
 ```
 
-最小限のアプリケーションは次のようになる。
+最小限のアプリケーションは次のようになる。`@main` を付けた型がそのままエントリポイントになる。
 
 ```swift
+// Sources/MyApp/Counter.swift
 import TUIKit
 
-final class Counter: Component {
+@main
+final class Counter: TerminalApp {
     private var count = 0
 
-    func body() -> any View {
+    var body: some View {
         VStack(spacing: 1) {
             Text("カウント: \(count)").bold()
             Text("↑↓ で増減、q で終了").dim()
@@ -66,8 +68,26 @@ final class Counter: Component {
         return .handled
     }
 }
+```
 
-try Application(root: Counter()).run()
+`@main` はファイル名 `main.swift` では使えないため、ファイル名は型名に合わせる。
+
+起動時の設定は `options` で変える。
+
+```swift
+static var options: ApplicationOptions {
+    ApplicationOptions(tracksMouse: true, frameInterval: 1.0 / 30)
+}
+```
+
+`handle(_:)` には既定実装（すべて `.ignored`）があるため、表示だけのアプリは `body` だけで書ける。
+raw モードでは Ctrl+C が SIGINT にならないので、`Component` が処理しなかった Ctrl+C は
+`ApplicationOptions.quitsOnControlC`（既定で有効）が終了させる。自前で扱うなら `false` にする。
+
+`Application` を直接組み立てることもできる。
+
+```swift
+try Application(root: Counter(), options: .default).run()
 ```
 
 同梱のデモは次で起動する。
@@ -86,11 +106,11 @@ swift run tui-demo
 | 文字 | `DisplayWidth`, `TextWrapping` | 表示幅の計算と折り返し |
 | ビュー | `View`, `VStack`, `HStack`, `Text`, 各種修飾子 | レイアウトと描画 |
 | 部品 | `ListView`, `TextField`, `ProgressBar` | 状態を持つウィジェット |
-| 実行 | `Application`, `Component` | イベントループ |
+| 実行 | `TerminalApp`, `Application`, `Component` | エントリポイントとイベントループ |
 
 ### 描画の流れ
 
-1. `Application` が `Component.body()` を呼んで `View` のツリーを組み立てる。
+1. `Application` が `Component.body` を読んで `View` のツリーを組み立てる。
 2. ツリーを `Buffer`（`Cell` の二次元配列）へ描画する。
 3. `Renderer` が前フレームの `Buffer` と比較し、変わったセルだけを書き出す。
 

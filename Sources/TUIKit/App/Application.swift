@@ -5,36 +5,10 @@ import Glibc
 #endif
 
 /// 端末を初期化し、入力・描画のループを回すアプリケーション。
-public final class Application {
+public final class Application<Root: Component> {
 
-    /// 起動時の設定。
-    public struct Options {
-        /// 代替画面バッファへ切り替える（終了時に元の画面が戻る）。
-        public var usesAlternateScreen: Bool
-        /// マウスイベントを受け取る。
-        public var tracksMouse: Bool
-        /// ブラケットペーストを有効にする。
-        public var usesBracketedPaste: Bool
-        /// 入力がなくても一定間隔で再描画する（秒）。`nil` なら入力があるまで待つ。
-        public var frameInterval: Double?
-
-        public init(
-            usesAlternateScreen: Bool = true,
-            tracksMouse: Bool = false,
-            usesBracketedPaste: Bool = true,
-            frameInterval: Double? = nil
-        ) {
-            self.usesAlternateScreen = usesAlternateScreen
-            self.tracksMouse = tracksMouse
-            self.usesBracketedPaste = usesBracketedPaste
-            self.frameInterval = frameInterval
-        }
-
-        public static let `default` = Options()
-    }
-
-    private let root: any Component
-    private let options: Options
+    private let root: Root
+    private let options: ApplicationOptions
     private let terminal: Terminal
     private let reader: InputReader
     private let renderer: Renderer
@@ -43,8 +17,8 @@ public final class Application {
     private var isRunning = false
 
     public init(
-        root: any Component,
-        options: Options = .default,
+        root: Root,
+        options: ApplicationOptions = .default,
         terminal: Terminal = Terminal()
     ) {
         self.root = root
@@ -104,10 +78,9 @@ public final class Application {
             }
 
             for event in events {
-                if root.handle(event) == .quit {
-                    isRunning = false
-                    break
-                }
+                if deliver(event) { continue }
+                isRunning = false
+                break
             }
 
             let now = monotonicSeconds()
@@ -119,6 +92,19 @@ public final class Application {
         terminal.setCursorVisible(true)
     }
 
+    /// イベントをルートへ渡す。ループを続けるなら `true` を返す。
+    private func deliver(_ event: InputEvent) -> Bool {
+        switch root.handle(event) {
+        case .quit:
+            return false
+        case .handled:
+            return true
+        case .ignored:
+            // ルートが処理しなかった Ctrl+C は最後の脱出口として扱う。
+            return !options.quits(onUnhandled: event)
+        }
+    }
+
     /// 1 フレーム分を描画する。
     private func draw() {
         let size = terminal.size()
@@ -128,7 +114,7 @@ public final class Application {
         }
         buffer.clear()
 
-        let view = root.body()
+        let view = root.body
         let bounds = buffer.bounds
         view.render(into: &buffer, rect: bounds)
         renderer.render(buffer, cursor: root.cursorPosition)

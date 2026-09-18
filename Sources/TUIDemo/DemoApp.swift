@@ -5,7 +5,10 @@ import TUIKit
 ///   swift run tui-demo
 ///
 /// 操作: ↑↓/jk で選択、Tab で入力欄と一覧を切り替え、+/- で進捗、q または Ctrl+C で終了。
-final class DemoComponent: Component {
+@main
+final class DemoApp: TerminalApp {
+    static var options: ApplicationOptions { ApplicationOptions(tracksMouse: true) }
+
     private let items = [
         "差分レンダリング",
         "全角文字・絵文字の幅計算",
@@ -24,7 +27,7 @@ final class DemoComponent: Component {
     private var isEditing = false
     private var terminalSize = Size(width: 0, height: 0)
 
-    func body() -> any View {
+    var body: some View {
         VStack(spacing: 0) {
             header()
             HStack(spacing: 1) {
@@ -87,8 +90,6 @@ final class DemoComponent: Component {
         .flexible(horizontal: 1, vertical: 0)
     }
 
-    var cursorPosition: Point? { nil }
-
     func handle(_ event: InputEvent) -> EventResult {
         lastEventDescription = describe(event)
 
@@ -98,7 +99,6 @@ final class DemoComponent: Component {
         }
 
         if case .key(let keyEvent) = event {
-            if keyEvent.isControl("c") { return .quit }
             if keyEvent.key == .tab {
                 isEditing.toggle()
                 return .handled
@@ -158,16 +158,4 @@ final class DemoComponent: Component {
         default: return String(describing: key)
         }
     }
-}
-
-let component = DemoComponent()
-let application = Application(
-    root: component,
-    options: Application.Options(tracksMouse: true)
-)
-
-do {
-    try application.run()
-} catch {
-    print("起動できませんでした: \(error)")
 }
