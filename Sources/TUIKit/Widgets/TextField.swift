@@ -5,7 +5,7 @@ public final class TextFieldState {
     public private(set) var cursor: Int
 
     public init(text: String = "") {
-        self.characters = Array(text)
+        self.characters = TextFieldState.sanitizedCharacters(of: text)
         self.cursor = characters.count
     }
 
@@ -21,19 +21,40 @@ public final class TextFieldState {
     }
 
     public func setText(_ text: String) {
-        characters = Array(text)
+        characters = TextFieldState.sanitizedCharacters(of: text)
         cursor = characters.count
     }
 
+    /// 1 文字を挿入する。制御文字は `sanitized(_:)` の規則で置き換え、または捨てる。
     public func insert(_ character: Character) {
-        characters.insert(character, at: cursor)
+        guard let allowed = TextFieldState.sanitized(character) else { return }
+        characters.insert(allowed, at: cursor)
         cursor += 1
     }
 
+    /// 文字列を挿入する。貼り付けもここを通る。
     public func insert(contentsOf text: String) {
-        for character in text where character != "\n" {
+        for character in text {
             insert(character)
         }
+    }
+
+    /// 1 行の入力欄に置ける文字へ整える。捨てる文字には `nil` を返す。
+    ///
+    /// 改行（`\r\n` は 1 つの `Character` なのでまとめて 1 つ）とタブは空白 1 個に置き換え、
+    /// ほかの制御文字は取り除く。幅 0 の制御文字が残るとカーソル移動が
+    /// 止まったように見えるため、入力経路のすべてでこの判定を通す。
+    private static func sanitized(_ character: Character) -> Character? {
+        if character.isNewline || character == "\t" { return " " }
+        guard let first = character.unicodeScalars.first else { return nil }
+        if first.value < 0x20 || (first.value >= 0x7F && first.value < 0xA0) {
+            return nil
+        }
+        return character
+    }
+
+    private static func sanitizedCharacters(of text: String) -> [Character] {
+        text.compactMap { sanitized($0) }
     }
 
     @discardableResult

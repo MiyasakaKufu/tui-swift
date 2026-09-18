@@ -164,8 +164,68 @@ final class WidgetTests: XCTestCase {
 
     func testTextFieldHandlesPaste() {
         let state = TextFieldState()
-        XCTAssertTrue(state.handle(.paste("xy\nz")))
+        XCTAssertTrue(state.handle(.paste("xyz")))
         XCTAssertEqual(state.text, "xyz")
+    }
+
+    func testTextFieldPasteTurnsNewlinesIntoSpace() {
+        let state = TextFieldState()
+        state.handle(.paste("a\rb"))
+        XCTAssertEqual(state.text, "a b")
+        XCTAssertEqual(state.cursor, 3)
+
+        let crlf = TextFieldState()
+        crlf.handle(.paste("a\r\nb"))
+        XCTAssertEqual(crlf.text, "a b")
+        XCTAssertEqual(crlf.cursor, 3)
+
+        let lf = TextFieldState()
+        lf.handle(.paste("a\nb"))
+        XCTAssertEqual(lf.text, "a b")
+    }
+
+    func testTextFieldPasteTurnsTabIntoSpace() {
+        let state = TextFieldState()
+        state.handle(.paste("a\tb"))
+        XCTAssertEqual(state.text, "a b")
+        XCTAssertEqual(state.cursor, 3)
+    }
+
+    func testTextFieldPasteDropsOtherControlCharacters() {
+        let state = TextFieldState()
+        state.handle(.paste("a\u{07}b\u{1B}c\u{7F}d\u{9B}e"))
+        XCTAssertEqual(state.text, "abcde")
+        XCTAssertEqual(state.cursor, 5)
+    }
+
+    func testTextFieldSanitizedTextKeepsCursorMovable() {
+        let state = TextFieldState()
+        state.handle(.paste("a\r\nb"))
+        state.moveToStart()
+        state.moveRight()
+        XCTAssertEqual(state.cursorColumn, 1)
+        state.moveRight()
+        XCTAssertEqual(state.cursorColumn, 2)
+    }
+
+    func testTextFieldInsertSanitizesControlCharacters() {
+        let state = TextFieldState()
+        state.insert("a")
+        state.insert("\n")
+        state.insert("\u{07}")
+        state.insert("b")
+        XCTAssertEqual(state.text, "a b")
+        XCTAssertEqual(state.cursor, 3)
+    }
+
+    func testTextFieldInitialTextAndSetTextAreSanitized() {
+        let state = TextFieldState(text: "a\tb")
+        XCTAssertEqual(state.text, "a b")
+        XCTAssertEqual(state.cursor, 3)
+
+        state.setText("c\r\nd\u{07}")
+        XCTAssertEqual(state.text, "c d")
+        XCTAssertEqual(state.cursor, 3)
     }
 
     func testTextFieldRendersPlaceholder() {
