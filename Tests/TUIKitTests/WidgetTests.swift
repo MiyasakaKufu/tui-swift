@@ -180,4 +180,32 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(field.scrollOffset(forWidth: 4), 3)
         XCTAssertEqual(render(field, width: 4, height: 1), "def ")
     }
+
+    func testEmptyTextFieldShowsCursorOverPlaceholder() {
+        let field = TextField(state: TextFieldState(), placeholder: "入力")
+        var buffer = Buffer(size: Size(width: 10, height: 1))
+        let bounds = buffer.bounds
+        field.render(into: &buffer, rect: bounds)
+
+        XCTAssertTrue(buffer[0, 0].style.attributes.contains(.reverse))
+        XCTAssertEqual(buffer.debugText(), "入力      ")
+    }
+
+    func testEmptyTextFieldWithoutPlaceholderShowsCursor() {
+        let field = TextField(state: TextFieldState())
+        var buffer = Buffer(size: Size(width: 4, height: 1))
+        let bounds = buffer.bounds
+        field.render(into: &buffer, rect: bounds)
+
+        XCTAssertTrue(buffer[0, 0].style.attributes.contains(.reverse))
+    }
+
+    func testPlaceholderHasNoCursorWhenCursorHidden() {
+        let field = TextField(state: TextFieldState(), placeholder: "name", showsCursor: false)
+        var buffer = Buffer(size: Size(width: 6, height: 1))
+        let bounds = buffer.bounds
+        field.render(into: &buffer, rect: bounds)
+
+        XCTAssertFalse(buffer[0, 0].style.attributes.contains(.reverse))
+    }
 }

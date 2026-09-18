@@ -169,20 +169,22 @@ public struct TextField: View {
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard rect.width > 0, rect.height > 0 else { return }
         let row = Rect(x: rect.minX, y: rect.minY, width: rect.width, height: 1)
+        buffer.fill(row, with: Cell(character: " ", style: style))
 
         if state.isEmpty && !placeholder.isEmpty {
-            buffer.fill(row, with: Cell(character: " ", style: style))
             buffer.write(
                 DisplayWidth.truncate(placeholder, to: rect.width),
                 at: Point(x: rect.minX, y: rect.minY),
                 style: placeholderStyle,
                 clippedTo: row
             )
+            // 空でもどこに入力されるか分かるよう、プレースホルダーの先頭セルに
+            // カーソルを重ねる。表示幅は変わらない。
+            drawCursor(into: &buffer, at: Point(x: rect.minX, y: rect.minY), in: rect)
             return
         }
 
         let offset = scrollOffset(forWidth: rect.width)
-        buffer.fill(row, with: Cell(character: " ", style: style))
         buffer.write(
             state.text,
             at: Point(x: rect.minX - offset, y: rect.minY),
@@ -190,14 +192,19 @@ public struct TextField: View {
             clippedTo: row
         )
 
-        if showsCursor {
-            let x = rect.minX + state.cursorColumn - offset
-            if x >= rect.minX && x < rect.maxX {
-                var cell = buffer[x, rect.minY]
-                cell.style = cell.style.adding(.reverse)
-                cell.isContinuation = false
-                buffer[x, rect.minY] = cell
-            }
-        }
+        drawCursor(
+            into: &buffer,
+            at: Point(x: rect.minX + state.cursorColumn - offset, y: rect.minY),
+            in: rect
+        )
+    }
+
+    /// カーソル位置のセルを反転させる。
+    private func drawCursor(into buffer: inout Buffer, at point: Point, in rect: Rect) {
+        guard showsCursor, point.x >= rect.minX, point.x < rect.maxX else { return }
+        var cell = buffer[point.x, point.y]
+        cell.style = cell.style.adding(.reverse)
+        cell.isContinuation = false
+        buffer[point.x, point.y] = cell
     }
 }
