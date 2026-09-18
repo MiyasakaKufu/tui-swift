@@ -44,6 +44,35 @@ final class InputParserTests: XCTestCase {
         XCTAssertEqual(events(bytes("\u{1B}OP")), [.key(KeyEvent(.function(1)))])
     }
 
+    func testFunctionKeysOneToFourWithModifiers() {
+        XCTAssertEqual(
+            events(bytes("\u{1B}[1;2P")),
+            [.key(KeyEvent(.function(1), modifiers: .shift))]
+        )
+        XCTAssertEqual(
+            events(bytes("\u{1B}[1;3Q")),
+            [.key(KeyEvent(.function(2), modifiers: .alt))]
+        )
+        XCTAssertEqual(
+            events(bytes("\u{1B}[1;5R")),
+            [.key(KeyEvent(.function(3), modifiers: .control))]
+        )
+        XCTAssertEqual(
+            events(bytes("\u{1B}[1;5S")),
+            [.key(KeyEvent(.function(4), modifiers: .control))]
+        )
+        XCTAssertEqual(
+            events(bytes("\u{1B}[1;8P")),
+            [.key(KeyEvent(.function(1), modifiers: [.shift, .alt, .control]))]
+        )
+    }
+
+    /// 修飾パラメータのない `CSI P`〜`CSI S` も F1〜F4 として扱う。
+    func testFunctionKeysOneToFourWithoutModifiers() {
+        XCTAssertEqual(events(bytes("\u{1B}[P")), [.key(KeyEvent(.function(1)))])
+        XCTAssertEqual(events(bytes("\u{1B}[S")), [.key(KeyEvent(.function(4)))])
+    }
+
     func testFunctionKeyFromTildeSequence() {
         XCTAssertEqual(events(bytes("\u{1B}[15~")), [.key(KeyEvent(.function(5)))])
     }
