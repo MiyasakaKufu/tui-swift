@@ -1,3 +1,6 @@
+// glibc では posix_openpt などの宣言に必要。Darwin では既定で宣言されている。
+#define _GNU_SOURCE 1
+
 #include "include/ctui_test_support.h"
 
 #include <fcntl.h>

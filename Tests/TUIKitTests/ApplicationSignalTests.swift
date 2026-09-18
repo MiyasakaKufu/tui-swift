@@ -1,4 +1,5 @@
 import XCTest
+import Dispatch
 import Foundation
 import CTUITestSupport
 @testable import TUIKit
@@ -57,6 +58,23 @@ final class ApplicationSignalTests: XCTestCase {
         wait(for: [run.finished], timeout: 5)
 
         XCTAssertNil(run.error.value)
+    }
+
+    /// シグナルハンドラが、起こすためのパイプへ書き込む。
+    func testSignalWritesToWakeupDescriptor() throws {
+        SignalWatcher.install()
+        let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
+
+        // 他のテストが残した合図を片付けてから確かめる。
+        discard(descriptor)
+        _ = SignalWatcher.consumeWindowResize()
+
+        raise(SIGWINCH)
+
+        XCTAssertTrue(isReadable(descriptor), "シグナルでパイプへ書き込まれていない")
+        XCTAssertTrue(SignalWatcher.consumeWindowResize())
+
+        discard(descriptor)
     }
 
     /// 起こすための記述子が読めるようになれば、入力がなくても待ちが終わる。
@@ -165,6 +183,9 @@ private final class TerminationProbe: Component, @unchecked Sendable {
 }
 
 /// テスト用の疑似端末。
+///
+/// マスタ側を読み続けるスレッドを持つ。誰も読まないと出力バッファが詰まり、
+/// スレーブ側への `write(2)` や、出力の掃き出しを待つ `tcsetattr(TCSAFLUSH)` が返らなくなる。
 private final class PseudoTerminal {
     enum Failure: Error {
         case unavailable(errno: Int32)
@@ -172,7 +193,10 @@ private final class PseudoTerminal {
 
     let master: Int32
     let slave: Int32
+
     private var isClosed = false
+    private let stopsDraining = AtomicFlag()
+    private let drainingStopped = DispatchSemaphore(value: 0)
 
     init() throws {
         var master: Int32 = -1
@@ -182,6 +206,7 @@ private final class PseudoTerminal {
         }
         self.master = master
         self.slave = slave
+        startDraining()
     }
 
     deinit {
@@ -196,8 +221,52 @@ private final class PseudoTerminal {
     func close() {
         guard !isClosed else { return }
         isClosed = true
+        // 読み捨てスレッドが記述子を触らなくなってから閉じる。
+        stopsDraining.set()
+        drainingStopped.wait()
         closeDescriptor(slave)
         closeDescriptor(master)
+    }
+
+    private func startDraining() {
+        let master = self.master
+        let stopsDraining = self.stopsDraining
+        let drainingStopped = self.drainingStopped
+
+        Thread.detachNewThread {
+            var scratch = [UInt8](repeating: 0, count: 4096)
+            while !stopsDraining.isSet {
+                var descriptor = pollfd(fd: master, events: Int16(POLLIN), revents: 0)
+                guard poll(&descriptor, 1, 50) > 0 else { continue }
+
+                let count = scratch.withUnsafeMutableBufferPointer { buffer -> Int in
+                    guard let base = buffer.baseAddress else { return 0 }
+                    return read(master, base, buffer.count)
+                }
+                if count > 0 { continue }
+                if count < 0 && (errno == EINTR || errno == EAGAIN) { continue }
+                break
+            }
+            drainingStopped.signal()
+        }
+    }
+}
+
+/// スレッドをまたいで使う真偽値。
+private final class AtomicFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+
+    var isSet: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+
+    func set() {
+        lock.lock()
+        value = true
+        lock.unlock()
     }
 }
 
@@ -244,4 +313,22 @@ private final class PipePair {
 /// `close(2)`。型のメソッド名と衝突しないよう、ファイルスコープの関数として定義している。
 private func closeDescriptor(_ descriptor: Int32) {
     _ = close(descriptor)
+}
+
+/// 未読のバイトがあるか。
+private func isReadable(_ descriptor: Int32) -> Bool {
+    var polled = pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)
+    return poll(&polled, 1, 0) > 0
+}
+
+/// 未読のバイトを読み捨てる。非ブロッキングな記述子であること。
+private func discard(_ descriptor: Int32) {
+    var scratch = [UInt8](repeating: 0, count: 64)
+    while isReadable(descriptor) {
+        let count = scratch.withUnsafeMutableBufferPointer { buffer -> Int in
+            guard let base = buffer.baseAddress else { return 0 }
+            return read(descriptor, base, buffer.count)
+        }
+        if count <= 0 { break }
+    }
 }
