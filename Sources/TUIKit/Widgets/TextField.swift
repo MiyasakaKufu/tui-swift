@@ -157,13 +157,21 @@ public struct TextField: View {
     }
 
     /// 与えられた幅のとき、先頭何桁分をスクロールして隠すか。
+    ///
+    /// カーソルを収めるのに必要な桁数を求めたあと、先頭から文字幅を積算して
+    /// 文字の区切りまで切り上げる。全角文字の途中で切れて左端が空白になるのを避ける。
     public func scrollOffset(forWidth width: Int) -> Int {
         guard width > 0 else { return 0 }
         let column = state.cursorColumn
-        if column >= width {
-            return column - width + 1
+        guard column >= width else { return 0 }
+
+        let required = column - width + 1
+        var offset = 0
+        for character in state.text {
+            if offset >= required { break }
+            offset += DisplayWidth.width(of: character)
         }
-        return 0
+        return offset
     }
 
     public func render(into buffer: inout Buffer, rect: Rect) {

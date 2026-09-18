@@ -181,6 +181,43 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(render(field, width: 4, height: 1), "def ")
     }
 
+    func testScrolledTextFieldDoesNotShowHalfOfWideCharacter() {
+        let state = TextFieldState(text: "あいう")
+        let field = TextField(state: state, showsCursor: false)
+        // 必要なスクロール量は 3 桁だが、「い」の途中で切れないよう 4 桁へ切り上げる。
+        XCTAssertEqual(field.scrollOffset(forWidth: 4), 4)
+        XCTAssertEqual(render(field, width: 4, height: 1), "う  ")
+    }
+
+    func testTextFieldScrollsToCharacterBoundaryWithMixedWidths() {
+        let state = TextFieldState(text: "aあbい")
+        let field = TextField(state: state, showsCursor: false)
+        XCTAssertEqual(field.scrollOffset(forWidth: 4), 3)
+        XCTAssertEqual(render(field, width: 4, height: 1), "bい ")
+    }
+
+    func testTextFieldScrollOffsetAlwaysLandsOnCharacterBoundary() {
+        let state = TextFieldState()
+        let field = TextField(state: state, showsCursor: false)
+        for character in "aあiい漢x字" {
+            state.insert(character)
+            for width in 1...6 {
+                let offset = field.scrollOffset(forWidth: width)
+                var boundaries: Set<Int> = [0]
+                var column = 0
+                for existing in state.text {
+                    column += DisplayWidth.width(of: existing)
+                    boundaries.insert(column)
+                }
+                XCTAssertTrue(
+                    boundaries.contains(offset),
+                    "幅 \(width)・内容 \(state.text) でスクロール量 \(offset) が文字の区切りにない"
+                )
+                XCTAssertLessThan(state.cursorColumn - offset, width)
+            }
+        }
+    }
+
     func testEmptyTextFieldShowsCursorOverPlaceholder() {
         let field = TextField(state: TextFieldState(), placeholder: "入力")
         var buffer = Buffer(size: Size(width: 10, height: 1))
