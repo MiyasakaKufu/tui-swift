@@ -23,6 +23,8 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
 - **宣言的なレイアウト** — `VStack` / `HStack` / `Spacer` / `border` などを組み合わせて画面を記述する。
 - **入力の解析** — 矢印キー、ファンクションキー、修飾キー、マウス（SGR 1006）、
   ブラケットペーストを解釈する。分割して届いたシーケンスも正しく扱う。
+  端末が対応していれば kitty keyboard protocol を使い、Ctrl+I と Tab のように
+  従来は同じバイト列だったキーを区別する。
 - **IME への対応** — 入力欄は描画のたびに `TextFieldState.renderedCursorPoint` へ
   端末カーソルを置くべき位置を記録する。`Component.cursorPosition` でそれを返すと、
   変換中の文字と変換候補が入力欄の位置に出る。
@@ -90,6 +92,10 @@ static var options: ApplicationOptions {
 マウス（`tracksMouse`）とフォーカス通知（`reportsFocus`）は既定で無効になっている。
 有効にした端末だけが `.mouse` / `.focus` を送ってくるため、使うアプリが明示的に有効にする。
 
+kitty keyboard protocol（`usesKeyboardProtocol`）は既定で有効になっている。起動時に端末へ
+対応状況を問い合わせ、対応していれば有効にする。対応していない端末では、従来どおり
+時間切れでキーを確定させる。問い合わせを送りたくないアプリだけ `false` にする。
+
 `handle(_:)` には既定実装（すべて `.ignored`）があるため、表示だけのアプリは `body` だけで書ける。
 raw モードでは Ctrl+C が SIGINT にならないので、`Component` が処理しなかった Ctrl+C は
 `ApplicationOptions.quitsOnControlC`（既定で有効）が終了させる。自前で扱うなら `false` にする。
@@ -100,7 +106,7 @@ Ctrl+Z も同じくシグナルにならないため、処理しなかった Ctr
 
 外から SIGINT / SIGQUIT / SIGTERM / SIGHUP を受けたときはイベントループを終えて端末を戻す。
 `fatalError` や範囲外アクセスで落ちたときも、シグナルハンドラが raw モード・代替画面・
-マウス受信・ブラケットペーストを元に戻してから、本来のクラッシュ処理へ進む。
+マウス受信・ブラケットペースト・キーの形式を元に戻してから、本来のクラッシュ処理へ進む。
 
 `Application` を直接組み立てることもできる。
 
@@ -183,6 +189,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | 修飾 | Ctrl, Alt, Shift（CSI の修飾パラメータを解釈） |
 | マウス | 押下・解放・ドラッグ・ホイール 4 方向・拡張ボタン（SGR 1006） |
 | その他 | ブラケットペースト、フォーカス通知（`reportsFocus` で有効にしたとき） |
+| kitty | CSI u 形式のキー（F13〜F35、テンキー、Ctrl+I と Tab の区別） |
 
 ## 動作環境
 

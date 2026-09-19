@@ -33,6 +33,7 @@ public final class Terminal: TerminalOutput {
     private var isMouseTrackingEnabled = false
     private var isBracketedPasteEnabled = false
     private var isFocusReportingEnabled = false
+    private var isKeyboardProtocolEnabled = false
 
     /// 入出力のファイル記述子を指定して端末を作る。
     ///
@@ -217,6 +218,22 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
+    /// kitty keyboard protocol を切り替える。
+    ///
+    /// 有効にすると、Ctrl+I と Tab のように従来は同じバイト列になるキーが区別でき、
+    /// Escape や Alt+[ の続きを時間切れで待つ必要がなくなる。
+    ///
+    /// - Parameters:
+    ///   - enabled: 有効にするなら `true`。
+    /// - Note: 対応しない端末は制御コードを読み飛ばすため、有効にしても何も変わらない。
+    ///   対応しているかは `ANSI.queryKeyboardProtocol` で問い合わせる。
+    public func setKeyboardProtocolEnabled(_ enabled: Bool) {
+        guard enabled != isKeyboardProtocolEnabled else { return }
+        isKeyboardProtocolEnabled = enabled
+        write(enabled ? ANSI.enableKeyboardProtocol : ANSI.disableKeyboardProtocol)
+        flush()
+    }
+
     /// 端末を起動前の状態へ戻す。
     ///
     /// - Note: 二重に呼んでも安全。
@@ -226,6 +243,7 @@ public final class Terminal: TerminalOutput {
         isMouseTrackingEnabled = false
         isBracketedPasteEnabled = false
         isFocusReportingEnabled = false
+        isKeyboardProtocolEnabled = false
         disableRawMode()
     }
 
@@ -235,6 +253,7 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Postcondition: `reactivate()` で同じ設定へ戻せる。二重に呼んでも安全。
     public func deactivate() {
+        if isKeyboardProtocolEnabled { write(ANSI.disableKeyboardProtocol) }
         if isMouseTrackingEnabled { write(ANSI.disableMouseTracking) }
         if isBracketedPasteEnabled { write(ANSI.disableBracketedPaste) }
         if isFocusReportingEnabled { write(ANSI.disableFocusReporting) }
@@ -264,6 +283,7 @@ public final class Terminal: TerminalOutput {
         if isMouseTrackingEnabled { write(ANSI.enableMouseTracking) }
         if isBracketedPasteEnabled { write(ANSI.enableBracketedPaste) }
         if isFocusReportingEnabled { write(ANSI.enableFocusReporting) }
+        if isKeyboardProtocolEnabled { write(ANSI.enableKeyboardProtocol) }
         flush()
     }
 

@@ -273,4 +273,104 @@ final class InputParserTests: XCTestCase {
         XCTAssertEqual(events(bytes("\u{1B}[I")), [.focus(true)])
         XCTAssertEqual(events(bytes("\u{1B}[O")), [.focus(false)])
     }
+
+    // MARK: - kitty keyboard protocol
+
+    /// `CSI u` 形式では、同じバイト列になっていたキーが別のキーとして届く。
+    func testKeyboardProtocolDisambiguatesControlKeys() {
+        XCTAssertEqual(
+            events(bytes("\u{1B}[105;5u")),
+            [.key(KeyEvent(.character("i"), modifiers: .control))]
+        )
+        XCTAssertEqual(events(bytes("\u{1B}[9u")), [.key(KeyEvent(.tab))])
+        XCTAssertEqual(
+            events(bytes("\u{1B}[109;5u")),
+            [.key(KeyEvent(.character("m"), modifiers: .control))]
+        )
+        XCTAssertEqual(events(bytes("\u{1B}[13u")), [.key(KeyEvent(.enter))])
+    }
+
+    /// `CSI u` 形式の Escape・Backspace も、時間切れを待たずに確定する。
+    func testKeyboardProtocolNamedKeys() {
+        XCTAssertEqual(events(bytes("\u{1B}[27u")), [.key(KeyEvent(.escape))])
+        XCTAssertEqual(events(bytes("\u{1B}[127u")), [.key(KeyEvent(.backspace))])
+        XCTAssertEqual(
+            events(bytes("\u{1B}[27;3u")),
+            [.key(KeyEvent(.escape, modifiers: .alt))]
+        )
+    }
+
+    /// Shift+Tab は、形式が変わっても `CSI Z` と同じキーになる。
+    func testKeyboardProtocolShiftTabMatchesLegacyBackTab() {
+        XCTAssertEqual(events(bytes("\u{1B}[9;2u")), events(bytes("\u{1B}[Z")))
+        XCTAssertEqual(events(bytes("\u{1B}[9;2u")), [.key(KeyEvent(.backTab))])
+        XCTAssertEqual(
+            events(bytes("\u{1B}[9;6u")),
+            [.key(KeyEvent(.backTab, modifiers: .control))]
+        )
+    }
+
+    /// 私用領域のキーコードは、対応するキーが無ければ文字にしない。
+    func testKeyboardProtocolFunctionalKeys() {
+        XCTAssertEqual(events(bytes("\u{1B}[57376u")), [.key(KeyEvent(.function(13)))])
+        XCTAssertEqual(events(bytes("\u{1B}[57399u")), [.key(KeyEvent(.character("0")))])
+        XCTAssertEqual(events(bytes("\u{1B}[57414u")), [.key(KeyEvent(.enter))])
+        XCTAssertEqual(events(bytes("\u{1B}[57417u")), [.key(KeyEvent(.left))])
+        // 57358 は Caps Lock。
+        XCTAssertEqual(events(bytes("\u{1B}[57358u")), [])
+    }
+
+    /// 下位パラメータ（`:`）は、上位のパラメータへ混ざらない。
+    func testKeyboardProtocolSubParametersDoNotMergeIntoModifiers() {
+        XCTAssertEqual(
+            events(bytes("\u{1B}[97;2:1u")),
+            [.key(KeyEvent(.character("a"), modifiers: .shift))]
+        )
+        // 下位パラメータを読み飛ばすと `2:1` が 21 になり、Ctrl が付いて見える。
+        guard case .key(let keyEvent)? = events(bytes("\u{1B}[97;2:1u")).first else {
+            return XCTFail("キーイベントが得られなかった")
+        }
+        XCTAssertFalse(keyEvent.modifiers.contains(.control))
+    }
+
+    /// 代替キーコード（`:`）が付いていても、先頭のキーコードで解釈する。
+    func testKeyboardProtocolAlternateKeyCodesAreIgnored() {
+        XCTAssertEqual(
+            events(bytes("\u{1B}[97:65;2u")),
+            [.key(KeyEvent(.character("a"), modifiers: .shift))]
+        )
+    }
+
+    /// キーを離した通知は、押したときと同じキーを二重に届けない。
+    func testKeyboardProtocolReleaseIsIgnored() {
+        XCTAssertEqual(events(bytes("\u{1B}[97;1:3u")), [])
+        XCTAssertEqual(events(bytes("\u{1B}[97;1:1u")), [.key(KeyEvent(.character("a")))])
+        // 種別 2 はキーリピート。
+        XCTAssertEqual(events(bytes("\u{1B}[97;1:2u")), [.key(KeyEvent(.character("a")))])
+    }
+
+    /// 対応状況の応答はキーではなく、応答として取り出せる。
+    func testKeyboardProtocolReplyIsNotAKey() {
+        var parser = InputParser()
+        XCTAssertEqual(parser.feed(bytes("\u{1B}[?1u")), [])
+        XCTAssertEqual(parser.takeReplies(), [.keyboardProtocol(flags: 1)])
+        XCTAssertEqual(parser.takeReplies(), [])
+    }
+
+    /// 装置属性の応答はキーではなく、応答として取り出せる。
+    func testDeviceAttributesReplyIsNotAKey() {
+        var parser = InputParser()
+        XCTAssertEqual(parser.feed(bytes("\u{1B}[?62;9;c")), [])
+        XCTAssertEqual(parser.takeReplies(), [.deviceAttributes])
+    }
+
+    /// 応答とキーが続けて届いても、キーは失われない。
+    func testRepliesAndKeysArriveTogether() {
+        var parser = InputParser()
+        XCTAssertEqual(
+            parser.feed(bytes("\u{1B}[?1u\u{1B}[?62;ca")),
+            [.key(KeyEvent(.character("a")))]
+        )
+        XCTAssertEqual(parser.takeReplies(), [.keyboardProtocol(flags: 1), .deviceAttributes])
+    }
 }

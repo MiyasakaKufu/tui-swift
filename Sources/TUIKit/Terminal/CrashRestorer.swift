@@ -14,7 +14,8 @@ enum CrashRestorer {
 
     /// 端末を戻すために書き出す制御コード。
     static let restoreSequence =
-        ANSI.disableMouseTracking
+        ANSI.disableKeyboardProtocol
+        + ANSI.disableMouseTracking
         + ANSI.disableBracketedPaste
         + ANSI.disableFocusReporting
         + ANSI.exitAlternateScreen

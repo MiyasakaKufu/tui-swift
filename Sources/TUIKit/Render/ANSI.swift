@@ -39,6 +39,21 @@ public enum ANSI {
     /// フォーカス変化の通知を止める。
     public static let disableFocusReporting = "\u{1B}[?1004l"
 
+    /// kitty keyboard protocol の対応状況を問い合わせる。
+    ///
+    /// - Note: 対応する端末だけが `CSI ? <flags> u` を返す。対応しない端末は何も返さない。
+    public static let queryKeyboardProtocol = "\u{1B}[?u"
+    /// 端末の種別を問い合わせる。
+    ///
+    /// - Note: どの端末も `CSI ? <params> c` を返すため、先に送った問い合わせの応答が
+    ///   出揃ったことを知る目印に使える。
+    public static let queryDeviceAttributes = "\u{1B}[c"
+
+    /// キーの曖昧さを解消する形式（kitty keyboard protocol の flag 1）でキーを受け取る。
+    public static let enableKeyboardProtocol = "\u{1B}[=1u"
+    /// kitty keyboard protocol のすべてのフラグを落とし、従来の形式へ戻す。
+    public static let disableKeyboardProtocol = "\u{1B}[=0u"
+
     /// カーソルを移動するシーケンスを組み立てる。
     ///
     /// - Parameters:

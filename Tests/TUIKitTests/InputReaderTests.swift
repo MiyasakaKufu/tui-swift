@@ -79,6 +79,44 @@ final class InputReaderTests: XCTestCase {
         XCTAssertEqual(reader.wait(timeout: 5), [])
     }
 
+    /// 装置属性の応答が届いた時点で、待ち時間を使い切らずに戻る。
+    func testQueryRepliesReturnOnceDeviceAttributesArrive() throws {
+        let input = try PipePair()
+        defer { input.close() }
+        let reader = InputReader(descriptor: input.readEnd)
+
+        input.send("\u{1B}[?1u\u{1B}[?62;c")
+        let started = Date()
+        XCTAssertEqual(
+            reader.waitForQueryReplies(timeout: 5),
+            [.keyboardProtocol(flags: 1), .deviceAttributes]
+        )
+        XCTAssertLessThan(Date().timeIntervalSince(started), 1)
+    }
+
+    /// 応答しない端末では、待ち時間が過ぎたら応答なしとして戻る。
+    func testQueryRepliesGiveUpAfterTimeout() throws {
+        let input = try PipePair()
+        defer { input.close() }
+        let reader = InputReader(descriptor: input.readEnd)
+
+        XCTAssertEqual(reader.waitForQueryReplies(timeout: 0.1), [])
+    }
+
+    /// 応答を待つ間に届いたキーは捨てず、次の待ちで返す。
+    func testKeysArrivingWhileWaitingForRepliesAreKept() throws {
+        let input = try PipePair()
+        defer { input.close() }
+        let reader = InputReader(descriptor: input.readEnd)
+
+        input.send("a\u{1B}[?1u\u{1B}[?62;c")
+        XCTAssertEqual(
+            reader.waitForQueryReplies(timeout: 5),
+            [.keyboardProtocol(flags: 1), .deviceAttributes]
+        )
+        XCTAssertEqual(reader.wait(timeout: 0.1), [.key(KeyEvent(.character("a")))])
+    }
+
     /// 入力が閉じていれば、待ち時間を使い切らずに戻る。
     func testClosedInputReturnsWithoutWaiting() throws {
         let input = try PipePair()

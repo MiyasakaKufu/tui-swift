@@ -13,6 +13,9 @@ public final class InputReader {
     /// 未解釈のバイトを最後に受け取った時刻。続きを待つ時間はここから測る。
     private var pendingSince: Double?
 
+    /// 応答を待つ間に届き、まだ返していないイベント。
+    private var bufferedEvents: [InputEvent] = []
+
     /// 入力待ちを中断させるための記述子。
     ///
     /// `SignalWatcher.wakeupDescriptor` を渡すことを想定している。
@@ -36,11 +39,19 @@ public final class InputReader {
     /// 途中までしか届いていない制御コードは、続きを待つ時間が過ぎるまで確定させない。
     /// 待ち時間は呼び出しをまたいで測るので、`timeout` より長くなることもある。
     ///
+    /// `waitForQueryReplies(timeout:)` が待つ間に届いたイベントが残っていれば、待たずに返す。
+    ///
     /// - Parameters:
     ///   - timeout: 待ち時間（秒）。`nil` ならイベントが届くまで待つ。
     /// - Returns: 解釈できたイベント。
     ///   タイムアウトしたときや、`wakeupDescriptor` で起こされたときは空配列。
     public func wait(timeout: Double?) -> [InputEvent] {
+        if !bufferedEvents.isEmpty {
+            let events = bufferedEvents
+            bufferedEvents.removeAll()
+            return events
+        }
+
         let deadline = timeout.map { monotonicSeconds() + max(0, $0) }
 
         while true {
@@ -49,7 +60,7 @@ public final class InputReader {
             }
             let readiness = waitForReadable(
                 descriptor,
-                wakeupDescriptor,
+                wakeup: wakeupDescriptor,
                 InputReader.milliseconds(until: earlier(deadline, flushDeadline))
             )
 
@@ -76,6 +87,41 @@ public final class InputReader {
                 if let deadline, now >= deadline { return [] }
             }
         }
+    }
+
+    /// 端末へ送った問い合わせの応答を、装置属性の応答が届くまで待つ。
+    ///
+    /// 装置属性（`CSI c`）の応答は、それより前に送った問い合わせの応答が出揃った目印になる。
+    /// 呼ぶ前に、確かめたい問い合わせと続けて `ANSI.queryDeviceAttributes` も送っておく。
+    ///
+    /// - Parameters:
+    ///   - timeout: 待ち時間（秒）。
+    /// - Returns: 届いた応答。何も届かないまま時間切れになれば空配列。
+    /// - Postcondition: 待つ間に届いたキーやマウスのイベントは捨てず、次の `wait(timeout:)` で返す。
+    public func waitForQueryReplies(timeout: Double) -> [TerminalReply] {
+        let deadline = monotonicSeconds() + max(0, timeout)
+        var replies: [TerminalReply] = []
+
+        while monotonicSeconds() < deadline {
+            // ここでは読み捨てないので、渡すと `poll(2)` が即座に返り続け、時間切れまで空回りする。
+            let readiness = waitForReadable(
+                descriptor,
+                wakeup: nil,
+                InputReader.milliseconds(until: deadline)
+            )
+            guard readiness.contains(.input) else { continue }
+
+            let (events, byteCount) = readAvailable()
+            bufferedEvents.append(contentsOf: events)
+            pendingSince = parser.hasPendingBytes ? monotonicSeconds() : nil
+            replies.append(contentsOf: parser.takeReplies())
+
+            // 閉じた記述子はいつでも読み取り可能になる。読めたバイト数を見ずに待ち直すと、
+            // 入力が閉じた後は時間切れまで回り続ける。
+            if byteCount == 0 { break }
+            if replies.contains(.deviceAttributes) { break }
+        }
+        return replies
     }
 
     /// 読み取り可能なバイトをすべて読み、イベントと読めたバイト数を返す。
@@ -145,7 +191,7 @@ private struct Readiness: OptionSet {
 /// - Returns: 読み取り可能になった記述子の種別。タイムアウトや失敗では空。
 private func waitForReadable(
     _ descriptor: Int32,
-    _ wakeupDescriptor: Int32?,
+    wakeup wakeupDescriptor: Int32?,
     _ timeoutMilliseconds: Int32
 ) -> Readiness {
     var descriptors = [pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)]
