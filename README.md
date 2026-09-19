@@ -25,6 +25,9 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
   ブラケットペーストを解釈する。分割して届いたシーケンスも正しく扱う。
   端末が対応していれば kitty keyboard protocol を使い、Ctrl+I と Tab のように
   従来は同じバイト列だったキーを区別する。
+- **IME への対応** — 入力欄は描画のたびに `TextFieldState.renderedCursorPoint` へ
+  端末カーソルを置くべき位置を記録する。`Component.cursorPosition` でそれを返すと、
+  変換中の文字と変換候補が入力欄の位置に出る。
 - **端末の後始末** — raw モード・代替画面・マウストラッキング・フォーカス通知を
   終了時に必ず元へ戻す。
 - **外部依存なし** — SwiftPM だけでビルドできる。
