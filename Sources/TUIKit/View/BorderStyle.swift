@@ -1,5 +1,6 @@
 /// 枠線に使う文字の組み合わせ。
 public struct BorderStyle: Hashable, Sendable {
+    // var に戻すと幅 1 桁という不変条件が壊れる。差し替えはイニシャライザ経由で。
     public private(set) var topLeft: Character
     public private(set) var top: Character
     public private(set) var topRight: Character
@@ -33,7 +34,6 @@ public struct BorderStyle: Hashable, Sendable {
         self.bottomRight = Self.singleWidth(bottomRight, fallback: "┘")
     }
 
-    /// 表示幅が 1 桁の文字だけを通し、そうでなければ `fallback` を返す。
     private static func singleWidth(_ character: Character, fallback: Character) -> Character {
         DisplayWidth.width(of: character) == 1 ? character : fallback
     }

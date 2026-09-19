@@ -57,13 +57,8 @@ public struct Buffer: Hashable, Sendable {
 
     /// 矩形領域を 1 文字の繰り返しで埋める。
     ///
-    /// 全角文字は 2 桁を占めるので、先頭のセルに文字を置き、次のセルを継続セルにする。
-    /// 行の末尾に文字の幅より狭い桁が残った場合は、そこを空白で埋める。
-    ///
-    /// - Parameters:
-    ///   - rect: 埋める領域。バッファの外へはみ出した分は無視される。
-    ///   - character: 繰り返す文字。表示幅が 0 の文字は繰り返せないため、領域全体を空白で埋める。
-    ///   - style: 書き込むセルのスタイル。
+    /// - Parameter character: 繰り返す文字。領域の幅が表示幅で割り切れない場合、行末に残った桁は
+    ///   空白になる。表示幅が 0 の文字は繰り返せないため、領域全体を空白で埋める。
     public mutating func fill(_ rect: Rect, repeating character: Character, style: Style = .plain) {
         let region = rect.intersection(bounds)
         guard !region.isEmpty else { return }
@@ -91,6 +86,7 @@ public struct Buffer: Hashable, Sendable {
                 }
                 x += characterWidth
             }
+            // 端末は全角文字を半分だけ描けない。半端に残った桁を文字で埋めてはいけない。
             while x < region.maxX {
                 self[x, y] = blank
                 x += 1
