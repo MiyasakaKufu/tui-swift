@@ -43,6 +43,8 @@ public final class Application<Root: Component> {
         defer { terminal.restore() }
 
         SignalWatcher.install()
+        reader.wakeupDescriptor = SignalWatcher.wakeupDescriptor
+
         if options.usesAlternateScreen { terminal.enterAlternateScreen() }
         terminal.setMouseTrackingEnabled(options.tracksMouse)
         terminal.setBracketedPasteEnabled(options.usesBracketedPaste)

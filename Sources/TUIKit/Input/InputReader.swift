@@ -10,14 +10,30 @@ public final class InputReader {
     private var parser = InputParser()
     private var readBuffer = [UInt8](repeating: 0, count: 4096)
 
-    public init(descriptor: Int32 = 0) {
+    /// 入力待ちを中断させるための記述子。
+    ///
+    /// `SignalWatcher.wakeupDescriptor` を渡すことを想定している。
+    /// これが読み取り可能になると、`wait(timeout:)` は入力がなくても戻る。
+    ///
+    /// - Precondition: 読み取り可能になったバイトは読み捨てるため、非ブロッキングであること。
+    public var wakeupDescriptor: Int32?
+
+    /// 指定した記述子から読み出すリーダーを作る。
+    ///
+    /// - Parameters:
+    ///   - descriptor: 入力を読み取るファイル記述子。
+    ///   - wakeupDescriptor: 入力待ちを中断させる記述子。`nil` なら入力だけを待つ。
+    public init(descriptor: Int32 = 0, wakeupDescriptor: Int32? = nil) {
         self.descriptor = descriptor
+        self.wakeupDescriptor = wakeupDescriptor
     }
 
     /// 入力を待ち、届いたイベントを返す。
     ///
-    /// - Parameter timeout: 待ち時間（秒）。`nil` ならイベントが届くまで待つ。
-    /// - Returns: 解釈できたイベント。タイムアウト時は空配列。
+    /// - Parameters:
+    ///   - timeout: 待ち時間（秒）。`nil` ならイベントが届くまで待つ。
+    /// - Returns: 解釈できたイベント。
+    ///   タイムアウトしたときや、`wakeupDescriptor` で起こされたときは空配列。
     public func wait(timeout: Double?) -> [InputEvent] {
         let milliseconds: Int32
         if let timeout {
@@ -26,9 +42,17 @@ public final class InputReader {
             milliseconds = -1
         }
 
-        let ready = waitForReadable(descriptor, milliseconds)
-        if ready <= 0 {
-            // タイムアウト（あるいはシグナルで中断）。途中まで届いた ESC はここで確定させる。
+        let readiness = waitForReadable(descriptor, wakeupDescriptor, milliseconds)
+
+        if readiness.contains(.wakeup), let wakeup = wakeupDescriptor {
+            discardPendingBytes(wakeup)
+        }
+
+        guard readiness.contains(.input) else {
+            // 起こされただけのときに確定させてはいけない。届きかけの ESC が壊れる。
+            // 続きのバイトは次の待ちで受け取る。
+            if readiness.contains(.wakeup) { return [] }
+            // 単独で届いた ESC は、続きが来ないと分かった時点で確定させる。
             return parser.flush()
         }
 
@@ -50,7 +74,7 @@ public final class InputReader {
 
         if events.isEmpty && parser.hasPendingBytes {
             // 単独の ESC だけが届いた場合は、続きが来ないことを確認してから確定させる。
-            if waitForReadable(descriptor, 20) <= 0 {
+            if !waitForReadable(descriptor, nil, 20).contains(.input) {
                 events.append(contentsOf: parser.flush())
             }
         }
@@ -58,11 +82,61 @@ public final class InputReader {
     }
 }
 
-/// `poll(2)` で読み取り可能になるまで待つ。
+/// `poll(2)` がどの記述子で起きたか。
+private struct Readiness: OptionSet {
+    let rawValue: Int
+
+    /// 入力が読み取り可能になった。
+    static let input = Readiness(rawValue: 1 << 0)
+    /// シグナル通知のパイプが読み取り可能になった。
+    static let wakeup = Readiness(rawValue: 1 << 1)
+}
+
+/// `poll(2)` で入力（と、あればシグナル通知）が読み取り可能になるまで待つ。
 ///
-/// `InputReader` のメソッド名と衝突しないよう、ファイルスコープの関数として定義している。
-private func waitForReadable(_ descriptor: Int32, _ timeoutMilliseconds: Int32) -> Int32 {
-    var descriptors = pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)
-    let result = poll(&descriptors, 1, timeoutMilliseconds)
-    return result
+/// - Parameters:
+///   - descriptor: 入力を読み取るファイル記述子。
+///   - wakeupDescriptor: 入力待ちを中断させる記述子。`nil` なら入力だけを待つ。
+///   - timeoutMilliseconds: 待ち時間（ミリ秒）。負なら読み取り可能になるまで待つ。
+/// - Returns: 読み取り可能になった記述子の種別。タイムアウトや失敗では空。
+private func waitForReadable(
+    _ descriptor: Int32,
+    _ wakeupDescriptor: Int32?,
+    _ timeoutMilliseconds: Int32
+) -> Readiness {
+    var descriptors = [pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)]
+    if let wakeupDescriptor {
+        descriptors.append(pollfd(fd: wakeupDescriptor, events: Int16(POLLIN), revents: 0))
+    }
+
+    let result = descriptors.withUnsafeMutableBufferPointer { buffer -> Int32 in
+        guard let base = buffer.baseAddress else { return -1 }
+        return poll(base, nfds_t(buffer.count), timeoutMilliseconds)
+    }
+    guard result > 0 else { return [] }
+
+    var readiness: Readiness = []
+    if descriptors[0].revents != 0 { readiness.insert(.input) }
+    if descriptors.count > 1, descriptors[1].revents != 0 { readiness.insert(.wakeup) }
+    return readiness
+}
+
+/// 読み取り可能なバイトをすべて読み捨てる。
+///
+/// - Parameters:
+///   - descriptor: 読み捨てる非ブロッキングなファイル記述子。
+private func discardPendingBytes(_ descriptor: Int32) {
+    var scratch = [UInt8](repeating: 0, count: 64)
+    while true {
+        let count = scratch.withUnsafeMutableBufferPointer { buffer -> Int in
+            guard let base = buffer.baseAddress else { return 0 }
+            return read(descriptor, base, buffer.count)
+        }
+        if count > 0 {
+            if count < scratch.count { break }
+            continue
+        }
+        if count < 0 && errno == EINTR { continue }
+        break
+    }
 }
