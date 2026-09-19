@@ -10,6 +10,18 @@ final class LayoutTests: XCTestCase {
         return buffer.debugText()
     }
 
+    func testTabIsNotDroppedFromText() {
+        XCTAssertEqual(render(Text("a\tb"), width: 10, height: 1), "a   b     ")
+    }
+
+    func testTabInsideLineAlignsToTabStop() {
+        XCTAssertEqual(render(Text("ab\tc\td"), width: 12, height: 1), "ab  c   d   ")
+    }
+
+    func testTextTabSizeIsConfigurable() {
+        XCTAssertEqual(render(Text("a\tb").tabStops(every: 8), width: 10, height: 1), "a       b ")
+    }
+
     func testVStackStacksChildrenVertically() {
         let view = VStack {
             Text("a")
@@ -69,6 +81,11 @@ final class LayoutTests: XCTestCase {
     func testBorderWithTitle() {
         let view = EmptyView().border(.ascii, title: "T")
         XCTAssertEqual(render(view, width: 8, height: 3), "+ T ---+\n|      |\n+------+")
+    }
+
+    func testBorderTitleExpandsTabs() {
+        let view = EmptyView().border(.ascii, title: "a\tb")
+        XCTAssertEqual(render(view, width: 10, height: 3), "+ a  b --+\n|        |\n+--------+")
     }
 
     func testPaddingShiftsContent() {

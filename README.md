@@ -17,6 +17,8 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
   ちらつかず、大きな画面でも出力量が小さい。
 - **全角文字と絵文字に対応** — East Asian Width と結合文字を考慮して桁数を計算し、
   全角文字がセルの境界で割れないように描画する。曖昧幅の文字は 1 桁と 2 桁から選べる。
+- **タブの展開** — タブは幅を計算する前に次のタブストップまでの空白へ展開する。
+  既定のタブ幅は 4 桁で、`Text(_:tabSize:)` や `.tabStops(every:)` で変えられる。
 - **宣言的なレイアウト** — `VStack` / `HStack` / `Spacer` / `border` などを組み合わせて画面を記述する。
 - **入力の解析** — 矢印キー、ファンクションキー、修飾キー、マウス（SGR 1006）、
   ブラケットペーストを解釈する。分割して届いたシーケンスも正しく扱う。
@@ -119,8 +121,7 @@ DisplayWidth.ambiguousWidth = DisplayWidth.resolveAmbiguousWidth(usingLocale: tr
 DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 ```
 
-`.wide` のとき、枠線と `ProgressBar` は 2 桁になる文字を避けて ASCII の記号
-（`+-|` と `#`）へ自動で切り替わる。
+`.wide` のときは枠線の罫線素片も 2 桁になるため、枠線は ASCII 版（`+-|`）へ自動で切り替わる。
 
 ## 構成
 
@@ -129,7 +130,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | 端末 | `Terminal`, `SignalWatcher` | raw モード、代替画面、サイズ取得、SIGWINCH |
 | 入力 | `InputParser`, `InputReader`, `KeyEvent`, `MouseEvent` | バイト列からイベントへの増分解析 |
 | 描画 | `Buffer`, `Cell`, `Renderer`, `Style` | セル単位の画面バッファと差分出力 |
-| 文字 | `DisplayWidth`, `TextWrapping` | 表示幅の計算と折り返し |
+| 文字 | `DisplayWidth`, `TextWrapping`, `TabExpansion` | 表示幅の計算、折り返し、タブの展開 |
 | ビュー | `View`, `VStack`, `HStack`, `Text`, 各種修飾子 | レイアウトと描画 |
 | 部品 | `ListView`, `TextField`, `ProgressBar` | 状態を持つウィジェット |
 | 実行 | `TerminalApp`, `Application`, `Component` | エントリポイントとイベントループ |

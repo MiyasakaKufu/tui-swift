@@ -1,14 +1,19 @@
 /// 枠線に使う文字の組み合わせ。
 public struct BorderStyle: Hashable, Sendable {
-    public var topLeft: Character
-    public var top: Character
-    public var topRight: Character
-    public var left: Character
-    public var right: Character
-    public var bottomLeft: Character
-    public var bottom: Character
-    public var bottomRight: Character
+    // var に戻すと幅 1 桁という不変条件が壊れる。差し替えはイニシャライザ経由で。
+    public private(set) var topLeft: Character
+    public private(set) var top: Character
+    public private(set) var topRight: Character
+    public private(set) var left: Character
+    public private(set) var right: Character
+    public private(set) var bottomLeft: Character
+    public private(set) var bottom: Character
+    public private(set) var bottomRight: Character
 
+    /// 8 方向の文字を指定して作る。
+    ///
+    /// 表示幅が 1 桁でない文字（全角文字や絵文字）を渡した場合は、その位置の既定の文字
+    /// （`single` と同じ細い実線）へ置き換える。
     public init(
         topLeft: Character,
         top: Character,
@@ -19,14 +24,18 @@ public struct BorderStyle: Hashable, Sendable {
         bottom: Character,
         bottomRight: Character
     ) {
-        self.topLeft = topLeft
-        self.top = top
-        self.topRight = topRight
-        self.left = left
-        self.right = right
-        self.bottomLeft = bottomLeft
-        self.bottom = bottom
-        self.bottomRight = bottomRight
+        self.topLeft = Self.singleWidth(topLeft, fallback: "┌")
+        self.top = Self.singleWidth(top, fallback: "─")
+        self.topRight = Self.singleWidth(topRight, fallback: "┐")
+        self.left = Self.singleWidth(left, fallback: "│")
+        self.right = Self.singleWidth(right, fallback: "│")
+        self.bottomLeft = Self.singleWidth(bottomLeft, fallback: "└")
+        self.bottom = Self.singleWidth(bottom, fallback: "─")
+        self.bottomRight = Self.singleWidth(bottomRight, fallback: "┘")
+    }
+
+    private static func singleWidth(_ character: Character, fallback: Character) -> Character {
+        DisplayWidth.width(of: character) == 1 ? character : fallback
     }
 
     /// 枠線に使う 8 文字。

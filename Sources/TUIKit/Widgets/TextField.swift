@@ -5,7 +5,7 @@ public final class TextFieldState {
     public private(set) var cursor: Int
 
     public init(text: String = "") {
-        self.characters = Array(text)
+        self.characters = TextFieldState.sanitizedCharacters(of: text)
         self.cursor = characters.count
     }
 
@@ -21,19 +21,45 @@ public final class TextFieldState {
     }
 
     public func setText(_ text: String) {
-        characters = Array(text)
+        characters = TextFieldState.sanitizedCharacters(of: text)
         cursor = characters.count
     }
 
+    /// 1 文字を挿入する。制御文字は `sanitized(_:)` の規則で置き換え、または捨てる。
     public func insert(_ character: Character) {
-        characters.insert(character, at: cursor)
+        guard let allowed = TextFieldState.sanitized(character) else { return }
+        characters.insert(allowed, at: cursor)
         cursor += 1
     }
 
+    /// 文字列を挿入する。貼り付けもここを通る。
     public func insert(contentsOf text: String) {
-        for character in text where character != "\n" {
+        for character in text {
             insert(character)
         }
+    }
+
+    /// 1 行の入力欄に置ける文字へ整える。捨てる文字には `nil` を返す。
+    ///
+    /// 改行（`\r\n` は 1 つの `Character` なのでまとめて 1 つ）とタブは空白 1 個に置き換え、
+    /// ほかの制御文字は取り除く。幅 0 の制御文字が残るとカーソル移動が
+    /// 止まったように見えるため、入力経路のすべてでこの判定を通す。
+    private static func sanitized(_ character: Character) -> Character? {
+        if character.isNewline || character == "\t" { return " " }
+        guard let first = character.unicodeScalars.first else { return nil }
+        if first.value < 0x20 || (first.value >= 0x7F && first.value < 0xA0) {
+            return nil
+        }
+        return character
+    }
+
+    private static func sanitizedCharacters(of text: String) -> [Character] {
+        text.compactMap { sanitized($0) }
+    }
+
+    /// 1 行の入力欄に置ける文字だけにした文字列。プレースホルダにも同じ規則を使う。
+    static func sanitizedText(_ text: String) -> String {
+        String(sanitizedCharacters(of: text))
     }
 
     @discardableResult
@@ -157,32 +183,42 @@ public struct TextField: View {
     }
 
     /// 与えられた幅のとき、先頭何桁分をスクロールして隠すか。
+    ///
+    /// カーソルを収めるのに必要な桁数を求めたあと、先頭から文字幅を積算して
+    /// 文字の区切りまで切り上げる。全角文字の途中で切れて左端が空白になるのを避ける。
     public func scrollOffset(forWidth width: Int) -> Int {
         guard width > 0 else { return 0 }
         let column = state.cursorColumn
-        if column >= width {
-            return column - width + 1
+        guard column >= width else { return 0 }
+
+        let required = column - width + 1
+        var offset = 0
+        for character in state.text {
+            if offset >= required { break }
+            offset += DisplayWidth.width(of: character)
         }
-        return 0
+        return offset
     }
 
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard rect.width > 0, rect.height > 0 else { return }
         let row = Rect(x: rect.minX, y: rect.minY, width: rect.width, height: 1)
+        buffer.fill(row, with: Cell(character: " ", style: style))
 
         if state.isEmpty && !placeholder.isEmpty {
-            buffer.fill(row, with: Cell(character: " ", style: style))
             buffer.write(
-                DisplayWidth.truncate(placeholder, to: rect.width),
+                DisplayWidth.truncate(TextFieldState.sanitizedText(placeholder), to: rect.width),
                 at: Point(x: rect.minX, y: rect.minY),
                 style: placeholderStyle,
                 clippedTo: row
             )
+            // 空でもどこに入力されるか分かるよう、プレースホルダーの先頭セルに
+            // カーソルを重ねる。表示幅は変わらない。
+            drawCursor(into: &buffer, at: Point(x: rect.minX, y: rect.minY), in: rect)
             return
         }
 
         let offset = scrollOffset(forWidth: rect.width)
-        buffer.fill(row, with: Cell(character: " ", style: style))
         buffer.write(
             state.text,
             at: Point(x: rect.minX - offset, y: rect.minY),
@@ -190,14 +226,19 @@ public struct TextField: View {
             clippedTo: row
         )
 
-        if showsCursor {
-            let x = rect.minX + state.cursorColumn - offset
-            if x >= rect.minX && x < rect.maxX {
-                var cell = buffer[x, rect.minY]
-                cell.style = cell.style.adding(.reverse)
-                cell.isContinuation = false
-                buffer[x, rect.minY] = cell
-            }
-        }
+        drawCursor(
+            into: &buffer,
+            at: Point(x: rect.minX + state.cursorColumn - offset, y: rect.minY),
+            in: rect
+        )
+    }
+
+    /// カーソル位置のセルを反転させる。
+    private func drawCursor(into buffer: inout Buffer, at point: Point, in rect: Rect) {
+        guard showsCursor, point.x >= rect.minX, point.x < rect.maxX else { return }
+        var cell = buffer[point.x, point.y]
+        cell.style = cell.style.adding(.reverse)
+        cell.isContinuation = false
+        buffer[point.x, point.y] = cell
     }
 }

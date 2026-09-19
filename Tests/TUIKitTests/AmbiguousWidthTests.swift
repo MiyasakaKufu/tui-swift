@@ -7,7 +7,6 @@ import Glibc
 import XCTest
 @testable import TUIKit
 
-/// East Asian Width が Ambiguous の文字の扱い。
 final class AmbiguousWidthTests: XCTestCase {
 
     private var savedAmbiguousWidth: DisplayWidth.AmbiguousWidth = .narrow
@@ -69,7 +68,7 @@ final class AmbiguousWidthTests: XCTestCase {
     }
 
     func testZeroWidthCharactersStayZero() {
-        // U+0301 は曖昧幅の範囲にも入っているが、結合文字の 0 桁が優先される。
+        // U+0300〜U+036F は Ambiguous でもあるが、結合文字の 0 桁が優先される。
         XCTAssertEqual(DisplayWidth.width(of: "e\u{0301}", ambiguous: .wide), 1)
         XCTAssertEqual(DisplayWidth.width(of: "\u{07}", ambiguous: .wide), 0)
     }
@@ -111,7 +110,6 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(localeValue: "zh_CN.utf8"), .wide)
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(localeValue: "ko_KR.UTF-8@euro"), .wide)
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(localeValue: "en_US.UTF-8"), .narrow)
-        // UTF-8 以外は判断材料にしない。
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(localeValue: "ja_JP.eucJP"), .narrow)
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(localeValue: "C"), .narrow)
         XCTAssertNil(DisplayWidth.parseAmbiguousWidth(localeValue: nil))
@@ -160,11 +158,11 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(render(view, width: 4, height: 3), "+--+\n|ab|\n+--+")
     }
 
-    func testProgressBarFallsBackToASCIIWhenAmbiguousIsWide() {
+    func testProgressBarKeepsRowWidthWhenAmbiguousIsWide() {
         XCTAssertEqual(render(ProgressBar(value: 0.5), width: 10, height: 1), "█████░░░░░")
 
         DisplayWidth.ambiguousWidth = .wide
-        // `░`（U+2591）は Neutral なので幅 1 のまま。全角になる `█` だけを置き換える。
-        XCTAssertEqual(render(ProgressBar(value: 0.5), width: 10, height: 1), "#####░░░░░")
+        // `█` は Ambiguous、`░`（U+2591）は Neutral なので、埋まる側だけ 2 桁になる。
+        XCTAssertEqual(render(ProgressBar(value: 0.5), width: 10, height: 1), "██ ░░░░░")
     }
 }

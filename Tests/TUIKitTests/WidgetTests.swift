@@ -164,8 +164,74 @@ final class WidgetTests: XCTestCase {
 
     func testTextFieldHandlesPaste() {
         let state = TextFieldState()
-        XCTAssertTrue(state.handle(.paste("xy\nz")))
+        XCTAssertTrue(state.handle(.paste("xyz")))
         XCTAssertEqual(state.text, "xyz")
+    }
+
+    func testTextFieldPasteTurnsNewlinesIntoSpace() {
+        let state = TextFieldState()
+        state.handle(.paste("a\rb"))
+        XCTAssertEqual(state.text, "a b")
+        XCTAssertEqual(state.cursor, 3)
+
+        let crlf = TextFieldState()
+        crlf.handle(.paste("a\r\nb"))
+        XCTAssertEqual(crlf.text, "a b")
+        XCTAssertEqual(crlf.cursor, 3)
+
+        let lf = TextFieldState()
+        lf.handle(.paste("a\nb"))
+        XCTAssertEqual(lf.text, "a b")
+    }
+
+    func testTextFieldPasteTurnsTabIntoSpace() {
+        let state = TextFieldState()
+        state.handle(.paste("a\tb"))
+        XCTAssertEqual(state.text, "a b")
+        XCTAssertEqual(state.cursor, 3)
+    }
+
+    func testTextFieldPasteDropsOtherControlCharacters() {
+        let state = TextFieldState()
+        state.handle(.paste("a\u{07}b\u{1B}c\u{7F}d\u{9B}e"))
+        XCTAssertEqual(state.text, "abcde")
+        XCTAssertEqual(state.cursor, 5)
+    }
+
+    func testTextFieldSanitizedTextKeepsCursorMovable() {
+        let state = TextFieldState()
+        state.handle(.paste("a\r\nb"))
+        state.moveToStart()
+        state.moveRight()
+        XCTAssertEqual(state.cursorColumn, 1)
+        state.moveRight()
+        XCTAssertEqual(state.cursorColumn, 2)
+    }
+
+    func testTextFieldInsertSanitizesControlCharacters() {
+        let state = TextFieldState()
+        state.insert("a")
+        state.insert("\n")
+        state.insert("\u{07}")
+        state.insert("b")
+        XCTAssertEqual(state.text, "a b")
+        XCTAssertEqual(state.cursor, 3)
+    }
+
+    func testTextFieldInitialTextAndSetTextAreSanitized() {
+        let state = TextFieldState(text: "a\tb")
+        XCTAssertEqual(state.text, "a b")
+        XCTAssertEqual(state.cursor, 3)
+
+        state.setText("c\r\nd\u{07}")
+        XCTAssertEqual(state.text, "c d")
+        XCTAssertEqual(state.cursor, 3)
+    }
+
+    /// プレースホルダも入力文字と同じ規則で整える（タブは空白 1 個）。
+    func testTextFieldPlaceholderIsSanitized() {
+        let field = TextField(state: TextFieldState(), placeholder: "a\tb", showsCursor: false)
+        XCTAssertEqual(render(field, width: 5, height: 1), "a b  ")
     }
 
     func testTextFieldRendersPlaceholder() {
@@ -179,5 +245,70 @@ final class WidgetTests: XCTestCase {
         let field = TextField(state: state, showsCursor: false)
         XCTAssertEqual(field.scrollOffset(forWidth: 4), 3)
         XCTAssertEqual(render(field, width: 4, height: 1), "def ")
+    }
+
+    func testScrolledTextFieldDoesNotShowHalfOfWideCharacter() {
+        let state = TextFieldState(text: "あいう")
+        let field = TextField(state: state, showsCursor: false)
+        // 必要なスクロール量は 3 桁だが、「い」の途中で切れないよう 4 桁へ切り上げる。
+        XCTAssertEqual(field.scrollOffset(forWidth: 4), 4)
+        XCTAssertEqual(render(field, width: 4, height: 1), "う  ")
+    }
+
+    func testTextFieldScrollsToCharacterBoundaryWithMixedWidths() {
+        let state = TextFieldState(text: "aあbい")
+        let field = TextField(state: state, showsCursor: false)
+        XCTAssertEqual(field.scrollOffset(forWidth: 4), 3)
+        XCTAssertEqual(render(field, width: 4, height: 1), "bい ")
+    }
+
+    func testTextFieldScrollOffsetAlwaysLandsOnCharacterBoundary() {
+        let state = TextFieldState()
+        let field = TextField(state: state, showsCursor: false)
+        for character in "aあiい漢x字" {
+            state.insert(character)
+            for width in 1...6 {
+                let offset = field.scrollOffset(forWidth: width)
+                var boundaries: Set<Int> = [0]
+                var column = 0
+                for existing in state.text {
+                    column += DisplayWidth.width(of: existing)
+                    boundaries.insert(column)
+                }
+                XCTAssertTrue(
+                    boundaries.contains(offset),
+                    "幅 \(width)・内容 \(state.text) でスクロール量 \(offset) が文字の区切りにない"
+                )
+                XCTAssertLessThan(state.cursorColumn - offset, width)
+            }
+        }
+    }
+
+    func testEmptyTextFieldShowsCursorOverPlaceholder() {
+        let field = TextField(state: TextFieldState(), placeholder: "入力")
+        var buffer = Buffer(size: Size(width: 10, height: 1))
+        let bounds = buffer.bounds
+        field.render(into: &buffer, rect: bounds)
+
+        XCTAssertTrue(buffer[0, 0].style.attributes.contains(.reverse))
+        XCTAssertEqual(buffer.debugText(), "入力      ")
+    }
+
+    func testEmptyTextFieldWithoutPlaceholderShowsCursor() {
+        let field = TextField(state: TextFieldState())
+        var buffer = Buffer(size: Size(width: 4, height: 1))
+        let bounds = buffer.bounds
+        field.render(into: &buffer, rect: bounds)
+
+        XCTAssertTrue(buffer[0, 0].style.attributes.contains(.reverse))
+    }
+
+    func testPlaceholderHasNoCursorWhenCursorHidden() {
+        let field = TextField(state: TextFieldState(), placeholder: "name", showsCursor: false)
+        var buffer = Buffer(size: Size(width: 6, height: 1))
+        let bounds = buffer.bounds
+        field.render(into: &buffer, rect: bounds)
+
+        XCTAssertFalse(buffer[0, 0].style.attributes.contains(.reverse))
     }
 }
