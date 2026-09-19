@@ -1,6 +1,7 @@
 /// 枠線に使う文字の組み合わせ。
 ///
-/// 枠線は 1 セルずつ書き込まれるので、どの文字も表示幅が 1 桁でなければならない。
+/// 枠線は `BorderView` が 1 セルに 1 文字ずつ書き込むので、この型は表示幅が 1 桁の文字しか保持しない。
+/// 不変条件はイニシャライザで守るため、呼び出し側が幅を確かめる必要はない。
 public struct BorderStyle: Hashable, Sendable {
     public private(set) var topLeft: Character
     public private(set) var top: Character
