@@ -4,12 +4,23 @@ public final class ListState {
     public private(set) var selectedIndex: Int = 0
     /// 表示の先頭にある項目の位置。
     public private(set) var scrollOffset: Int = 0
-    /// 一度に表示できる行数。描画時に `ListView` が更新する。
-    public internal(set) var visibleRows: Int = 0
+    /// 直前の描画で使った矩形。描画時に `ListView` が更新する。
+    public internal(set) var renderedRect: Rect = .zero
+    /// ホイール 1 回で動かす行数。
+    public var wheelScrollRows: Int = 2
+
+    /// 一度に表示できる行数。
+    public var visibleRows: Int { renderedRect.height }
 
     /// 項目の総数。`ListView` の初期化時に更新される。
     public var itemCount: Int {
-        didSet { clamp() }
+        didSet {
+            // 同じ値の代入で表示位置を選択へ戻してはいけない。
+            // `ListView` は描画のたびに作られ、同じ項目数が入り直すので、
+            // ホイールで動かした表示位置が 1 フレームで消える。
+            guard itemCount != oldValue else { return }
+            scrollToSelection()
+        }
     }
 
     /// 項目数を指定して状態を作る。
@@ -26,7 +37,7 @@ public final class ListState {
     ///   - index: 選択する位置。範囲外の値は端へ丸められる。
     public func select(_ index: Int) {
         selectedIndex = index
-        clamp()
+        scrollToSelection()
     }
 
     /// 選択を上へ動かす。
@@ -35,7 +46,7 @@ public final class ListState {
     ///   - amount: 動かす行数。
     public func moveUp(by amount: Int = 1) {
         selectedIndex -= amount
-        clamp()
+        scrollToSelection()
     }
 
     /// 選択を下へ動かす。
@@ -44,26 +55,37 @@ public final class ListState {
     ///   - amount: 動かす行数。
     public func moveDown(by amount: Int = 1) {
         selectedIndex += amount
-        clamp()
+        scrollToSelection()
     }
 
     /// 先頭の項目を選択する。
     public func moveToStart() {
         selectedIndex = 0
-        clamp()
+        scrollToSelection()
     }
 
     /// 末尾の項目を選択する。
     public func moveToEnd() {
         selectedIndex = itemCount - 1
-        clamp()
+        scrollToSelection()
+    }
+
+    /// 表示位置だけを動かす。選択は動かさない。
+    ///
+    /// - Parameters:
+    ///   - amount: 動かす行数。正で下、負で上。表示位置は項目の範囲へ丸められる。
+    public func scroll(by amount: Int) {
+        scrollOffset += amount
+        clampScroll()
     }
 
     /// 上下キー・PageUp/PageDown・Home/End と縦方向のホイールを処理する。
     ///
     /// - Parameters:
     ///   - event: 端末から届いたイベント。
-    /// - Returns: 選択を動かしたら `true`。
+    /// - Returns: 選択または表示位置を動かしたら `true`。
+    /// - Note: ホイールは選択ではなく表示位置を `wheelScrollRows` 行動かす。
+    ///   `renderedRect` の外で起きたホイールは処理しない。
     @discardableResult
     public func handle(_ event: InputEvent) -> Bool {
         guard case .key(let keyEvent) = event else {
@@ -77,11 +99,9 @@ public final class ListState {
                 // 強制するため。
                 switch mouseEvent.action {
                 case .scrollUp:
-                    moveUp()
-                    return true
+                    return scrollByWheel(at: mouseEvent.position, rows: -wheelScrollRows)
                 case .scrollDown:
-                    moveDown()
-                    return true
+                    return scrollByWheel(at: mouseEvent.position, rows: wheelScrollRows)
                 case .scrollLeft, .scrollRight:
                     return false
                 case .press, .release, .drag:
@@ -114,11 +134,23 @@ public final class ListState {
         return true
     }
 
-    /// 選択位置が表示範囲に入るようスクロール位置を調整する。
+    /// 矩形の中で起きたホイールとして表示位置を動かす。
+    ///
+    /// - Parameters:
+    ///   - position: ホイールが起きた位置。
+    ///   - rows: 動かす行数。正で下、負で上。
+    /// - Returns: 矩形の中で起きていたら `true`。
+    private func scrollByWheel(at position: Point, rows: Int) -> Bool {
+        guard renderedRect.contains(position) else { return false }
+        scroll(by: rows)
+        return true
+    }
+
+    /// 選択位置が表示範囲に入るよう表示位置を動かす。
     ///
     /// - Postcondition: `selectedIndex` は 0 以上 `itemCount` 未満、
     ///   `scrollOffset` は `selectedIndex` が表示範囲に入る値になる。
-    func clamp() {
+    func scrollToSelection() {
         if itemCount <= 0 {
             selectedIndex = 0
             scrollOffset = 0
@@ -126,14 +158,23 @@ public final class ListState {
         }
         selectedIndex = min(max(0, selectedIndex), itemCount - 1)
 
-        guard visibleRows > 0 else {
+        if visibleRows > 0 {
+            if selectedIndex < scrollOffset {
+                scrollOffset = selectedIndex
+            } else if selectedIndex >= scrollOffset + visibleRows {
+                scrollOffset = selectedIndex - visibleRows + 1
+            }
+        }
+        clampScroll()
+    }
+
+    /// 表示位置を項目の範囲へ収める。選択は追いかけない。
+    ///
+    /// - Postcondition: `scrollOffset` は 0 以上 `itemCount - visibleRows` 以下になる。
+    func clampScroll() {
+        guard itemCount > 0, visibleRows > 0 else {
             scrollOffset = 0
             return
-        }
-        if selectedIndex < scrollOffset {
-            scrollOffset = selectedIndex
-        } else if selectedIndex >= scrollOffset + visibleRows {
-            scrollOffset = selectedIndex - visibleRows + 1
         }
         scrollOffset = min(max(0, scrollOffset), max(0, itemCount - visibleRows))
     }
@@ -203,13 +244,19 @@ public struct ListView: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    /// - Postcondition: `state.visibleRows` が `rect` の高さに更新され、
-    ///   選択位置が表示範囲に入るようスクロール位置が調整される。
+    /// - Postcondition: `state.renderedRect` が `rect` に更新され、
+    ///   スクロール位置が項目の範囲へ収められる。
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard !rect.isEmpty else { return }
 
-        state.visibleRows = rect.height
-        state.clamp()
+        // 描画のたびに選択へ戻すと、ホイールで動かした表示位置が元に戻る。
+        let rowsChanged = state.visibleRows != rect.height
+        state.renderedRect = rect
+        if rowsChanged {
+            state.scrollToSelection()
+        } else {
+            state.clampScroll()
+        }
 
         let margin = marginMarker ?? String(
             repeating: " ",

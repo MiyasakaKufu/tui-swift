@@ -29,17 +29,28 @@ final class WidgetTests: XCTestCase {
 
     // MARK: - ListState
 
+    /// 描画済みとみなせるリストの状態を作る。
+    ///
+    /// - Parameters:
+    ///   - itemCount: 項目の総数。
+    ///   - visibleRows: 一度に表示できる行数。
+    ///   - width: 描画した矩形の桁数。
+    /// - Returns: 原点から広げた矩形を描画済みとして持つ状態。
+    private func listState(itemCount: Int, visibleRows: Int, width: Int = 10) -> ListState {
+        let state = ListState(itemCount: itemCount)
+        state.renderedRect = Rect(x: 0, y: 0, width: width, height: visibleRows)
+        return state
+    }
+
     func testListStateScrollsToKeepSelectionVisible() {
-        let state = ListState(itemCount: 10)
-        state.visibleRows = 3
+        let state = listState(itemCount: 10, visibleRows: 3)
         for _ in 0..<4 { state.moveDown() }
         XCTAssertEqual(state.selectedIndex, 4)
         XCTAssertEqual(state.scrollOffset, 2)
     }
 
     func testListStateStopsAtBounds() {
-        let state = ListState(itemCount: 3)
-        state.visibleRows = 3
+        let state = listState(itemCount: 3, visibleRows: 3)
         state.moveUp()
         XCTAssertEqual(state.selectedIndex, 0)
         state.moveDown(by: 10)
@@ -47,8 +58,7 @@ final class WidgetTests: XCTestCase {
     }
 
     func testListStateHandlesArrowKeys() {
-        let state = ListState(itemCount: 3)
-        state.visibleRows = 3
+        let state = listState(itemCount: 3, visibleRows: 3)
         XCTAssertTrue(state.handle(.key(KeyEvent(.down))))
         XCTAssertEqual(state.selectedIndex, 1)
         XCTAssertTrue(state.handle(.key(KeyEvent(.up))))
@@ -56,30 +66,83 @@ final class WidgetTests: XCTestCase {
         XCTAssertFalse(state.handle(.key(KeyEvent(.enter))))
     }
 
-    func testListStateHandlesScrollWheel() {
-        let state = ListState(itemCount: 5)
-        state.visibleRows = 5
-        let scroll = MouseEvent(position: .zero, button: .none, action: .scrollDown)
-        XCTAssertTrue(state.handle(.mouse(scroll)))
+    /// ホイールは選択ではなく表示位置を動かす。
+    func testListStateScrollsViewportWithWheel() {
+        let state = listState(itemCount: 20, visibleRows: 5)
+        let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
+        XCTAssertTrue(state.handle(.mouse(down)))
+        XCTAssertEqual(state.scrollOffset, state.wheelScrollRows)
+        XCTAssertEqual(state.selectedIndex, 0, "選択は動かないこと")
+
+        let up = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollUp)
+        XCTAssertTrue(state.handle(.mouse(up)))
+        XCTAssertEqual(state.scrollOffset, 0)
+        XCTAssertEqual(state.selectedIndex, 0)
+    }
+
+    /// 表示位置は項目の範囲に収まり、端を超えない。
+    func testListStateWheelStopsAtBounds() {
+        let state = listState(itemCount: 8, visibleRows: 5)
+        let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
+        for _ in 0..<10 { XCTAssertTrue(state.handle(.mouse(down))) }
+        XCTAssertEqual(state.scrollOffset, 3)
+
+        let up = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollUp)
+        for _ in 0..<10 { XCTAssertTrue(state.handle(.mouse(up))) }
+        XCTAssertEqual(state.scrollOffset, 0)
+    }
+
+    /// リストの外（隣のペインなど）で起きたホイールは処理しない。
+    func testListStateIgnoresWheelOutsideRenderedRect() {
+        let state = ListState(itemCount: 20)
+        state.renderedRect = Rect(x: 2, y: 1, width: 5, height: 4)
+
+        for position in [Point(x: 1, y: 2), Point(x: 7, y: 2), Point(x: 4, y: 0), Point(x: 4, y: 5)] {
+            let event = MouseEvent(position: position, button: .none, action: .scrollDown)
+            XCTAssertFalse(state.handle(.mouse(event)), "\(position) は範囲外")
+            XCTAssertEqual(state.scrollOffset, 0)
+        }
+
+        let inside = MouseEvent(position: Point(x: 2, y: 1), button: .none, action: .scrollDown)
+        XCTAssertTrue(state.handle(.mouse(inside)))
+        XCTAssertEqual(state.scrollOffset, state.wheelScrollRows)
+    }
+
+    /// 一度も描画していない状態では、どこで起きたホイールも処理しない。
+    func testListStateIgnoresWheelBeforeFirstRender() {
+        let state = ListState(itemCount: 20)
+        let event = MouseEvent(position: .zero, button: .none, action: .scrollDown)
+        XCTAssertFalse(state.handle(.mouse(event)))
+        XCTAssertEqual(state.scrollOffset, 0)
+    }
+
+    /// 選択を動かすと、表示位置は選択を追いかけて戻る。
+    func testListStateSelectionScrollsBackAfterWheel() {
+        let state = listState(itemCount: 20, visibleRows: 5)
+        let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
+        for _ in 0..<5 { state.handle(.mouse(down)) }
+        XCTAssertEqual(state.scrollOffset, 10)
+
+        state.moveDown()
         XCTAssertEqual(state.selectedIndex, 1)
+        XCTAssertEqual(state.scrollOffset, 1)
     }
 
     /// 縦方向のリストは横スクロールを扱わない（親に委ねる）。
     func testListStateDoesNotHandleHorizontalScroll() {
-        let state = ListState(itemCount: 5)
-        state.visibleRows = 5
+        let state = listState(itemCount: 5, visibleRows: 5)
         for action in [MouseAction.scrollLeft, .scrollRight] {
             let event = MouseEvent(position: .zero, button: .none, action: action)
             XCTAssertFalse(state.handle(.mouse(event)), "\(action) は扱わないこと")
             XCTAssertEqual(state.selectedIndex, 0, "\(action) で選択が動かないこと")
+            XCTAssertEqual(state.scrollOffset, 0, "\(action) で表示位置が動かないこと")
         }
     }
 
     /// トラックパッドで斜めに動かすと横スクロールのコードが混ざる。
-    /// 縦のノッチ数ぶんだけ選択が動き、横スクロールは無視されること。
+    /// 縦のノッチ数ぶんだけ表示位置が動き、横スクロールは無視されること。
     func testListStateIgnoresHorizontalWheelInDiagonalStream() {
-        let state = ListState(itemCount: 10)
-        state.visibleRows = 5
+        let state = listState(itemCount: 30, visibleRows: 5)
 
         var parser = InputParser()
         let stream = "\u{1B}[<65;1;1M"   // 下
@@ -93,7 +156,8 @@ final class WidgetTests: XCTestCase {
         var handledCount = 0
         for event in events where state.handle(event) { handledCount += 1 }
         XCTAssertEqual(handledCount, 3, "縦の 3 ノッチだけが処理されること")
-        XCTAssertEqual(state.selectedIndex, 3)
+        XCTAssertEqual(state.scrollOffset, 3 * state.wheelScrollRows)
+        XCTAssertEqual(state.selectedIndex, 0)
     }
 
     func testListViewRendersSelectionMarker() {
@@ -105,9 +169,40 @@ final class WidgetTests: XCTestCase {
     func testListViewScrollsWithState() {
         let state = ListState()
         let list = ListView(items: ["a", "b", "c"], state: state)
-        state.visibleRows = 2
         state.select(2)
         XCTAssertEqual(render(list, width: 5, height: 2), "  b  \n> c  ")
+    }
+
+    /// 描画は選択を追いかけ直さないので、ホイールで動かした表示位置が残る。
+    func testListViewKeepsWheelScrollAcrossRenders() {
+        let items = ["a", "b", "c", "d"]
+        let state = ListState()
+        _ = render(ListView(items: items, state: state), width: 5, height: 2)
+
+        let down = MouseEvent(position: .zero, button: .none, action: .scrollDown)
+        XCTAssertTrue(state.handle(.mouse(down)))
+        XCTAssertEqual(state.scrollOffset, 2)
+
+        // `ListView` は描画のたびに作られ、`itemCount` が代入し直される。
+        // そこで表示位置が選択へ戻らないことを、本番と同じ形で確かめる。
+        XCTAssertEqual(render(ListView(items: items, state: state), width: 5, height: 2), "  c  \n  d  ")
+        XCTAssertEqual(state.scrollOffset, 2)
+        XCTAssertEqual(state.selectedIndex, 0)
+    }
+
+    /// 表示できる行数が変わったときは、選択が見える位置へ戻る。
+    func testListViewScrollsToSelectionWhenHeightChanges() {
+        let items = ["a", "b", "c", "d"]
+        let state = ListState()
+        let list = ListView(items: items, state: state)
+        state.select(3)
+        XCTAssertEqual(render(list, width: 5, height: 2), "  c  \n> d  ")
+
+        let up = MouseEvent(position: .zero, button: .none, action: .scrollUp)
+        XCTAssertTrue(state.handle(.mouse(up)))
+        XCTAssertEqual(state.scrollOffset, 0)
+
+        XCTAssertEqual(render(list, width: 5, height: 3), "  b  \n  c  \n> d  ")
     }
 
     // MARK: - TextFieldState

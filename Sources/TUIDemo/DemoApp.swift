@@ -3,8 +3,6 @@ import TUIKit
 /// TUIKit の主な機能を一通り触れるデモ。
 ///
 ///   swift run tui-demo
-///
-/// 操作: ↑↓/jk で選択、Tab で入力欄と一覧を切り替え、+/- で進捗、q または Ctrl+C で終了。
 @main
 final class DemoApp: TerminalApp {
     static var options: ApplicationOptions {
@@ -84,6 +82,7 @@ final class DemoApp: TerminalApp {
     private func footer() -> some View {
         HStack(spacing: 2) {
             Text(" ↑↓/jk 選択 ").styled(Style(foreground: .black, background: .white))
+            Text(" ホイール スクロール ").styled(Style(foreground: .black, background: .white))
             Text(" Tab 切り替え ").styled(Style(foreground: .black, background: .white))
             Text(" q 終了 ").styled(Style(foreground: .black, background: .white))
             Spacer()
