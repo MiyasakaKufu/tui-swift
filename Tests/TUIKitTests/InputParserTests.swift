@@ -104,6 +104,55 @@ final class InputParserTests: XCTestCase {
         XCTAssertFalse(parser.hasPendingBytes)
     }
 
+    func testTimedOutBracketAndOBecomeAltKeys() {
+        for (text, character) in [("\u{1B}[", Character("[")), ("\u{1B}O", Character("O"))] {
+            var parser = InputParser()
+            XCTAssertTrue(parser.feed(bytes(text)).isEmpty)
+            XCTAssertEqual(
+                parser.flush(),
+                [.key(KeyEvent(.character(character), modifiers: .alt))]
+            )
+            XCTAssertFalse(parser.hasPendingBytes)
+        }
+    }
+
+    func testTimedOutHalfSequenceIsDiscarded() {
+        var parser = InputParser()
+        XCTAssertTrue(parser.feed(bytes("\u{1B}[<65;10")).isEmpty)
+        XCTAssertEqual(parser.flush(), [])
+        XCTAssertFalse(parser.hasPendingBytes)
+    }
+
+    func testSequenceSplitMidwayIsParsedWhenTheRestArrives() {
+        var parser = InputParser()
+        XCTAssertTrue(parser.feed(bytes("\u{1B}[<65;10")).isEmpty)
+        XCTAssertEqual(parser.feed(bytes(";5M")), [
+            .mouse(MouseEvent(position: Point(x: 9, y: 4), button: .none, action: .scrollDown))
+        ])
+    }
+
+    func testStartedSequenceIsWaitedForLongerThanLoneEscape() {
+        var parser = InputParser()
+        XCTAssertNil(parser.pendingWaitDuration)
+
+        XCTAssertTrue(parser.feed([0x1B]).isEmpty)
+        let escapeDuration = parser.pendingWaitDuration
+        XCTAssertTrue(parser.feed([0x5B]).isEmpty)
+        let sequenceDuration = parser.pendingWaitDuration
+
+        XCTAssertNotNil(escapeDuration)
+        XCTAssertNotNil(sequenceDuration)
+        XCTAssertLessThan(escapeDuration ?? 0, sequenceDuration ?? 0)
+    }
+
+    func testPasteIsNotWaitedFor() {
+        var parser = InputParser()
+        XCTAssertTrue(parser.feed(bytes("\u{1B}[200~ab")).isEmpty)
+        XCTAssertNil(parser.pendingWaitDuration)
+        XCTAssertEqual(parser.flush(), [])
+        XCTAssertEqual(parser.feed(bytes("\u{1B}[201~")), [.paste("ab")])
+    }
+
     func testIncompleteSequenceIsBuffered() {
         var parser = InputParser()
         XCTAssertTrue(parser.feed([0x1B, 0x5B]).isEmpty)

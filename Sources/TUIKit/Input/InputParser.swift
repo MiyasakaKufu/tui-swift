@@ -9,11 +9,26 @@ public struct InputParser {
     /// ブラケットペーストの終端 `ESC [ 201 ~`。
     private static let pasteTerminator: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
 
+    /// 単独の ESC の続きを待つ時間（秒）。
+    private static let escapeWaitDuration = 0.05
+
+    /// 始まりだけが届いた制御コードの続きを待つ時間（秒）。
+    private static let sequenceWaitDuration = 1.0
+
     /// 何も読み取っていないパーサを作る。
     public init() {}
 
     /// 未解釈のバイトが残っているか。
     public var hasPendingBytes: Bool { !pending.isEmpty }
+
+    /// 未解釈のバイトの続きを待つ時間（秒）。
+    ///
+    /// この時間が過ぎても続きが届かなければ `flush()` を呼んでよい。
+    /// 待っても確定できるものがないときは `nil`。
+    public var pendingWaitDuration: Double? {
+        guard !isInPaste, let first = pending.first, first == 0x1B else { return nil }
+        return pending.count == 1 ? InputParser.escapeWaitDuration : InputParser.sequenceWaitDuration
+    }
 
     /// バイト列を流し込み、確定したイベントを取り出す。
     ///
@@ -50,14 +65,29 @@ public struct InputParser {
         return events
     }
 
-    /// 入力が途切れたときに呼び、単独の ESC を Escape キーとして確定させる。
+    /// 入力が途切れたときに呼び、ESC で始まる未解釈のバイトを捨てるか確定させる。
+    ///
+    /// 単独の ESC は Escape キー、`ESC [` と `ESC O` は Alt+[ と Alt+O になる。
+    /// それより長い、途中までの制御コードは捨てる。
     ///
     /// - Returns: 確定したイベント。確定するものがなければ空配列。
+    /// - Postcondition: ESC で始まる未解釈のバイトは残らない。
     public mutating func flush() -> [InputEvent] {
         guard !isInPaste, let first = pending.first, first == 0x1B else { return [] }
-        pending.removeFirst()
-        var events: [InputEvent] = [.key(KeyEvent(.escape))]
-        events.append(contentsOf: feed([]))
+        if pending.count == 1 {
+            pending.removeFirst()
+            return [.key(KeyEvent(.escape))]
+        }
+
+        // 途中までの制御コードを 1 バイトずつキーにしてはいけない。
+        // 続きが届いてももう制御コードとして読めず、`ESC [ < 65 ; 10` が Escape と文字の列になる。
+        var events: [InputEvent] = []
+        if pending.count == 2, pending[1] == 0x5B || pending[1] == 0x4F {
+            // Alt+[ と Alt+O は `ESC [` / `ESC O` として届き、CSI / SS3 の始まりと同じ形になる。
+            let character = Character(Unicode.Scalar(pending[1]))
+            events.append(.key(KeyEvent(.character(character), modifiers: .alt)))
+        }
+        pending.removeAll()
         return events
     }
 
