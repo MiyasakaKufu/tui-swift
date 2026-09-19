@@ -8,48 +8,55 @@ import Glibc
 ///
 /// 東アジアの全角文字と絵文字は 2 桁、結合文字や制御文字は 0 桁として扱う。
 /// East Asian Width が Ambiguous の文字（罫線素片、`…`、`█`、矢印など）は
-/// 端末の設定で 1 桁にも 2 桁にもなるため、`ambiguousWidth` で切り替える。
+/// 端末の設定によって 1 桁にも 2 桁にも表示されるため、`ambiguousWidth` で切り替える。
 public enum DisplayWidth {
 
     /// East Asian Width が Ambiguous の文字を何桁として扱うか。
     public enum AmbiguousWidth: Int, Sendable {
-        /// 半角（1 桁）として扱う。
+        /// 1 桁として扱う。
         case narrow = 1
-        /// 全角（2 桁）として扱う。
+        /// 2 桁として扱う。
         case wide = 2
     }
 
-    /// 曖昧幅の扱いを上書きする環境変数の名前。go-runewidth などと同じものを使う。
+    /// 曖昧幅の扱いを上書きする環境変数の名前。
+    ///
+    /// go-runewidth や tcell が見るものと同じ `RUNEWIDTH_EASTASIAN`。
     public static let ambiguousWidthEnvironmentVariable = "RUNEWIDTH_EASTASIAN"
 
-    /// 曖昧幅の文字を何桁として扱うか。既定は `resolveAmbiguousWidth()` の結果。
+    /// 曖昧幅の文字を何桁として扱うか。
     ///
-    /// 最初に参照した時点で一度だけ解決される。端末の設定が分かっているアプリは
-    /// 起動時に代入して切り替える。
+    /// - Note: 初期値は最初に参照した時点で `resolveAmbiguousWidth()` から一度だけ決まる。
+    ///   あとから環境変数を変えても反映されないため、切り替えるにはこのプロパティへ代入する。
     public static var ambiguousWidth: AmbiguousWidth = resolveAmbiguousWidth()
 
     // MARK: - 設定の解決
 
-    /// 環境（と任意でロケール）から曖昧幅の扱いを決める。
+    /// 環境変数とロケールから、曖昧幅の扱いを決める。
     ///
-    /// - Parameter usingLocale: 環境変数が未設定のときロケールから推測する。
-    ///   端末側の設定と食い違うとかえって表示が崩れるため、既定では見ない。
+    /// - Parameters:
+    ///   - usingLocale: 環境変数が未設定のときに、ロケールからも推測するか。
+    /// - Returns: 決まった扱い。どちらからも決まらなければ `.narrow`。
     public static func resolveAmbiguousWidth(usingLocale: Bool = false) -> AmbiguousWidth {
         if let fromEnvironment = ambiguousWidthFromEnvironment() { return fromEnvironment }
         if usingLocale, let fromLocale = ambiguousWidthFromLocale() { return fromLocale }
         return .narrow
     }
 
-    /// 環境変数 `RUNEWIDTH_EASTASIAN` から曖昧幅の扱いを読む。未設定なら `nil`。
+    /// 環境変数 `RUNEWIDTH_EASTASIAN` から曖昧幅の扱いを読む。
     ///
-    /// 値が `1` のときだけ全角として扱う。
+    /// - Returns: 値が `1` なら `.wide`、ほかの値なら `.narrow`。
+    ///   環境変数が未設定か空文字列なら `nil`。
     public static func ambiguousWidthFromEnvironment() -> AmbiguousWidth? {
         parseAmbiguousWidth(environmentValue: environmentString(ambiguousWidthEnvironmentVariable))
     }
 
-    /// ロケール（`LC_ALL` → `LC_CTYPE` → `LANG`）から曖昧幅の扱いを推測する。
+    /// ロケールから曖昧幅の扱いを推測する。
     ///
-    /// いずれも未設定なら `nil`。UTF-8 のロケールで言語が ja / ko / zh のときだけ全角にする。
+    /// `LC_ALL` `LC_CTYPE` `LANG` の順に探し、最初に見つかった値だけを見る。
+    ///
+    /// - Returns: 文字集合が UTF-8 で、言語が ja / ko / zh なら `.wide`、
+    ///   それ以外なら `.narrow`。3 つとも未設定なら `nil`。
     public static func ambiguousWidthFromLocale() -> AmbiguousWidth? {
         for name in ["LC_ALL", "LC_CTYPE", "LANG"] {
             guard let value = environmentString(name), !value.isEmpty else { continue }
@@ -58,34 +65,54 @@ public enum DisplayWidth {
         return nil
     }
 
-    /// 曖昧幅を全角にする言語。
+    /// 曖昧幅を 2 桁として扱う言語。
     private static let eastAsianLanguages: Set<String> = ["ja", "ko", "zh"]
 
+    /// 環境変数 `RUNEWIDTH_EASTASIAN` の値を解釈する。
+    ///
+    /// - Parameters:
+    ///   - value: 環境変数の値。未設定なら `nil`。
+    /// - Returns: `1` なら `.wide`、ほかの値なら `.narrow`。`nil` か空文字列なら `nil`。
     static func parseAmbiguousWidth(environmentValue value: String?) -> AmbiguousWidth? {
         guard let value, !value.isEmpty else { return nil }
         return value == "1" ? .wide : .narrow
     }
 
+    /// `LC_ALL` などのロケール名を解釈する。
+    ///
+    /// - Parameters:
+    ///   - value: ロケール名。未設定なら `nil`。
+    /// - Returns: 文字集合が UTF-8 で、言語が ja / ko / zh なら `.wide`、
+    ///   それ以外なら `.narrow`。`nil` か空文字列なら `nil`。
     static func parseAmbiguousWidth(localeValue value: String?) -> AmbiguousWidth? {
         guard let value, !value.isEmpty else { return nil }
 
-        // "ja_JP.UTF-8@modifier" から修飾子を落とし、言語と文字集合に分ける。
+        // POSIX のロケール名は "言語[_地域][.文字集合][@修飾子]" の形をとる。
         let body = value.split(separator: "@", maxSplits: 1).first ?? ""
         let parts = body.split(separator: ".", maxSplits: 1)
         let territory = parts.first ?? ""
         let language = (territory.split(separator: "_").first ?? "").lowercased()
         let codeset = parts.count > 1 ? normalizedCodeset(parts[1]) : ""
 
-        // UTF-8 以外のロケール（C や eucJP など）では端末側の解釈が読めないので全角にしない。
+        // C や eucJP のロケールで端末がどちらの幅を選ぶかは決まっていない。推測で 2 桁にしない。
         guard codeset == "utf8" else { return .narrow }
         return eastAsianLanguages.contains(language) ? .wide : .narrow
     }
 
-    /// `UTF-8` `utf8` `eucJP` のような文字集合名を比較しやすい形に揃える。
+    /// 文字集合名を比較できる形に揃える。
+    ///
+    /// - Parameters:
+    ///   - value: `UTF-8` `utf8` `eucJP` のような文字集合名。
+    /// - Returns: 小文字にし、`-` と `_` を取り除いた文字列。
     private static func normalizedCodeset(_ value: Substring) -> String {
         value.lowercased().filter { $0 != "-" && $0 != "_" }
     }
 
+    /// 環境変数の値を読む。
+    ///
+    /// - Parameters:
+    ///   - name: 環境変数の名前。
+    /// - Returns: 設定されていればその値、なければ `nil`。
     private static func environmentString(_ name: String) -> String? {
         guard let raw = getenv(name) else { return nil }
         return String(cString: raw)
@@ -93,7 +120,12 @@ public enum DisplayWidth {
 
     // MARK: - 幅の計算
 
-    /// 1 文字（書記素クラスタ）の表示幅。
+    /// 1 文字（書記素クラスタ）の表示幅を返す。
+    ///
+    /// - Parameters:
+    ///   - character: 幅を求める文字。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `ambiguousWidth` に従う。
+    /// - Returns: 桁数。全角文字と絵文字は 2、結合文字と制御文字は 0。
     public static func width(
         of character: Character,
         ambiguous: AmbiguousWidth = DisplayWidth.ambiguousWidth
@@ -117,7 +149,12 @@ public enum DisplayWidth {
         return 1
     }
 
-    /// 文字列全体の表示幅。
+    /// 文字列全体の表示幅を返す。
+    ///
+    /// - Parameters:
+    ///   - string: 幅を求める文字列。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `ambiguousWidth` に従う。
+    /// - Returns: 各文字の桁数の合計。
     public static func width(
         of string: String,
         ambiguous: AmbiguousWidth = DisplayWidth.ambiguousWidth
@@ -131,7 +168,14 @@ public enum DisplayWidth {
 
     /// 表示幅が `limit` を超えないように末尾を切り詰める。
     ///
-    /// 切り詰めが発生した場合は `ellipsis` を付加する（`ellipsis` 自体の幅も `limit` に含む）。
+    /// - Parameters:
+    ///   - string: 切り詰める文字列。
+    ///   - limit: 許容する表示幅。0 以下なら空文字列を返す。
+    ///   - ellipsis: 切り詰めたときに末尾へ付ける文字列。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `ambiguousWidth` に従う。
+    /// - Returns: 表示幅が `limit` 以下の文字列。切り詰めが起きなければ `string` そのまま。
+    /// - Note: `ellipsis` 自身の幅も `limit` に含める。
+    ///   `ellipsis` だけで `limit` に達する場合は付けずに切り詰める。
     public static func truncate(
         _ string: String,
         to limit: Int,
@@ -150,7 +194,13 @@ public enum DisplayWidth {
         return String(head) + ellipsis
     }
 
-    /// 表示幅が `limit` を超えない範囲の接頭辞。
+    /// 表示幅が `limit` を超えない範囲の接頭辞を返す。
+    ///
+    /// - Parameters:
+    ///   - string: 切り出す元の文字列。
+    ///   - limit: 許容する表示幅。0 以下なら空の `Substring` を返す。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `ambiguousWidth` に従う。
+    /// - Returns: 表示幅が `limit` 以下になる最長の接頭辞。全角文字を途中で割ることはない。
     public static func prefix(
         of string: String,
         width limit: Int,
@@ -168,6 +218,11 @@ public enum DisplayWidth {
         return string[string.startIndex..<index]
     }
 
+    /// スカラーが幅を持たないかを調べる。
+    ///
+    /// - Parameters:
+    ///   - scalar: 調べるスカラー。
+    /// - Returns: 結合文字・囲み文字・書式文字・ゼロ幅スペースなら `true`。
     private static func isZeroWidth(_ scalar: Unicode.Scalar) -> Bool {
         if scalar.value == 0x200B { return true }
         switch scalar.properties.generalCategory {
@@ -178,15 +233,32 @@ public enum DisplayWidth {
         }
     }
 
+    /// スカラーが East Asian Width で Wide / Fullwidth かを調べる。
+    ///
+    /// - Parameters:
+    ///   - scalar: 調べるスカラー。
+    /// - Returns: `wideRanges` のいずれかに含まれれば `true`。
     private static func isWide(_ scalar: Unicode.Scalar) -> Bool {
         scalar.value >= 0x1100 && contains(wideRanges, scalar.value)
     }
 
+    /// スカラーが East Asian Width で Ambiguous かを調べる。
+    ///
+    /// - Parameters:
+    ///   - scalar: 調べるスカラー。
+    /// - Returns: `ambiguousRanges` のいずれかに含まれれば `true`。
     private static func isAmbiguous(_ scalar: Unicode.Scalar) -> Bool {
         scalar.value >= 0x00A1 && contains(ambiguousRanges, scalar.value)
     }
 
-    /// 昇順に並んだ範囲表の二分探索。
+    /// 範囲表に値が含まれるかを調べる。
+    ///
+    /// - Parameters:
+    ///   - ranges: 探索する範囲表。
+    ///   - value: 探すコードポイント。
+    /// - Returns: どれかの範囲に含まれれば `true`。
+    /// - Precondition: `ranges` は昇順に並び、範囲どうしが重ならない。
+    /// - Complexity: 範囲の個数を n として O(log n)。
     private static func contains(_ ranges: [ClosedRange<UInt32>], _ value: UInt32) -> Bool {
         var low = 0
         var high = ranges.count - 1
@@ -206,7 +278,9 @@ public enum DisplayWidth {
 
     // MARK: - 範囲表
 
-    /// East Asian Width が Wide / Fullwidth のコードポイント範囲（昇順・重複なし）。
+    /// East Asian Width が Wide / Fullwidth のコードポイント範囲。
+    ///
+    /// - Invariant: 昇順に並び、範囲どうしが重ならない。
     static let wideRanges: [ClosedRange<UInt32>] = [
         0x1100...0x115F,    // ハングル字母
         0x2E80...0x303E,    // CJK 部首補助〜CJK 記号
@@ -231,10 +305,11 @@ public enum DisplayWidth {
         0x30000...0x3FFFD,
     ]
 
-    /// East Asian Width が Ambiguous のコードポイント範囲（昇順）。
+    /// East Asian Width が Ambiguous のコードポイント範囲。
     ///
     /// ラテン・ギリシャ・キリル文字の一部、記号、罫線素片、ブロック要素、私用領域が含まれる。
-    /// 二分探索の前提として昇順・重複なしで並べる。
+    ///
+    /// - Invariant: 昇順に並び、範囲どうしが重ならない。
     static let ambiguousRanges: [ClosedRange<UInt32>] = [
         0x00A1...0x00A1, 0x00A4...0x00A4, 0x00A7...0x00A8,
         0x00AA...0x00AA, 0x00AD...0x00AE, 0x00B0...0x00B4,

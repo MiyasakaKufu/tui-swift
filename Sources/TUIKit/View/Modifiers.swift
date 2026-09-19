@@ -75,10 +75,9 @@ public struct BorderView<Content: View>: View {
         }
     }
 
-    /// 実際に描画へ使う枠線。
+    /// 実際に枠として描く文字の組み合わせ。
     ///
-    /// 曖昧幅を全角として扱う端末では罫線素片が 2 桁になり枠が崩れるため、
-    /// 1 桁に収まらない枠線は ASCII 版へ落とす。
+    /// `borderStyle` が 1 桁に収まらないときは `.ascii` になる。
     var effectiveBorderStyle: BorderStyle {
         borderStyle.fitsInSingleColumn ? borderStyle : .ascii
     }
