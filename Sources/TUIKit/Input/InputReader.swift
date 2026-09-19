@@ -32,8 +32,8 @@ public final class InputReader {
     ///
     /// - Parameters:
     ///   - timeout: 待ち時間（秒）。`nil` ならイベントが届くまで待つ。
-    /// - Returns: 解釈できたイベント。タイムアウトしたときや、`wakeupDescriptor` で
-    ///   起こされたときは空配列。
+    /// - Returns: 解釈できたイベント。
+    ///   タイムアウトしたときや、`wakeupDescriptor` で起こされたときは空配列。
     public func wait(timeout: Double?) -> [InputEvent] {
         let milliseconds: Int32
         if let timeout {

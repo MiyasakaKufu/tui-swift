@@ -186,8 +186,9 @@ private final class TerminationProbe: Component, @unchecked Sendable {
 ///
 /// マスタ側を読み続けるスレッドを持つ。
 ///
-/// - Warning: 読み捨てをやめてはいけない。出力バッファが詰まると、スレーブ側への `write(2)` や、
-///   出力の掃き出しを待つ `tcsetattr(TCSAFLUSH)` が返らなくなる。
+/// - Warning: 読み捨てをやめてはいけない。
+///   出力バッファが詰まると、スレーブ側への `write(2)` や、出力の掃き出しを待つ
+///   `tcsetattr(TCSAFLUSH)` が返らなくなる。
 private final class PseudoTerminal {
     enum Failure: Error {
         case unavailable(errno: Int32)

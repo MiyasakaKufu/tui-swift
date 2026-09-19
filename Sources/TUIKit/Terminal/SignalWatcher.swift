@@ -18,8 +18,8 @@ private func wakeUpEventLoop() {
     let descriptor = wakeupWriteDescriptor
     guard descriptor >= 0 else { return }
 
-    // シグナルハンドラから呼べるのは非同期シグナル安全な操作だけ。`write(2)` は安全だが
-    // `errno` を書き換えるため、割り込まれた側から見える値を戻さなければならない。
+    // シグナルハンドラから呼べるのは非同期シグナル安全な操作だけ。
+    // `write(2)` は安全だが `errno` を書き換えるため、割り込まれた側から見える値を戻す。
     let savedErrno = errno
     var byte: UInt8 = 0
     // 書けなくても書き直さない。起こす合図は 1 バイトあれば足りる。
@@ -91,8 +91,8 @@ private func openWakeupPipe() {
     var descriptors: [Int32] = [-1, -1]
     guard pipe(&descriptors) == 0 else { return }
 
-    // ブロッキングのままにしてはいけない。パイプが詰まったときに、ハンドラ内の `write(2)` と
-    // 読み捨てのための `read(2)` が止まる。
+    // ブロッキングのままにしてはいけない。
+    // パイプが詰まると、ハンドラ内の `write(2)` と読み捨てのための `read(2)` が止まる。
     makeNonBlocking(descriptors[0])
     makeNonBlocking(descriptors[1])
     closeOnExec(descriptors[0])

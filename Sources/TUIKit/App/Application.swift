@@ -58,8 +58,8 @@ public final class Application<Root: Component> {
         var lastFrame = monotonicSeconds()
 
         while isRunning {
-            // フラグの有無で分岐してはいけない。実際のサイズを見ていれば、SIGWINCH を
-            // 取りこぼしても次のフレームで変更に気づける。
+            // フラグの有無で分岐してはいけない。
+            // 実際のサイズを見ていれば、SIGWINCH を取りこぼしても次のフレームで変更に気づける。
             _ = SignalWatcher.consumeWindowResize()
             let size = terminal.size()
             if size != buffer.size {
