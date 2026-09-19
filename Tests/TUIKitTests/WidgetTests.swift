@@ -492,4 +492,73 @@ final class WidgetTests: XCTestCase {
 
         XCTAssertFalse(buffer[0, 0].style.attributes.contains(.reverse))
     }
+
+    // MARK: - TextField が報告するカーソル位置
+
+    private func renderedCursorPoint(
+        of field: TextField,
+        in rect: Rect,
+        screen: Size = Size(width: 12, height: 4)
+    ) -> Point? {
+        var buffer = Buffer(size: screen)
+        field.render(into: &buffer, rect: rect)
+        return field.state.renderedCursorPoint
+    }
+
+    func testTextFieldReportsNoCursorPositionBeforeRender() {
+        XCTAssertNil(TextFieldState(text: "ab").renderedCursorPoint)
+    }
+
+    func testTextFieldReportsCursorPositionInScreenCoordinates() {
+        let state = TextFieldState(text: "あい")
+        let field = TextField(state: state)
+        let rect = Rect(x: 2, y: 1, width: 6, height: 1)
+
+        XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 6, y: 1))
+    }
+
+    func testScrolledTextFieldReportsCursorPositionInsideRect() {
+        let state = TextFieldState(text: "abcdef")
+        let field = TextField(state: state)
+        let rect = Rect(x: 1, y: 0, width: 4, height: 1)
+
+        XCTAssertEqual(field.scrollOffset(forWidth: 4), 3)
+        XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 4, y: 0))
+    }
+
+    func testEmptyTextFieldReportsCursorPositionAtPlaceholderStart() {
+        let state = TextFieldState()
+        let field = TextField(state: state, placeholder: "ここに入力")
+        let rect = Rect(x: 3, y: 2, width: 5, height: 1)
+
+        XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 3, y: 2))
+    }
+
+    func testTextFieldReportsCursorPositionWithHiddenCursor() {
+        let state = TextFieldState(text: "ab")
+        let field = TextField(state: state, showsCursor: false)
+        let rect = Rect(x: 0, y: 0, width: 5, height: 1)
+
+        XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 2, y: 0))
+    }
+
+    func testTextFieldCursorPositionFollowsCursorMovement() {
+        let state = TextFieldState(text: "abc")
+        let field = TextField(state: state, showsCursor: false)
+        let rect = Rect(x: 4, y: 3, width: 5, height: 1)
+
+        state.moveToStart()
+        XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 4, y: 3))
+
+        state.moveRight()
+        XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 5, y: 3))
+    }
+
+    func testTextFieldForgetsCursorPositionWhenItHasNoRoom() {
+        let state = TextFieldState(text: "ab")
+        let field = TextField(state: state)
+
+        XCTAssertNotNil(renderedCursorPoint(of: field, in: Rect(x: 0, y: 0, width: 5, height: 1)))
+        XCTAssertNil(renderedCursorPoint(of: field, in: Rect(x: 0, y: 0, width: 0, height: 1)))
+    }
 }

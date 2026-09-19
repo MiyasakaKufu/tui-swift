@@ -7,6 +7,13 @@ public final class TextFieldState {
     /// カーソルの文字インデックス（0 〜 文字数）。
     public private(set) var cursor: Int
 
+    /// 直前の描画でカーソルを置いた画面上の位置。まだ描画していなければ `nil`。
+    ///
+    /// - Note: IME の変換中の文字と変換候補の一覧は、端末が本物のカーソル位置に表示する。
+    ///   入力欄にフォーカスがある間、`Component.cursorPosition` でこの値を返すと、
+    ///   変換中の文字が入力欄の上に出る。返さなければ差分描画が最後に書き込んだ位置に出る。
+    public internal(set) var renderedCursorPoint: Point?
+
     /// 初期の文字列を指定して状態を作る。
     ///
     /// - Parameters:
@@ -317,8 +324,13 @@ public struct TextField: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。使うのは最初の 1 行だけ。
+    /// - Postcondition: `state.renderedCursorPoint` がカーソルの画面上の位置に更新される。
+    ///   描く領域がなければ `nil` になる。
     public func render(into buffer: inout Buffer, rect: Rect) {
-        guard rect.width > 0, rect.height > 0 else { return }
+        guard rect.width > 0, rect.height > 0 else {
+            state.renderedCursorPoint = nil
+            return
+        }
         let row = Rect(x: rect.minX, y: rect.minY, width: rect.width, height: 1)
         buffer.fill(row, with: Cell(character: " ", style: style))
 
@@ -331,7 +343,7 @@ public struct TextField: View {
             )
             // 空でもどこに入力されるか分かるよう、プレースホルダーの先頭セルに
             // カーソルを重ねる。表示幅は変わらない。
-            drawCursor(into: &buffer, at: Point(x: rect.minX, y: rect.minY), in: rect)
+            placeCursor(into: &buffer, at: Point(x: rect.minX, y: rect.minY), in: rect)
             return
         }
 
@@ -343,21 +355,29 @@ public struct TextField: View {
             clippedTo: row
         )
 
-        drawCursor(
+        placeCursor(
             into: &buffer,
             at: Point(x: rect.minX + state.cursorColumn - offset, y: rect.minY),
             in: rect
         )
     }
 
-    /// カーソル位置のセルを反転させる。
+    /// カーソルの位置を状態へ記録し、そのセルを反転させる。
     ///
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
-    ///   - point: 反転させるセルの位置。
+    ///   - point: カーソルを置くセルの位置。
     ///   - rect: 入力欄の矩形。この外へは描かない。
-    private func drawCursor(into buffer: inout Buffer, at point: Point, in rect: Rect) {
-        guard showsCursor, point.x >= rect.minX, point.x < rect.maxX else { return }
+    /// - Postcondition: `state.renderedCursorPoint` が `point`（矩形の外なら `nil`）になる。
+    private func placeCursor(into buffer: inout Buffer, at point: Point, in rect: Rect) {
+        guard point.x >= rect.minX, point.x < rect.maxX else {
+            state.renderedCursorPoint = nil
+            return
+        }
+        // 反転表示をやめても IME に渡す位置は要る。記録を `showsCursor` で止めてはいけない。
+        state.renderedCursorPoint = point
+
+        guard showsCursor else { return }
         var cell = buffer[point.x, point.y]
         cell.style = cell.style.adding(.reverse)
         cell.isContinuation = false
