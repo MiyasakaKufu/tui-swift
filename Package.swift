@@ -15,6 +15,13 @@ let package = Package(
         .target(name: "CTUIShim"),
         .target(name: "TUIKit", dependencies: ["CTUIShim"]),
         .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),
-        .testTarget(name: "TUIKitTests", dependencies: ["TUIKit"]),
+        // 製品コードから参照できてしまうため、ライブラリ本体のターゲットには混ぜない。
+        // glibc は posix_openpt などを機能テストマクロで隠すため、Linux では _GNU_SOURCE を立てる。
+        .target(
+            name: "CTUITestSupport",
+            path: "Tests/CTUITestSupport",
+            cSettings: [.define("_GNU_SOURCE", .when(platforms: [.linux]))]
+        ),
+        .testTarget(name: "TUIKitTests", dependencies: ["TUIKit", "CTUITestSupport"]),
     ]
 )
