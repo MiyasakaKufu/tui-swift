@@ -10,6 +10,9 @@ public final class InputReader {
     private var parser = InputParser()
     private var readBuffer = [UInt8](repeating: 0, count: 4096)
 
+    /// 未解釈のバイトを最後に受け取った時刻。続きを待つ時間はここから測る。
+    private var pendingSince: Double?
+
     /// 入力待ちを中断させるための記述子。
     ///
     /// `SignalWatcher.wakeupDescriptor` を渡すことを想定している。
@@ -30,39 +33,64 @@ public final class InputReader {
 
     /// 入力を待ち、届いたイベントを返す。
     ///
+    /// 途中までしか届いていない制御コードは、続きを待つ時間が過ぎるまで確定させない。
+    /// 待ち時間は呼び出しをまたいで測るので、`timeout` より長くなることもある。
+    ///
     /// - Parameters:
     ///   - timeout: 待ち時間（秒）。`nil` ならイベントが届くまで待つ。
     /// - Returns: 解釈できたイベント。
     ///   タイムアウトしたときや、`wakeupDescriptor` で起こされたときは空配列。
     public func wait(timeout: Double?) -> [InputEvent] {
-        let milliseconds: Int32
-        if let timeout {
-            milliseconds = Int32(max(0, min(Double(Int32.max), timeout * 1000)))
-        } else {
-            milliseconds = -1
+        let deadline = timeout.map { monotonicSeconds() + max(0, $0) }
+
+        while true {
+            let flushDeadline = pendingSince.flatMap { since in
+                parser.pendingWaitDuration.map { since + $0 }
+            }
+            let readiness = waitForReadable(
+                descriptor,
+                wakeupDescriptor,
+                InputReader.milliseconds(until: earlier(deadline, flushDeadline))
+            )
+
+            if readiness.contains(.wakeup), let wakeup = wakeupDescriptor {
+                discardPendingBytes(wakeup)
+            }
+
+            if readiness.contains(.input) {
+                let (events, byteCount) = readAvailable()
+                pendingSince = parser.hasPendingBytes ? monotonicSeconds() : nil
+                // 読むものがないのに読み取り可能なのは、入力が閉じたとき。待ち続けても届かない。
+                if !events.isEmpty || byteCount == 0 { return events }
+            } else if readiness.contains(.wakeup) {
+                // 起こされただけのときに確定させてはいけない。届きかけの ESC が壊れる。
+                // 続きのバイトは次の待ちで受け取る。
+                return []
+            } else {
+                let now = monotonicSeconds()
+                if let flushDeadline, now >= flushDeadline {
+                    let events = parser.flush()
+                    if !parser.hasPendingBytes { pendingSince = nil }
+                    if !events.isEmpty { return events }
+                }
+                if let deadline, now >= deadline { return [] }
+            }
         }
+    }
 
-        let readiness = waitForReadable(descriptor, wakeupDescriptor, milliseconds)
-
-        if readiness.contains(.wakeup), let wakeup = wakeupDescriptor {
-            discardPendingBytes(wakeup)
-        }
-
-        guard readiness.contains(.input) else {
-            // 起こされただけのときに確定させてはいけない。届きかけの ESC が壊れる。
-            // 続きのバイトは次の待ちで受け取る。
-            if readiness.contains(.wakeup) { return [] }
-            // 単独で届いた ESC は、続きが来ないと分かった時点で確定させる。
-            return parser.flush()
-        }
-
+    /// 読み取り可能なバイトをすべて読み、イベントと読めたバイト数を返す。
+    ///
+    /// - Returns: 解釈できたイベントと、読み取ったバイト数。
+    private func readAvailable() -> (events: [InputEvent], byteCount: Int) {
         var events: [InputEvent] = []
+        var byteCount = 0
         while true {
             let count = readBuffer.withUnsafeMutableBufferPointer { buffer -> Int in
                 guard let base = buffer.baseAddress else { return 0 }
                 return read(descriptor, base, buffer.count)
             }
             if count > 0 {
+                byteCount += count
                 events.append(contentsOf: parser.feed(Array(readBuffer[0..<count])))
                 if count < readBuffer.count { break }
             } else if count < 0 && errno == EINTR {
@@ -71,15 +99,31 @@ public final class InputReader {
                 break
             }
         }
-
-        if events.isEmpty && parser.hasPendingBytes {
-            // 単独の ESC だけが届いた場合は、続きが来ないことを確認してから確定させる。
-            if !waitForReadable(descriptor, nil, 20).contains(.input) {
-                events.append(contentsOf: parser.flush())
-            }
-        }
-        return events
+        return (events, byteCount)
     }
+
+    /// 指定した時刻までの残り時間（ミリ秒）。
+    ///
+    /// - Parameters:
+    ///   - deadline: 待ちを終える時刻。`nil` なら待ち続ける。
+    /// - Returns: `poll(2)` に渡す待ち時間。`deadline` が `nil` なら負の値。
+    private static func milliseconds(until deadline: Double?) -> Int32 {
+        guard let deadline else { return -1 }
+        let remaining = (deadline - monotonicSeconds()) * 1000
+        return Int32(max(0, min(Double(Int32.max), remaining.rounded(.up))))
+    }
+}
+
+/// 早いほうの時刻。片方が `nil` ならもう片方。
+///
+/// - Parameters:
+///   - lhs: 比べる時刻。
+///   - rhs: 比べる時刻。
+/// - Returns: 早いほうの時刻。どちらも `nil` なら `nil`。
+private func earlier(_ lhs: Double?, _ rhs: Double?) -> Double? {
+    guard let lhs else { return rhs }
+    guard let rhs else { return lhs }
+    return min(lhs, rhs)
 }
 
 /// `poll(2)` がどの記述子で起きたか。
