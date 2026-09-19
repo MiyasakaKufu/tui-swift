@@ -8,7 +8,6 @@ int ctui_test_open_pty(int *master, int *slave);
 
 /// 端末のウィンドウサイズを設定する。
 ///
-/// Swift から C の可変長引数関数 `ioctl` を直接呼べないため、シムを用意している。
 /// 成功時は 0、失敗時は -1 を返す。
 int ctui_test_set_terminal_size(int fd, int columns, int rows);
 

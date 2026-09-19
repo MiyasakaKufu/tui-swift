@@ -14,7 +14,7 @@ public final class Application<Root: Component> {
     private let renderer: Renderer
 
     private var buffer = Buffer(size: .zero)
-    /// 最後に `.resize` として通知したサイズ。サイズ変化の判定はこれと比べる。
+    /// 最後に `.resize` として通知したサイズ。
     private var reportedSize = Size.zero
     private var isRunning = false
 
@@ -59,7 +59,7 @@ public final class Application<Root: Component> {
         var lastFrame = monotonicSeconds()
 
         while isRunning {
-            // 描画の前にサイズを確かめる。SIGWINCH を取りこぼしていてもここで気づける。
+            // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
             if !synchronizeSize() {
                 isRunning = false
                 break
@@ -106,13 +106,10 @@ public final class Application<Root: Component> {
         }
     }
 
-    /// 端末サイズの変化を検出し、バッファを作り直したうえで `.resize` を通知する。
-    ///
-    /// 比べる相手をバッファのサイズではなく「最後に通知したサイズ」にしてあるため、
-    /// フレームの先頭と SIGWINCH の処理のどちらが先に変化へ気づいても通知は 1 回だけ行われる。
-    /// バッファを先に作り直したせいで差分が消え、通知が落ちることはない。
+    /// 端末サイズの変化を検出し、バッファを作り直して `.resize` を通知する。
     ///
     /// - Returns: ループを続けるなら `true`。
+    /// - Postcondition: 同じサイズについて `.resize` が二重に通知されることはない。
     private func synchronizeSize() -> Bool {
         let size = terminal.size()
         guard size != reportedSize else { return true }
@@ -125,7 +122,9 @@ public final class Application<Root: Component> {
         return root.handle(.resize(size)) != .quit
     }
 
-    /// 1 フレーム分を描画する。サイズの追従は `synchronizeSize()` が済ませている。
+    /// 1 フレーム分を描画する。
+    ///
+    /// - Precondition: `synchronizeSize()` によってバッファが端末サイズに追従している。
     private func draw() {
         buffer.clear()
 

@@ -13,12 +13,6 @@ import CTUITestSupport
 final class ApplicationBugReproductionTests: XCTestCase {
 
     /// イベントを処理している最中に端末サイズが変わっても `.resize` が届く。
-    ///
-    /// 以前は次の順で処理され、通知が落ちていた。
-    ///
-    /// 1. ループの先頭の描画がバッファを新しいサイズにする
-    /// 2. SIGWINCH の処理での比較が「バッファと同じサイズ」になる
-    /// 3. `.resize` が通知されない
     func testResizeDuringEventHandlingIsReported() throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -47,7 +41,6 @@ final class ApplicationBugReproductionTests: XCTestCase {
             terminal: Terminal(input: slave, output: slave)
         )
         component.onFirstKey = {
-            // イベントを処理している最中に端末サイズが変わる状況を作る。
             _ = setTerminalSize(master, resizedSize)
             raise(SIGWINCH)
         }
@@ -70,7 +63,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
 // MARK: - テスト用のコンポーネント
 
-/// 受け取った `.resize` を記録し、キー入力に合わせて決められた動きをする。
+/// 受け取った `.resize` を記録し、キー入力に合わせて決められた動きをするコンポーネント。
 private final class ResizeRecordingComponent: Component {
 
     /// 受け取った `.resize` のサイズを届いた順に並べたもの。
@@ -131,7 +124,11 @@ private final class Latch {
         return isRaised
     }
 
-    /// 立つまで待つ。時間内に立たなければ `false` を返す。
+    /// フラグが立つまで待つ。
+    ///
+    /// - Parameters:
+    ///   - timeout: 待つ秒数の上限。
+    /// - Returns: 時間内に立てば `true`。
     func wait(timeout: Double) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while !isSet {
@@ -142,7 +139,7 @@ private final class Latch {
     }
 }
 
-/// pty の master 側に溜まる出力を読み捨てる。
+/// pty の master 側に溜まる出力を読み捨てるスレッド。
 private final class OutputDrain {
     private let descriptor: Int32
     private let stopped = Latch()

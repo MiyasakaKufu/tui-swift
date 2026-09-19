@@ -15,7 +15,7 @@ let package = Package(
         .target(name: "CTUIShim"),
         .target(name: "TUIKit", dependencies: ["CTUIShim"]),
         .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),
-        // テストから疑似端末（pty）を扱うためのシム。ライブラリ本体には含めない。
+        // 製品コードから参照できてしまうため、ライブラリ本体のターゲットには混ぜない。
         // glibc は posix_openpt などを機能テストマクロで隠すため、Linux では _GNU_SOURCE を立てる。
         .target(
             name: "CTUITestSupport",
