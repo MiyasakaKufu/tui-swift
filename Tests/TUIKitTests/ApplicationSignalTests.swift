@@ -11,9 +11,6 @@ import Glibc
 #endif
 
 /// シグナルがイベントループへ届くかを、疑似端末（pty）の上で確かめる。
-///
-/// シグナルは `poll(2)` の最中ではなく、その直前に届くことがある。
-/// 以前はフラグを立てるだけだったため、この場合は次の入力が来るまでループが動かなかった。
 final class ApplicationSignalTests: XCTestCase {
 
     /// イベント待ちに入る直前の SIGWINCH でも、入力なしで再描画される。
@@ -23,7 +20,8 @@ final class ApplicationSignalTests: XCTestCase {
 
         XCTAssertEqual(ctui_set_terminal_size(pty.master, 20, 5), 0, "初期サイズを設定できない")
 
-        // 最初の描画の途中、つまりサイズを確認した後・イベント待ちに入る前にリサイズする。
+        // `body` はサイズを確認した後・イベント待ちに入る前に呼ばれる。
+        // ここでリサイズすることで、シグナルが届くタイミングを狙って揃えられる。
         let probe = ResizeProbe {
             XCTAssertEqual(ctui_set_terminal_size(pty.master, 30, 8), 0, "サイズを変更できない")
             kill(getpid(), SIGWINCH)
@@ -31,7 +29,7 @@ final class ApplicationSignalTests: XCTestCase {
 
         let run = runInBackground(root: probe, terminal: pty.terminal())
 
-        // 入力は一切送らない。修正前はここでタイムアウトする。
+        // 入力を送ってはいけない。シグナルだけでループが動くことを確かめている。
         wait(for: [probe.resized, run.finished], timeout: 5)
 
         XCTAssertNil(run.error.value)
@@ -54,7 +52,7 @@ final class ApplicationSignalTests: XCTestCase {
 
         let run = runInBackground(root: probe, terminal: pty.terminal())
 
-        // 入力は一切送らない。修正前はここでタイムアウトする。
+        // 入力を送ってはいけない。シグナルだけでループが終わることを確かめている。
         wait(for: [run.finished], timeout: 5)
 
         XCTAssertNil(run.error.value)
@@ -87,16 +85,18 @@ final class ApplicationSignalTests: XCTestCase {
         let reader = InputReader(descriptor: input.readEnd, wakeupDescriptor: wakeup.readEnd)
         wakeup.writeByte()
 
-        // タイムアウトなしで待っても、合図があるので戻ってくる。
         XCTAssertTrue(reader.wait(timeout: nil).isEmpty)
-
-        // 合図は読み捨てられているので、次の待ちがすぐ終わってしまうことはない。
         XCTAssertFalse(wakeup.isReadable, "合図が読み捨てられていない")
     }
 
     // MARK: - 補助
 
     /// 別スレッドでイベントループを回す。
+    ///
+    /// - Parameters:
+    ///   - root: ループに渡すコンポーネント。
+    ///   - terminal: 入出力に使う端末。
+    /// - Returns: ループの終了を待つための expectation と、`run()` が投げたエラーの入れ物。
     private func runInBackground<Root: Component>(
         root: Root,
         terminal: Terminal
@@ -123,7 +123,8 @@ final class ApplicationSignalTests: XCTestCase {
 }
 
 /// スレッドをまたいで結果を受け渡すための入れ物。
-/// 読み書きの順序は `XCTestExpectation` で保証する。
+///
+/// 読み書きの順序は `XCTestExpectation` で揃える。
 private final class ResultBox<Value>: @unchecked Sendable {
     var value: Value
 
@@ -132,10 +133,9 @@ private final class ResultBox<Value>: @unchecked Sendable {
     }
 }
 
-/// リサイズの通知を記録し、二度目で終了するコンポーネント。
+/// リサイズの通知を記録し、二度目の通知で終了するコンポーネント。
 ///
-/// 一度目は起動時のサイズ通知、二度目が SIGWINCH によるもの。
-/// 最初の描画で一度だけ、渡された処理（リサイズとシグナル送信）を実行する。
+/// 最初の描画で一度だけ、渡された処理を実行する。
 private final class ResizeProbe: Component, @unchecked Sendable {
     private let trigger: () -> Void
     private var hasDrawn = false
@@ -184,8 +184,10 @@ private final class TerminationProbe: Component, @unchecked Sendable {
 
 /// テスト用の疑似端末。
 ///
-/// マスタ側を読み続けるスレッドを持つ。誰も読まないと出力バッファが詰まり、
-/// スレーブ側への `write(2)` や、出力の掃き出しを待つ `tcsetattr(TCSAFLUSH)` が返らなくなる。
+/// マスタ側を読み続けるスレッドを持つ。
+///
+/// - Warning: 読み捨てをやめてはいけない。出力バッファが詰まると、スレーブ側への `write(2)` や、
+///   出力の掃き出しを待つ `tcsetattr(TCSAFLUSH)` が返らなくなる。
 private final class PseudoTerminal {
     enum Failure: Error {
         case unavailable(errno: Int32)
@@ -213,7 +215,7 @@ private final class PseudoTerminal {
         close()
     }
 
-    /// スレーブ側を入出力に使う端末。
+    /// スレーブ側を入出力に使う端末を作る。
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
     }
@@ -310,18 +312,30 @@ private final class PipePair {
     }
 }
 
-/// `close(2)`。型のメソッド名と衝突しないよう、ファイルスコープの関数として定義している。
+// クラスの中から `close(2)` は直接呼べない。メンバーの `close()` が先に見つかる。
+/// ファイル記述子を閉じる。
+///
+/// - Parameters:
+///   - descriptor: 閉じるファイル記述子。
 private func closeDescriptor(_ descriptor: Int32) {
     _ = close(descriptor)
 }
 
 /// 未読のバイトがあるか。
+///
+/// - Parameters:
+///   - descriptor: 調べるファイル記述子。
+/// - Returns: 読み取り可能なら `true`。
 private func isReadable(_ descriptor: Int32) -> Bool {
     var polled = pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)
     return poll(&polled, 1, 0) > 0
 }
 
-/// 未読のバイトを読み捨てる。非ブロッキングな記述子であること。
+/// 未読のバイトを読み捨てる。
+///
+/// - Parameters:
+///   - descriptor: 読み捨てるファイル記述子。
+/// - Precondition: `descriptor` は非ブロッキングであること。
 private func discard(_ descriptor: Int32) {
     var scratch = [UInt8](repeating: 0, count: 64)
     while isReadable(descriptor) {

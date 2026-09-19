@@ -41,7 +41,6 @@ public final class Application<Root: Component> {
         defer { terminal.restore() }
 
         SignalWatcher.install()
-        // シグナルが届いたらイベント待ちを起こせるようにする。
         reader.wakeupDescriptor = SignalWatcher.wakeupDescriptor
 
         if options.usesAlternateScreen { terminal.enterAlternateScreen() }
@@ -59,8 +58,8 @@ public final class Application<Root: Component> {
         var lastFrame = monotonicSeconds()
 
         while isRunning {
-            // フラグは合図にすぎないので、実際のサイズを見て判断する。
-            // SIGWINCH を取りこぼしても、次のフレームでサイズ変更に気づける。
+            // フラグの有無で分岐してはいけない。実際のサイズを見ていれば、SIGWINCH を
+            // 取りこぼしても次のフレームで変更に気づける。
             _ = SignalWatcher.consumeWindowResize()
             let size = terminal.size()
             if size != buffer.size {

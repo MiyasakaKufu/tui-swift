@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+// Swift 側へ移してはいけない。`posix_openpt` などは Swift の Glibc モジュールから見えない。
 int ctui_open_pty(int *master, int *slave) {
     int master_descriptor;
     int slave_descriptor;
@@ -37,6 +38,7 @@ int ctui_open_pty(int *master, int *slave) {
     return 0;
 }
 
+// Swift 側へ移してはいけない。`ioctl` は可変長引数のため Swift から直接呼べない。
 int ctui_set_terminal_size(int fd, int columns, int rows) {
     struct winsize ws;
 

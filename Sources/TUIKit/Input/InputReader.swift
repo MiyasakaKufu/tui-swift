@@ -10,12 +10,19 @@ public final class InputReader {
     private var parser = InputParser()
     private var readBuffer = [UInt8](repeating: 0, count: 4096)
 
-    /// 入力待ちを中断させるための記述子。`SignalWatcher.wakeupDescriptor` を想定している。
+    /// 入力待ちを中断させるための記述子。
     ///
-    /// ここが読み取り可能になると `wait(timeout:)` は入力がなくても戻る。
-    /// 溜まったバイトは読み捨てるため、非ブロッキングな記述子であること。
+    /// `SignalWatcher.wakeupDescriptor` を渡すことを想定している。
+    /// これが読み取り可能になると、`wait(timeout:)` は入力がなくても戻る。
+    ///
+    /// - Precondition: 読み取り可能になったバイトは読み捨てるため、非ブロッキングであること。
     public var wakeupDescriptor: Int32?
 
+    /// 指定した記述子から読み出すリーダーを作る。
+    ///
+    /// - Parameters:
+    ///   - descriptor: 入力を読み取るファイル記述子。
+    ///   - wakeupDescriptor: 入力待ちを中断させる記述子。`nil` なら入力だけを待つ。
     public init(descriptor: Int32 = 0, wakeupDescriptor: Int32? = nil) {
         self.descriptor = descriptor
         self.wakeupDescriptor = wakeupDescriptor
@@ -23,8 +30,10 @@ public final class InputReader {
 
     /// 入力を待ち、届いたイベントを返す。
     ///
-    /// - Parameter timeout: 待ち時間（秒）。`nil` ならイベントが届くまで待つ。
-    /// - Returns: 解釈できたイベント。タイムアウト時や、シグナルで起こされたときは空配列。
+    /// - Parameters:
+    ///   - timeout: 待ち時間（秒）。`nil` ならイベントが届くまで待つ。
+    /// - Returns: 解釈できたイベント。タイムアウトしたときや、`wakeupDescriptor` で
+    ///   起こされたときは空配列。
     public func wait(timeout: Double?) -> [InputEvent] {
         let milliseconds: Int32
         if let timeout {
@@ -40,10 +49,10 @@ public final class InputReader {
         }
 
         guard readiness.contains(.input) else {
-            // シグナルで起こされただけなら、届きかけの ESC をここで確定させない。
-            // 続きのバイトは次の待ちで受け取れる。
+            // 起こされただけのときに確定させてはいけない。届きかけの ESC が壊れる。
+            // 続きのバイトは次の待ちで受け取る。
             if readiness.contains(.wakeup) { return [] }
-            // タイムアウト（あるいはシグナルで中断）。途中まで届いた ESC はここで確定させる。
+            // 単独で届いた ESC は、続きが来ないと分かった時点で確定させる。
             return parser.flush()
         }
 
@@ -85,7 +94,11 @@ private struct Readiness: OptionSet {
 
 /// `poll(2)` で入力（と、あればシグナル通知）が読み取り可能になるまで待つ。
 ///
-/// `InputReader` のメソッド名と衝突しないよう、ファイルスコープの関数として定義している。
+/// - Parameters:
+///   - descriptor: 入力を読み取るファイル記述子。
+///   - wakeupDescriptor: 入力待ちを中断させる記述子。`nil` なら入力だけを待つ。
+///   - timeoutMilliseconds: 待ち時間（ミリ秒）。負なら読み取り可能になるまで待つ。
+/// - Returns: 読み取り可能になった記述子の種別。タイムアウトや失敗では空。
 private func waitForReadable(
     _ descriptor: Int32,
     _ wakeupDescriptor: Int32?,
@@ -108,7 +121,10 @@ private func waitForReadable(
     return readiness
 }
 
-/// 読み取り可能なバイトを読み捨てる。合図としてのパイプを空にするために使う。
+/// 読み取り可能なバイトをすべて読み捨てる。
+///
+/// - Parameters:
+///   - descriptor: 読み捨てる非ブロッキングなファイル記述子。
 private func discardPendingBytes(_ descriptor: Int32) {
     var scratch = [UInt8](repeating: 0, count: 64)
     while true {
