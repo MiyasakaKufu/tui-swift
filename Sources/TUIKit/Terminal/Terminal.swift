@@ -23,7 +23,10 @@ public final class Terminal: TerminalOutput {
     /// 出力を書き出すファイル記述子。
     public let outputDescriptor: Int32
 
+    /// raw モードへ入る前の端末属性。戻す先として覚えておく。
     private var originalAttributes: termios?
+    /// raw モードが今この端末に効いているか。
+    private var isRawModeActive = false
     private var pendingOutput: [UInt8] = []
 
     private var isInAlternateScreen = false
@@ -52,7 +55,7 @@ public final class Terminal: TerminalOutput {
 
     /// raw モードが有効かどうか。
     public var isRawModeEnabled: Bool {
-        originalAttributes != nil
+        isRawModeActive
     }
 
     // MARK: - サイズ
@@ -90,17 +93,25 @@ public final class Terminal: TerminalOutput {
     ///   termios の取得・設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 元の端末属性を覚えるため、`disableRawMode()` で戻せる。
     ///   すでに raw モードなら何もしない。
+    /// - Note: クラッシュしても端末が戻るよう、シグナルハンドラを仕掛ける。
     public func enableRawMode() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
-        guard originalAttributes == nil else { return }
+        guard !isRawModeActive else { return }
 
         var attributes = termios()
         if tcgetattr(inputDescriptor, &attributes) != 0 {
             throw TerminalError.termiosFailed(errno: errno)
         }
-        originalAttributes = attributes
+        try applyRawMode(basedOn: attributes)
+    }
 
-        var raw = attributes
+    /// 覚えた端末属性をもとに raw モードを設定する。
+    ///
+    /// - Parameters:
+    ///   - original: raw モードへ入る前の端末属性。
+    /// - Throws: termios の設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
+    private func applyRawMode(basedOn original: termios) throws {
+        var raw = original
         raw.c_iflag &= ~tcflag_t(IXON | ICRNL | BRKINT | INPCK | ISTRIP)
         raw.c_oflag &= ~tcflag_t(OPOST)
         raw.c_lflag &= ~tcflag_t(ECHO | ICANON | ISIG | IEXTEN)
@@ -115,16 +126,32 @@ public final class Terminal: TerminalOutput {
         }
 
         if tcsetattr(inputDescriptor, TCSAFLUSH, &raw) != 0 {
-            originalAttributes = nil
             throw TerminalError.termiosFailed(errno: errno)
         }
+
+        originalAttributes = original
+        isRawModeActive = true
+        CrashRestorer.arm(
+            input: inputDescriptor,
+            output: outputDescriptor,
+            originalAttributes: original
+        )
     }
 
     /// raw モードを解除し、元の端末属性へ戻す。
     public func disableRawMode() {
-        guard var attributes = originalAttributes else { return }
-        _ = tcsetattr(inputDescriptor, TCSAFLUSH, &attributes)
+        applyOriginalAttributes()
         originalAttributes = nil
+        CrashRestorer.disarm()
+    }
+
+    /// 覚えている端末属性を書き戻す。
+    ///
+    /// - Postcondition: 覚えた属性は残るので、`reactivate()` で raw モードへ戻せる。
+    private func applyOriginalAttributes() {
+        guard isRawModeActive, var attributes = originalAttributes else { return }
+        _ = tcsetattr(inputDescriptor, TCSAFLUSH, &attributes)
+        isRawModeActive = false
     }
 
     // MARK: - 画面モード
@@ -194,16 +221,50 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Note: 二重に呼んでも安全。
     public func restore() {
-        setMouseTrackingEnabled(false)
-        setBracketedPasteEnabled(false)
-        setFocusReportingEnabled(false)
-        if isInAlternateScreen {
-            leaveAlternateScreen()
-        }
+        deactivate()
+        isInAlternateScreen = false
+        isMouseTrackingEnabled = false
+        isBracketedPasteEnabled = false
+        isFocusReportingEnabled = false
+        disableRawMode()
+    }
+
+    /// 設定を覚えたまま端末を起動前の状態へ戻す。
+    ///
+    /// 一時停止のように、端末をいったんシェルへ返してから戻ってくる場合に使う。
+    ///
+    /// - Postcondition: `reactivate()` で同じ設定へ戻せる。二重に呼んでも安全。
+    public func deactivate() {
+        if isMouseTrackingEnabled { write(ANSI.disableMouseTracking) }
+        if isBracketedPasteEnabled { write(ANSI.disableBracketedPaste) }
+        if isFocusReportingEnabled { write(ANSI.disableFocusReporting) }
+        if isInAlternateScreen { write(ANSI.exitAlternateScreen) }
         write(ANSI.reset)
         write(ANSI.showCursor)
         flush()
-        disableRawMode()
+        applyOriginalAttributes()
+    }
+
+    /// 覚えている設定を端末へ入れ直す。
+    ///
+    /// - Throws: 入出力が端末でなければ `TerminalError.notATerminal`、
+    ///   termios の設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
+    /// - Note: `deactivate()` の後だけでなく、捕まえられない SIGSTOP で止められた後のように、
+    ///   端末側の設定だけが失われた場合にも使える。今の状態を見ずに必ず設定し直す。
+    public func reactivate() throws {
+        guard isTerminal else { throw TerminalError.notATerminal }
+
+        if let original = originalAttributes {
+            try applyRawMode(basedOn: original)
+        }
+        if isInAlternateScreen {
+            write(ANSI.enterAlternateScreen)
+            write(ANSI.clearScreen)
+        }
+        if isMouseTrackingEnabled { write(ANSI.enableMouseTracking) }
+        if isBracketedPasteEnabled { write(ANSI.enableBracketedPaste) }
+        if isFocusReportingEnabled { write(ANSI.enableFocusReporting) }
+        flush()
     }
 
     // MARK: - 出力

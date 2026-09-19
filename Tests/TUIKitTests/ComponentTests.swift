@@ -45,6 +45,7 @@ final class ComponentTests: XCTestCase {
         XCTAssertTrue(options.usesBracketedPaste)
         XCTAssertNil(options.frameInterval)
         XCTAssertTrue(options.quitsOnControlC)
+        XCTAssertTrue(options.suspendsOnControlZ)
     }
 
     func testQuitsOnUnhandledControlC() {
@@ -58,6 +59,19 @@ final class ComponentTests: XCTestCase {
     func testQuitsOnControlCCanBeDisabled() {
         let options = ApplicationOptions(quitsOnControlC: false)
         XCTAssertFalse(options.quits(onUnhandled: .key(KeyEvent(.character("c"), modifiers: .control))))
+    }
+
+    func testSuspendsOnUnhandledControlZ() {
+        let options = ApplicationOptions.default
+        XCTAssertTrue(options.suspends(onUnhandled: .key(KeyEvent(.character("z"), modifiers: .control))))
+        XCTAssertFalse(options.suspends(onUnhandled: .key(KeyEvent(.character("z")))))
+        XCTAssertFalse(options.suspends(onUnhandled: .key(KeyEvent(.character("c"), modifiers: .control))))
+        XCTAssertFalse(options.suspends(onUnhandled: .resize(Size(width: 1, height: 1))))
+    }
+
+    func testSuspendsOnControlZCanBeDisabled() {
+        let options = ApplicationOptions(suspendsOnControlZ: false)
+        XCTAssertFalse(options.suspends(onUnhandled: .key(KeyEvent(.character("z"), modifiers: .control))))
     }
 
     func testTerminalAppProvidesDefaultOptions() {
