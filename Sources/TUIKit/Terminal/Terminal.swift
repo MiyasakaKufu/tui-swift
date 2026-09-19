@@ -29,6 +29,7 @@ public final class Terminal: TerminalOutput {
     private var isInAlternateScreen = false
     private var isMouseTrackingEnabled = false
     private var isBracketedPasteEnabled = false
+    private var isFocusReportingEnabled = false
 
     /// 入出力のファイル記述子を指定して端末を作る。
     ///
@@ -176,12 +177,26 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
+    /// フォーカス通知を切り替える。
+    ///
+    /// - Parameters:
+    ///   - enabled: 受け取るなら `true`。
+    /// - Note: 有効にすると、端末がフォーカスを得たとき `ESC [ I`、失ったとき `ESC [ O` を
+    ///   送ってくる。`InputParser` はこれらを `.focus` として解釈する。
+    public func setFocusReportingEnabled(_ enabled: Bool) {
+        guard enabled != isFocusReportingEnabled else { return }
+        isFocusReportingEnabled = enabled
+        write(enabled ? ANSI.enableFocusReporting : ANSI.disableFocusReporting)
+        flush()
+    }
+
     /// 端末を起動前の状態へ戻す。
     ///
     /// - Note: 二重に呼んでも安全。
     public func restore() {
         setMouseTrackingEnabled(false)
         setBracketedPasteEnabled(false)
+        setFocusReportingEnabled(false)
         if isInAlternateScreen {
             leaveAlternateScreen()
         }

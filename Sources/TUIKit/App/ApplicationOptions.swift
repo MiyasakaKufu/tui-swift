@@ -6,6 +6,11 @@ public struct ApplicationOptions {
     public var tracksMouse: Bool
     /// ブラケットペーストを有効にする。
     public var usesBracketedPaste: Bool
+    /// 端末のフォーカス変化を `.focus` として受け取る。
+    ///
+    /// - Note: 既定では無効。有効にしない限り `.focus` は届かない。
+    ///   フォーカス通知に対応しない端末では、有効にしても届かない。
+    public var reportsFocus: Bool
     /// 入力がなくても一定間隔で再描画する（秒）。`nil` なら入力があるまで待つ。
     public var frameInterval: Double?
     /// `Component` が処理しなかった Ctrl+C でアプリを終了する。
@@ -21,18 +26,21 @@ public struct ApplicationOptions {
     ///   - usesAlternateScreen: 代替画面バッファへ切り替えるか。
     ///   - tracksMouse: マウスイベントを受け取るか。
     ///   - usesBracketedPaste: ブラケットペーストを有効にするか。
+    ///   - reportsFocus: 端末のフォーカス変化を受け取るか。
     ///   - frameInterval: 入力がなくても再描画する間隔（秒）。`nil` なら入力があるまで待つ。
     ///   - quitsOnControlC: 処理されなかった Ctrl+C で終了するか。
     public init(
         usesAlternateScreen: Bool = true,
         tracksMouse: Bool = false,
         usesBracketedPaste: Bool = true,
+        reportsFocus: Bool = false,
         frameInterval: Double? = nil,
         quitsOnControlC: Bool = true
     ) {
         self.usesAlternateScreen = usesAlternateScreen
         self.tracksMouse = tracksMouse
         self.usesBracketedPaste = usesBracketedPaste
+        self.reportsFocus = reportsFocus
         self.frameInterval = frameInterval
         self.quitsOnControlC = quitsOnControlC
     }
