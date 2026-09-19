@@ -234,6 +234,92 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(render(field, width: 5, height: 1), "a b  ")
     }
 
+    // MARK: - TextFieldState と書記素クラスタ
+
+    /// 🇯🇵（地域表示記号 2 つ）
+    private let flagEmoji = "\u{1F1EF}\u{1F1F5}"
+    /// 👨‍👩‍👧（ZWJ で 3 つを結合）
+    private let familyEmoji = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"
+    /// 👍🏽（肌の色の修飾子付き）
+    private let thumbsUpEmoji = "\u{1F44D}\u{1F3FD}"
+
+    /// 端末から届いたバイト列をパーサ経由で入力欄に流し込む。
+    ///
+    /// - Parameters:
+    ///   - text: 端末から届いたとみなす文字列。
+    ///   - state: 流し込む先の入力欄。
+    private func typeText(_ text: String, into state: TextFieldState) {
+        // まとめて `feed` してはいけない。1 回の read に収まった場合しか試せなくなる。
+        var parser = InputParser()
+        for byte in Array(text.utf8) {
+            for event in parser.feed([byte]) {
+                state.handle(event)
+            }
+        }
+    }
+
+    func testTypedFlagEmojiIsDeletedAsOneCharacter() {
+        let state = TextFieldState()
+        typeText(flagEmoji, into: state)
+        XCTAssertEqual(state.text, flagEmoji)
+        XCTAssertEqual(state.cursor, 1)
+
+        XCTAssertTrue(state.deleteBackward())
+        XCTAssertEqual(state.text, "")
+        XCTAssertEqual(state.cursor, 0)
+    }
+
+    func testTypedZWJEmojiIsDeletedAsOneCharacter() {
+        let state = TextFieldState()
+        typeText(familyEmoji, into: state)
+        XCTAssertEqual(state.text, familyEmoji)
+        XCTAssertEqual(state.cursor, 1)
+        XCTAssertEqual(state.cursorColumn, 2)
+
+        XCTAssertTrue(state.deleteBackward())
+        XCTAssertEqual(state.text, "")
+    }
+
+    func testTypedSkinToneEmojiIsDeletedAsOneCharacter() {
+        let state = TextFieldState()
+        typeText(thumbsUpEmoji, into: state)
+        XCTAssertEqual(state.text, thumbsUpEmoji)
+        XCTAssertEqual(state.cursor, 1)
+
+        XCTAssertTrue(state.deleteBackward())
+        XCTAssertEqual(state.text, "")
+    }
+
+    func testCursorDoesNotEnterTypedEmoji() {
+        let state = TextFieldState()
+        typeText("a" + flagEmoji + "b", into: state)
+        XCTAssertEqual(state.cursor, 3)
+
+        state.moveLeft()
+        state.moveLeft()
+        XCTAssertEqual(state.cursor, 1)
+        XCTAssertTrue(state.deleteForward())
+        XCTAssertEqual(state.text, "ab")
+        XCTAssertEqual(state.cursor, 1)
+    }
+
+    func testTypedEmojiIsInsertedBeforeExistingText() {
+        let state = TextFieldState(text: "あ")
+        state.moveToStart()
+        typeText(flagEmoji, into: state)
+        XCTAssertEqual(state.text, flagEmoji + "あ")
+        XCTAssertEqual(state.cursor, 1)
+    }
+
+    func testPastedEmojiIsOneCharacter() {
+        let state = TextFieldState()
+        XCTAssertTrue(state.handle(.paste(flagEmoji + thumbsUpEmoji)))
+        XCTAssertEqual(state.cursor, 2)
+
+        XCTAssertTrue(state.deleteBackward())
+        XCTAssertEqual(state.text, flagEmoji)
+    }
+
     func testTextFieldRendersPlaceholder() {
         let state = TextFieldState()
         let field = TextField(state: state, placeholder: "name", showsCursor: false)
