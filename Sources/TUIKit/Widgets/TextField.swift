@@ -1,8 +1,7 @@
 /// 1 行のテキスト入力の状態。
 ///
-/// 内容は書記素クラスタ（Swift の `Character`）単位で持つ。端末からは 🇯🇵 や
-/// 👨‍👩‍👧 が Unicode スカラーごとに届く（パーサがスカラーごとにキーイベントを出す）
-/// ため、変更のたびに区切り直して 1 文字として扱えるようにする。
+/// - Invariant: 内容もカーソル位置も書記素クラスタ（`Character`）単位で、
+///   国旗や ZWJ で結合した絵文字も 1 文字として数える。
 public final class TextFieldState {
     private var characters: [Character]
     /// カーソルの文字インデックス（0 〜 文字数）。
@@ -56,8 +55,9 @@ public final class TextFieldState {
         return character
     }
 
-    /// 取り除いた制御文字の前後が 1 つの書記素クラスタになることがあるので、区切り直す。
     private static func sanitizedCharacters(of text: String) -> [Character] {
+        // 制御文字を取り除くと前後が 1 つの書記素クラスタになることがある。
+        // `compactMap` の結果をそのまま返してはいけない。
         Array(String(text.compactMap { sanitized($0) }))
     }
 
@@ -84,14 +84,18 @@ public final class TextFieldState {
         replace(0..<cursor, with: "")
     }
 
+    /// カーソルから末尾までを削除する。
     public func deleteToEnd() {
         replace(cursor..<characters.count, with: "")
     }
 
-    /// `range` の文字を `text` に置き換え、書記素クラスタを区切り直す。
+    /// `range` の文字を `text` に置き換える。
     ///
-    /// カーソルは `text` の末尾に置く。挿入した文字が前後と 1 つの書記素クラスタに
-    /// 結合した場合は、そのクラスタの後ろに置く。
+    /// - Parameters:
+    ///   - range: 置き換える範囲の文字インデックス。
+    ///   - text: 置き換えたあとに入る文字列。
+    /// - Postcondition: 内容は書記素クラスタで区切り直され、カーソルは `text` の末尾に来る。
+    ///   `text` が前後と 1 つのクラスタに結合した場合は、そのクラスタの後ろに来る。
     private func replace(_ range: Range<Int>, with text: String) {
         let head = String(characters[..<range.lowerBound]) + text
         let tail = String(characters[range.upperBound...])
@@ -99,9 +103,13 @@ public final class TextFieldState {
         cursor = TextFieldState.characterIndex(in: characters, afterUTF8Length: head.utf8.count)
     }
 
-    /// 先頭から数えて UTF-8 で `length` バイトの位置にあたる文字インデックス。
+    /// 先頭から UTF-8 で `length` バイトの位置にあたる文字インデックス。
     ///
-    /// その位置が書記素クラスタの内部に来る場合は、そのクラスタの後ろを返す。
+    /// - Parameters:
+    ///   - characters: 位置を探す文字の並び。
+    ///   - length: 先頭から数えた UTF-8 のバイト数。
+    /// - Returns: その位置の文字インデックス。位置が書記素クラスタの内部に来る場合は、
+    ///   そのクラスタの後ろ。
     private static func characterIndex(in characters: [Character], afterUTF8Length length: Int) -> Int {
         var consumed = 0
         var index = 0

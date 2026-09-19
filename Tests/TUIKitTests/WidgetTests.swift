@@ -245,9 +245,11 @@ final class WidgetTests: XCTestCase {
 
     /// 端末から届いたバイト列をパーサ経由で入力欄に流し込む。
     ///
-    /// 絵文字が複数回の read に分かれて届く場合も含めて確かめるため、
-    /// まとめずに 1 バイトずつ `feed` する。
+    /// - Parameters:
+    ///   - text: 端末から届いたとみなす文字列。
+    ///   - state: 流し込む先の入力欄。
     private func typeText(_ text: String, into state: TextFieldState) {
+        // まとめて `feed` してはいけない。1 回の read に収まった場合しか試せなくなる。
         var parser = InputParser()
         for byte in Array(text.utf8) {
             for event in parser.feed([byte]) {
