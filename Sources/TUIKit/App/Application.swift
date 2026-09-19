@@ -71,6 +71,8 @@ public final class Application<Root: Component> {
     ///   raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの画面サイズで `.resize` を通知する。
     ///   戻るときは端末を起動前の状態へ戻し、カーソルを表示に戻す。
+    /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
+    ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
     public func run() throws {
         guard terminal.isTerminal else { throw TerminalError.notATerminal }
 
@@ -79,6 +81,10 @@ public final class Application<Root: Component> {
 
         SignalWatcher.install()
         reader.wakeupDescriptor = SignalWatcher.wakeupDescriptor
+
+        if options.usesKeyboardProtocol, supportsKeyboardProtocol() {
+            terminal.setKeyboardProtocolEnabled(true)
+        }
 
         if options.usesAlternateScreen { terminal.enterAlternateScreen() }
         terminal.setMouseTrackingEnabled(options.tracksMouse)
@@ -138,6 +144,22 @@ public final class Application<Root: Component> {
         }
 
         terminal.setCursorVisible(true)
+    }
+
+    /// 端末が kitty keyboard protocol に対応しているかを問い合わせる。
+    ///
+    /// - Returns: 対応していれば `true`。
+    /// - Precondition: raw モードであること。canonical モードでは、応答が行単位でしか届かない。
+    private func supportsKeyboardProtocol() -> Bool {
+        terminal.write(ANSI.queryKeyboardProtocol)
+        terminal.write(ANSI.queryDeviceAttributes)
+        terminal.flush()
+
+        let replies = reader.waitForQueryReplies(timeout: queryTimeout)
+        return replies.contains { reply in
+            if case .keyboardProtocol = reply { return true }
+            return false
+        }
     }
 
     /// イベントをルートへ渡す。
@@ -210,3 +232,8 @@ public final class Application<Root: Component> {
         renderer.render(buffer, cursor: root.cursorPosition)
     }
 }
+
+/// 起動時の問い合わせに応答を待つ時間（秒）。
+///
+/// 装置属性の応答すら返さない端末のための上限で、ふつうはこれより早く応答が揃う。
+private let queryTimeout = 0.25

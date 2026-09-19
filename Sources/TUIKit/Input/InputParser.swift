@@ -5,6 +5,7 @@
 public struct InputParser {
     private var pending: [UInt8] = []
     private var isInPaste = false
+    private var replies: [TerminalReply] = []
 
     /// ブラケットペーストの終端 `ESC [ 201 ~`。
     private static let pasteTerminator: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
@@ -60,9 +61,21 @@ public struct InputParser {
             case .event(let event, let consumed):
                 pending.removeFirst(consumed)
                 events.append(event)
+            case .reply(let reply, let consumed):
+                pending.removeFirst(consumed)
+                replies.append(reply)
             }
         }
         return events
+    }
+
+    /// 溜まっている端末の応答を取り出す。
+    ///
+    /// - Returns: `feed(_:)` が読み取った応答。取り出した分は内部から消える。
+    public mutating func takeReplies() -> [TerminalReply] {
+        let taken = replies
+        replies.removeAll()
+        return taken
     }
 
     /// 入力が途切れたときに呼び、ESC で始まる未解釈のバイトを捨てるか確定させる。
@@ -95,6 +108,7 @@ public struct InputParser {
 
     private enum ParseOutcome {
         case event(InputEvent, consumed: Int)
+        case reply(TerminalReply, consumed: Int)
         case skip(consumed: Int)
         case pasteStart(consumed: Int)
         case incomplete
@@ -149,10 +163,10 @@ public struct InputParser {
 
     private func parseControlSequence() -> ParseOutcome {
         var index = 2
-        var isMouseSequence = false
+        var prefix: UInt8?
 
-        if index < pending.count, pending[index] == 0x3C { // '<'
-            isMouseSequence = true
+        if index < pending.count, pending[index] >= 0x3C, pending[index] <= 0x3F { // '<' '=' '>' '?'
+            prefix = pending[index]
             index += 1
         }
 
@@ -167,8 +181,8 @@ public struct InputParser {
             } else if byte >= 0x40 && byte <= 0x7E {
                 return interpret(
                     final: byte,
-                    parameters: InputParser.parseParameters(parameterBytes),
-                    isMouseSequence: isMouseSequence,
+                    parameters: Parameters(parameterBytes),
+                    prefix: prefix,
                     consumed: index + 1
                 )
             } else {
@@ -178,43 +192,79 @@ public struct InputParser {
         return .incomplete
     }
 
-    private static func parseParameters(_ bytes: [UInt8]) -> [Int] {
-        if bytes.isEmpty { return [] }
-        var parameters: [Int] = []
-        var current = 0
-        var hasDigits = false
-        for byte in bytes {
-            if byte >= 0x30 && byte <= 0x39 {
-                current = current * 10 + Int(byte - 0x30)
-                hasDigits = true
-            } else if byte == 0x3B { // ';'
-                parameters.append(hasDigits ? current : 0)
-                current = 0
-                hasDigits = false
+    /// `CSI` のパラメータ。
+    ///
+    /// `;` で区切られたパラメータが並び、それぞれが `:` で下位パラメータへ分かれる。
+    private struct Parameters {
+        private var groups: [[Int]] = []
+
+        /// パラメータのバイト列を解析して作る。
+        ///
+        /// - Parameters:
+        ///   - bytes: 前置きの記号と最終バイトの間にあるバイト列。
+        init(_ bytes: [UInt8]) {
+            guard !bytes.isEmpty else { return }
+
+            var group: [Int] = []
+            var current = 0
+            var hasDigits = false
+            for byte in bytes {
+                switch byte {
+                case 0x30...0x39:
+                    current = current * 10 + Int(byte - 0x30)
+                    hasDigits = true
+                case 0x3A: // ':'
+                    group.append(hasDigits ? current : 0)
+                    current = 0
+                    hasDigits = false
+                case 0x3B: // ';'
+                    group.append(hasDigits ? current : 0)
+                    groups.append(group)
+                    group = []
+                    current = 0
+                    hasDigits = false
+                default:
+                    break
+                }
             }
+            group.append(hasDigits ? current : 0)
+            groups.append(group)
         }
-        parameters.append(hasDigits ? current : 0)
-        return parameters
+
+        /// 指定した位置のパラメータ。無ければ `nil`。
+        ///
+        /// - Parameters:
+        ///   - index: 取り出す位置。0 起点。
+        subscript(index: Int) -> Int? { self[index, 0] }
+
+        /// 指定した位置のパラメータの、指定した位置の下位パラメータ。無ければ `nil`。
+        ///
+        /// - Parameters:
+        ///   - index: 取り出すパラメータの位置。0 起点。
+        ///   - subIndex: 取り出す下位パラメータの位置。0 起点。
+        subscript(index: Int, subIndex: Int) -> Int? {
+            guard index >= 0, index < groups.count else { return nil }
+            guard subIndex >= 0, subIndex < groups[index].count else { return nil }
+            return groups[index][subIndex]
+        }
     }
 
     private func interpret(
         final: UInt8,
-        parameters: [Int],
-        isMouseSequence: Bool,
+        parameters: Parameters,
+        prefix: UInt8?,
         consumed: Int
     ) -> ParseOutcome {
-        if isMouseSequence, final == 0x4D || final == 0x6D {
-            guard parameters.count >= 3 else { return .skip(consumed: consumed) }
-            let event = InputParser.mouseEvent(
-                code: parameters[0],
-                column: parameters[1],
-                row: parameters[2],
-                isPress: final == 0x4D
+        if let prefix {
+            return interpretPrivateSequence(
+                final: final,
+                parameters: parameters,
+                prefix: prefix,
+                consumed: consumed
             )
-            return .event(.mouse(event), consumed: consumed)
         }
 
-        let modifiers = KeyModifiers(csiParameter: parameters.count >= 2 ? parameters[1] : 1)
+        let modifiers = KeyModifiers(csiParameter: parameters[1] ?? 1)
 
         switch final {
         case 0x41: return .event(.key(KeyEvent(.up, modifiers: modifiers)), consumed: consumed)
@@ -226,24 +276,107 @@ public struct InputParser {
         case 0x5A: return .event(.key(KeyEvent(.backTab, modifiers: modifiers)), consumed: consumed)
         case 0x50, 0x51, 0x52, 0x53: // 'P'〜'S' — 修飾キー付きの F1〜F4
             // `CSI 1;2R`（Shift+F3）はカーソル位置の問い合わせへの応答と同じ形だが、
-            // TUIKit は問い合わせを送らないので F3 として扱う。
+            // TUIKit はカーソル位置（`CSI 6 n`）を問い合わせないので F3 として扱う。
             let number = Int(final - 0x4F)
             return .event(.key(KeyEvent(.function(number), modifiers: modifiers)), consumed: consumed)
         case 0x49: return .event(.focus(true), consumed: consumed)
         case 0x4F: return .event(.focus(false), consumed: consumed)
-        case 0x75: // CSI u（Kitty キーボードプロトコル）
-            guard let scalarValue = parameters.first, let scalar = Unicode.Scalar(UInt32(scalarValue)) else {
+        case 0x75: // 'u' — kitty keyboard protocol のキー
+            // 修飾キーのパラメータに続く下位パラメータはイベント種別で、3 はキーを離した通知。
+            // 押したときと同じキーになるため、そのまま返すと 1 回の打鍵が 2 つ届く。
+            if parameters[1, 1] == 3 { return .skip(consumed: consumed) }
+            guard let code = parameters[0], let key = InputParser.keyboardProtocolKey(code) else {
                 return .skip(consumed: consumed)
             }
-            return .event(.key(KeyEvent(.character(Character(scalar)), modifiers: modifiers)), consumed: consumed)
+            // Shift+Tab は従来 `CSI Z` として届き、Shift の付かない `.backTab` になる。
+            // 同じ打鍵がプロトコルの有無で別のキーになってはいけない。
+            if key == .tab, modifiers.contains(.shift) {
+                var rest = modifiers
+                rest.remove(.shift)
+                return .event(.key(KeyEvent(.backTab, modifiers: rest)), consumed: consumed)
+            }
+            return .event(.key(KeyEvent(key, modifiers: modifiers)), consumed: consumed)
         case 0x7E: // '~'
-            guard let code = parameters.first else { return .skip(consumed: consumed) }
+            guard let code = parameters[0] else { return .skip(consumed: consumed) }
             if code == 200 { return .pasteStart(consumed: consumed) }
             if code == 201 { return .skip(consumed: consumed) }
             guard let key = InputParser.tildeKey(code) else { return .skip(consumed: consumed) }
             return .event(.key(KeyEvent(key, modifiers: modifiers)), consumed: consumed)
         default:
             return .skip(consumed: consumed)
+        }
+    }
+
+    /// 前置きの記号が付いた `CSI` を解釈する。
+    ///
+    /// - Parameters:
+    ///   - final: 制御コードの最終バイト。
+    ///   - parameters: 最終バイトの前にあるパラメータ。
+    ///   - prefix: `CSI` の直後にある前置きの記号。
+    ///   - consumed: この制御コードが使うバイト数。
+    /// - Returns: 解釈の結果。知らない組み合わせは読み飛ばす。
+    private func interpretPrivateSequence(
+        final: UInt8,
+        parameters: Parameters,
+        prefix: UInt8,
+        consumed: Int
+    ) -> ParseOutcome {
+        switch (prefix, final) {
+        case (0x3C, 0x4D), (0x3C, 0x6D): // '<' と 'M' / 'm' — SGR 拡張形式のマウス
+            guard let code = parameters[0], let column = parameters[1], let row = parameters[2] else {
+                return .skip(consumed: consumed)
+            }
+            let event = InputParser.mouseEvent(
+                code: code,
+                column: column,
+                row: row,
+                isPress: final == 0x4D
+            )
+            return .event(.mouse(event), consumed: consumed)
+        case (0x3F, 0x75): // '?' と 'u' — kitty keyboard protocol の対応状況
+            return .reply(.keyboardProtocol(flags: parameters[0] ?? 0), consumed: consumed)
+        case (0x3F, 0x63): // '?' と 'c' — 装置属性
+            return .reply(.deviceAttributes, consumed: consumed)
+        default:
+            return .skip(consumed: consumed)
+        }
+    }
+
+    /// kitty keyboard protocol のキーコードをキーへ変換する。
+    ///
+    /// - Parameters:
+    ///   - code: `CSI <code> ... u` の先頭パラメータ。
+    /// - Returns: 対応するキー。当てはまるキーがなければ `nil`。
+    private static func keyboardProtocolKey(_ code: Int) -> Key? {
+        switch code {
+        case 9: return .tab
+        case 13, 57414: return .enter // 57414 はテンキーの Enter。
+        case 27: return .escape
+        case 127: return .backspace
+        case 57376...57398: return .function(code - 57376 + 13) // F13〜F35。
+        case 57399...57408: return .character(Character(Unicode.Scalar(UInt8(code - 57399 + 0x30)))) // テンキーの 0〜9。
+        case 57409: return .character(".")
+        case 57410: return .character("/")
+        case 57411: return .character("*")
+        case 57412: return .character("-")
+        case 57413: return .character("+")
+        case 57415: return .character("=")
+        case 57416: return .character(",")
+        case 57417: return .left
+        case 57418: return .right
+        case 57419: return .up
+        case 57420: return .down
+        case 57421: return .pageUp
+        case 57422: return .pageDown
+        case 57423: return .home
+        case 57424: return .end
+        case 57425: return .insert
+        case 57426: return .delete
+        default:
+            // 57344（U+E000）以降は私用領域で、キーコードとしての意味しかない。
+            // Caps Lock や修飾キー単独の通知がここへ来るので、文字にしてはいけない。
+            guard code > 0, code < 57344, let scalar = Unicode.Scalar(UInt32(code)) else { return nil }
+            return .character(Character(scalar))
         }
     }
 

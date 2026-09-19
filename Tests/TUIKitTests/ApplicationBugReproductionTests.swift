@@ -114,6 +114,108 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
     }
 
+    /// 対応する端末では kitty keyboard protocol を有効にし、Ctrl+I と Tab を区別する。
+    func testApplicationEnablesKeyboardProtocolWhenSupported() throws {
+        var masterDescriptor: Int32 = -1
+        var slaveDescriptor: Int32 = -1
+        let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
+        try XCTSkipIf(openResult != 0, "疑似端末を開けない環境のため飛ばす")
+        let master = masterDescriptor
+        let slave = slaveDescriptor
+        defer {
+            close(slave)
+            close(master)
+        }
+
+        XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
+
+        // 出力先が詰まるとループが止まるので、master 側は読み続ける。
+        let drain = OutputDrain(descriptor: master, recordsOutput: true)
+        drain.start()
+        defer { drain.stop() }
+
+        let component = KeyRecordingComponent(expectedCount: 2)
+        let application = Application(
+            root: component,
+            options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
+            terminal: Terminal(input: slave, output: slave)
+        )
+        component.onTimeout = { [weak application] in application?.stop() }
+
+        // 問い合わせに応える端末の代わり。応答を待つ間に送ってはいけない入力があるので、
+        // 問い合わせが届いてから応答し、有効になったのを見てからキーを送る。
+        let responder = Thread {
+            guard drain.waitForOutput(containing: ANSI.queryKeyboardProtocol, timeout: 5) else { return }
+            writeBytes(master, Array("\u{1B}[?1u\u{1B}[?62;c".utf8))
+            guard drain.waitForOutput(containing: ANSI.enableKeyboardProtocol, timeout: 5) else { return }
+
+            writeBytes(master, Array("\u{1B}[105;5u".utf8))
+            Thread.sleep(forTimeInterval: 0.2)
+            writeBytes(master, [0x09])
+        }
+        responder.start()
+
+        try application.run()
+
+        XCTAssertEqual(
+            component.keys,
+            [KeyEvent(.character("i"), modifiers: .control), KeyEvent(.tab)],
+            "Ctrl+I と Tab が区別されていない"
+        )
+        XCTAssertTrue(
+            drain.waitForOutput(containing: ANSI.enableKeyboardProtocol, timeout: 2),
+            "対応している端末で有効にするシーケンスが送られていない"
+        )
+        XCTAssertTrue(
+            drain.waitForOutput(containing: ANSI.disableKeyboardProtocol, timeout: 2),
+            "終了時に元の形式へ戻していない"
+        )
+    }
+
+    /// 応答しない端末では kitty keyboard protocol を有効にしない。
+    func testApplicationLeavesKeyboardProtocolOffWhenUnsupported() throws {
+        var masterDescriptor: Int32 = -1
+        var slaveDescriptor: Int32 = -1
+        let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
+        try XCTSkipIf(openResult != 0, "疑似端末を開けない環境のため飛ばす")
+        let master = masterDescriptor
+        let slave = slaveDescriptor
+        defer {
+            close(slave)
+            close(master)
+        }
+
+        XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
+
+        // 出力先が詰まるとループが止まるので、master 側は読み続ける。
+        let drain = OutputDrain(descriptor: master, recordsOutput: true)
+        drain.start()
+        defer { drain.stop() }
+
+        let component = KeyRecordingComponent(expectedCount: 1)
+        let application = Application(
+            root: component,
+            options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
+            terminal: Terminal(input: slave, output: slave)
+        )
+        component.onTimeout = { [weak application] in application?.stop() }
+
+        // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+        let sender = Thread {
+            guard component.hasStartedLoop.wait(timeout: 5) else { return }
+            writeByte(master, 0x09)
+        }
+        sender.start()
+
+        try application.run()
+
+        XCTAssertEqual(component.keys, [KeyEvent(.tab)], "従来どおりの形式で届いていない")
+        XCTAssertFalse(
+            drain.waitForOutput(containing: ANSI.enableKeyboardProtocol, timeout: 0.5),
+            "応答しない端末で有効にしてはいけない"
+        )
+    }
+
     /// Ctrl+Z を受けると端末をシェルへ返し、再開したら設定と画面を取り戻す。
     func testControlZSuspendsAndResumesTerminal() throws {
         var masterDescriptor: Int32 = -1
@@ -279,6 +381,45 @@ private final class FocusRecordingComponent: Component {
         guard case .focus(let gained) = event else { return .ignored }
         focusChanges.append(gained)
         return gained ? .handled : .quit
+    }
+
+    func update(elapsed: Double) {
+        hasStartedLoop.set()
+        elapsedTotal += elapsed
+        if elapsedTotal > 5 { onTimeout() }
+    }
+}
+
+/// 受け取ったキーを記録し、決めた数だけ届いたら終了するコンポーネント。
+private final class KeyRecordingComponent: Component {
+
+    /// 受け取ったキーを届いた順に並べたもの。
+    private(set) var keys: [KeyEvent] = []
+    /// イベントループが 1 周したら立つ。
+    let hasStartedLoop = Latch()
+
+    /// キーが届かないまま時間切れになったときの脱出口。
+    var onTimeout: () -> Void = {}
+
+    private let expectedCount: Int
+    private var elapsedTotal = 0.0
+
+    /// 終了するまでに受け取るキーの数を決めて作る。
+    ///
+    /// - Parameters:
+    ///   - expectedCount: この数だけキーを受け取ったら終了する。
+    init(expectedCount: Int) {
+        self.expectedCount = expectedCount
+    }
+
+    var body: some View {
+        Text("キーの確認")
+    }
+
+    func handle(_ event: InputEvent) -> EventResult {
+        guard case .key(let keyEvent) = event else { return .ignored }
+        keys.append(keyEvent)
+        return keys.count >= expectedCount ? .quit : .handled
     }
 
     func update(elapsed: Double) {

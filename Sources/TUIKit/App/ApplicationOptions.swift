@@ -11,6 +11,12 @@ public struct ApplicationOptions {
     /// - Note: 既定では無効。有効にしない限り `.focus` は届かない。
     ///   フォーカス通知に対応しない端末では、有効にしても届かない。
     public var reportsFocus: Bool
+    /// 端末が対応していれば kitty keyboard protocol を使う。
+    ///
+    /// - Note: 有効にすると、起動時に端末へ対応状況を問い合わせる。
+    ///   対応していれば Ctrl+I と Tab、Ctrl+M と Enter が区別でき、Escape や Alt+[ を
+    ///   時間切れで確定させる待ちがなくなる。対応していなければ、従来どおり時間切れで確定させる。
+    public var usesKeyboardProtocol: Bool
     /// 入力がなくても一定間隔で再描画する（秒）。`nil` なら入力があるまで待つ。
     public var frameInterval: Double?
     /// `Component` が処理しなかった Ctrl+C でアプリを終了する。
@@ -33,6 +39,7 @@ public struct ApplicationOptions {
     ///   - tracksMouse: マウスイベントを受け取るか。
     ///   - usesBracketedPaste: ブラケットペーストを有効にするか。
     ///   - reportsFocus: 端末のフォーカス変化を受け取るか。
+    ///   - usesKeyboardProtocol: 端末が対応していれば kitty keyboard protocol を使うか。
     ///   - frameInterval: 入力がなくても再描画する間隔（秒）。`nil` なら入力があるまで待つ。
     ///   - quitsOnControlC: 処理されなかった Ctrl+C で終了するか。
     ///   - suspendsOnControlZ: 処理されなかった Ctrl+Z で一時停止するか。
@@ -41,6 +48,7 @@ public struct ApplicationOptions {
         tracksMouse: Bool = false,
         usesBracketedPaste: Bool = true,
         reportsFocus: Bool = false,
+        usesKeyboardProtocol: Bool = true,
         frameInterval: Double? = nil,
         quitsOnControlC: Bool = true,
         suspendsOnControlZ: Bool = true
@@ -49,6 +57,7 @@ public struct ApplicationOptions {
         self.tracksMouse = tracksMouse
         self.usesBracketedPaste = usesBracketedPaste
         self.reportsFocus = reportsFocus
+        self.usesKeyboardProtocol = usesKeyboardProtocol
         self.frameInterval = frameInterval
         self.quitsOnControlC = quitsOnControlC
         self.suspendsOnControlZ = suspendsOnControlZ

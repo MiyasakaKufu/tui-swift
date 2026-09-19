@@ -13,6 +13,9 @@ public final class InputReader {
     /// 未解釈のバイトを最後に受け取った時刻。続きを待つ時間はここから測る。
     private var pendingSince: Double?
 
+    /// 応答を待つ間に届き、まだ返していないイベント。
+    private var bufferedEvents: [InputEvent] = []
+
     /// 入力待ちを中断させるための記述子。
     ///
     /// `SignalWatcher.wakeupDescriptor` を渡すことを想定している。
@@ -36,11 +39,19 @@ public final class InputReader {
     /// 途中までしか届いていない制御コードは、続きを待つ時間が過ぎるまで確定させない。
     /// 待ち時間は呼び出しをまたいで測るので、`timeout` より長くなることもある。
     ///
+    /// `waitForQueryReplies(timeout:)` が待つ間に届いたイベントが残っていれば、待たずに返す。
+    ///
     /// - Parameters:
     ///   - timeout: 待ち時間（秒）。`nil` ならイベントが届くまで待つ。
     /// - Returns: 解釈できたイベント。
     ///   タイムアウトしたときや、`wakeupDescriptor` で起こされたときは空配列。
     public func wait(timeout: Double?) -> [InputEvent] {
+        if !bufferedEvents.isEmpty {
+            let events = bufferedEvents
+            bufferedEvents.removeAll()
+            return events
+        }
+
         let deadline = timeout.map { monotonicSeconds() + max(0, $0) }
 
         while true {
@@ -76,6 +87,38 @@ public final class InputReader {
                 if let deadline, now >= deadline { return [] }
             }
         }
+    }
+
+    /// 端末へ送った問い合わせの応答を、装置属性の応答が届くまで待つ。
+    ///
+    /// 装置属性（`CSI c`）の応答は、それより前に送った問い合わせの応答が出揃った目印になる。
+    /// 対応していない問い合わせには応答が返らないので、これが無いと待ち時間を使い切るまで
+    /// 応答の有無を決められない。
+    ///
+    /// - Parameters:
+    ///   - timeout: 待ち時間（秒）。
+    /// - Returns: 届いた応答。何も届かないまま時間切れになれば空配列。
+    /// - Postcondition: 待つ間に届いたキーやマウスのイベントは捨てず、次の `wait(timeout:)` で返す。
+    public func waitForQueryReplies(timeout: Double) -> [TerminalReply] {
+        let deadline = monotonicSeconds() + max(0, timeout)
+        var replies: [TerminalReply] = []
+
+        while monotonicSeconds() < deadline {
+            // シグナル通知の記述子は見ない。読み捨てないまま起こされ続けると、
+            // 時間切れまで待ちに入れずに回り続ける。
+            let readiness = waitForReadable(descriptor, nil, InputReader.milliseconds(until: deadline))
+            guard readiness.contains(.input) else { continue }
+
+            let (events, byteCount) = readAvailable()
+            bufferedEvents.append(contentsOf: events)
+            pendingSince = parser.hasPendingBytes ? monotonicSeconds() : nil
+            replies.append(contentsOf: parser.takeReplies())
+
+            // 閉じた記述子はいつでも読み取り可能になり、`read(2)` は 0 を返す。
+            if byteCount == 0 { break }
+            if replies.contains(.deviceAttributes) { break }
+        }
+        return replies
     }
 
     /// 読み取り可能なバイトをすべて読み、イベントと読めたバイト数を返す。
