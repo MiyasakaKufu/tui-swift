@@ -142,7 +142,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
         component.onTimeout = { [weak application] in application?.stop() }
 
-        // 問い合わせに応える端末の代わり。応答を待つ間に送ってはいけない入力があるので、
+        // 問い合わせに応える端末の代わり。raw モードの設定は入力待ちのバイト列を捨てるため、
         // 問い合わせが届いてから応答し、有効になったのを見てからキーを送る。
         let responder = Thread {
             guard drain.waitForOutput(containing: ANSI.queryKeyboardProtocol, timeout: 5) else { return }
