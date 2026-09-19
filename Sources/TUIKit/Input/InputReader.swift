@@ -60,7 +60,7 @@ public final class InputReader {
             }
             let readiness = waitForReadable(
                 descriptor,
-                wakeupDescriptor,
+                wakeup: wakeupDescriptor,
                 InputReader.milliseconds(until: earlier(deadline, flushDeadline))
             )
 
@@ -103,9 +103,12 @@ public final class InputReader {
         var replies: [TerminalReply] = []
 
         while monotonicSeconds() < deadline {
-            // シグナル通知の記述子は見ない。ここでは読み捨てないので、渡すと
-            // `poll(2)` が即座に返り続け、時間切れまで空回りする。
-            let readiness = waitForReadable(descriptor, nil, InputReader.milliseconds(until: deadline))
+            // ここでは読み捨てないので、渡すと `poll(2)` が即座に返り続け、時間切れまで空回りする。
+            let readiness = waitForReadable(
+                descriptor,
+                wakeup: nil,
+                InputReader.milliseconds(until: deadline)
+            )
             guard readiness.contains(.input) else { continue }
 
             let (events, byteCount) = readAvailable()
@@ -188,7 +191,7 @@ private struct Readiness: OptionSet {
 /// - Returns: 読み取り可能になった記述子の種別。タイムアウトや失敗では空。
 private func waitForReadable(
     _ descriptor: Int32,
-    _ wakeupDescriptor: Int32?,
+    wakeup wakeupDescriptor: Int32?,
     _ timeoutMilliseconds: Int32
 ) -> Readiness {
     var descriptors = [pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)]
