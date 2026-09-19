@@ -103,8 +103,8 @@ public final class InputReader {
         var replies: [TerminalReply] = []
 
         while monotonicSeconds() < deadline {
-            // シグナル通知の記述子は見ない。起こされても応答は進まないうえ、
-            // ここでは読み捨てないので、見ると `poll(2)` が即座に返り続ける。
+            // シグナル通知の記述子は見ない。ここでは読み捨てないので、渡すと
+            // `poll(2)` が即座に返り続け、時間切れまで空回りする。
             let readiness = waitForReadable(descriptor, nil, InputReader.milliseconds(until: deadline))
             guard readiness.contains(.input) else { continue }
 

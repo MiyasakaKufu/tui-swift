@@ -16,6 +16,9 @@ public struct InputParser {
     /// 始まりだけが届いた制御コードの続きを待つ時間（秒）。
     private static let sequenceWaitDuration = 1.0
 
+    /// kitty keyboard protocol が機能キーに使う、私用領域の先頭のキーコード。
+    private static let firstFunctionalKeyCode = 0xE000
+
     /// 何も読み取っていないパーサを作る。
     public init() {}
 
@@ -289,7 +292,7 @@ public struct InputParser {
                 return .skip(consumed: consumed)
             }
             // Shift+Tab は従来 `CSI Z` として届き、Shift の付かない `.backTab` になる。
-            // 同じ打鍵をプロトコルの有無で別のキーにしてはいけない。
+            // `.tab` + Shift のまま返すと、アプリが同じ打鍵に 2 通りの判定を書くことになる。
             if key == .tab, modifiers.contains(.shift) {
                 var rest = modifiers
                 rest.remove(.shift)
@@ -348,8 +351,6 @@ public struct InputParser {
     ///   - code: `CSI <code> ... u` の先頭パラメータ。
     /// - Returns: 対応するキー。当てはまるキーがなければ `nil`。
     private static func keyboardProtocolKey(_ code: Int) -> Key? {
-        // 番号は kitty keyboard protocol の機能キー表による。57344（U+E000）以降は私用領域で、
-        // キーコードとしての意味しかない。
         switch code {
         case 9: return .tab
         case 13, 57414: return .enter
@@ -375,8 +376,9 @@ public struct InputParser {
         case 57425: return .insert
         case 57426: return .delete
         default:
-            // Caps Lock や修飾キー単独の通知が私用領域の番号で来る。文字にしてはいけない。
-            guard code > 0, code < 57344, let scalar = Unicode.Scalar(UInt32(code)) else { return nil }
+            guard code > 0, code < InputParser.firstFunctionalKeyCode,
+                  let scalar = Unicode.Scalar(UInt32(code))
+            else { return nil }
             return .character(Character(scalar))
         }
     }
