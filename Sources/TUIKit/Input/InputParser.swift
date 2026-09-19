@@ -19,6 +19,9 @@ public struct InputParser {
     /// kitty keyboard protocol が機能キーに使う、私用領域の先頭のキーコード。
     private static let firstFunctionalKeyCode = 0xE000
 
+    /// kitty keyboard protocol で、キーを離したことを表すイベント種別。
+    private static let keyReleaseEventType = 3
+
     /// 何も読み取っていないパーサを作る。
     public init() {}
 
@@ -285,9 +288,10 @@ public struct InputParser {
         case 0x49: return .event(.focus(true), consumed: consumed)
         case 0x4F: return .event(.focus(false), consumed: consumed)
         case 0x75: // 'u'
-            // 修飾キーに続く下位パラメータはイベント種別で、3 はキーを離した通知。
             // 捨てないと、1 回の打鍵が押下と解放の 2 つのキーになる。
-            if parameters[1, 1] == 3 { return .skip(consumed: consumed) }
+            if parameters[1, 1] == InputParser.keyReleaseEventType {
+                return .skip(consumed: consumed)
+            }
             guard let code = parameters[0], let key = InputParser.keyboardProtocolKey(code) else {
                 return .skip(consumed: consumed)
             }
