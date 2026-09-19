@@ -170,7 +170,8 @@ public struct ListView: View {
             let isSelected = (index == state.selectedIndex)
             let rowStyle = isSelected ? selectedStyle : style
             let prefix = isSelected ? selectionMarker : margin
-            let line = prefix + items[index]
+            // 幅で切り詰める前に展開しないと、タブの分だけ桁数の計算がずれる。
+            let line = TabExpansion.expand(prefix + items[index])
             let y = rect.minY + row
 
             // 選択行は行末まで塗って反転が途切れないようにする。

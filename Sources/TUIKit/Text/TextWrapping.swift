@@ -17,8 +17,14 @@ public enum TextWrapping {
     ///
     /// 改行文字は常に行の区切りとして扱う。LF（`\n`）だけでなく、
     /// CRLF（`\r\n`）・単独の CR（`\r`）も 1 つの改行として扱う。
-    public static func wrap(_ text: String, width: Int, mode: WrapMode) -> [String] {
-        let paragraphs = text
+    /// タブは幅を計算する前に、`tabSize` 桁ごとのタブストップまでの空白へ展開する。
+    public static func wrap(
+        _ text: String,
+        width: Int,
+        mode: WrapMode,
+        tabSize: Int = TabExpansion.defaultSize
+    ) -> [String] {
+        let paragraphs = TabExpansion.expand(text, tabSize: tabSize)
             .split(omittingEmptySubsequences: false, whereSeparator: { $0.isNewline })
             .map(String.init)
         if width <= 0 { return paragraphs.map { _ in "" } }

@@ -57,6 +57,11 @@ public final class TextFieldState {
         text.compactMap { sanitized($0) }
     }
 
+    /// 1 行の入力欄に置ける文字だけにした文字列。プレースホルダにも同じ規則を使う。
+    static func sanitizedText(_ text: String) -> String {
+        String(sanitizedCharacters(of: text))
+    }
+
     @discardableResult
     public func deleteBackward() -> Bool {
         guard cursor > 0 else { return false }
@@ -202,7 +207,7 @@ public struct TextField: View {
 
         if state.isEmpty && !placeholder.isEmpty {
             buffer.write(
-                DisplayWidth.truncate(placeholder, to: rect.width),
+                DisplayWidth.truncate(TextFieldState.sanitizedText(placeholder), to: rect.width),
                 at: Point(x: rect.minX, y: rect.minY),
                 style: placeholderStyle,
                 clippedTo: row

@@ -58,7 +58,7 @@ public struct BorderView<Content: View>: View {
         let desired = content.sizeThatFits(inner)
         var width = desired.width + 2
         if let titleText = title {
-            width = max(width, DisplayWidth.width(of: titleText) + 4)
+            width = max(width, DisplayWidth.width(of: TabExpansion.expand(titleText)) + 4)
         }
         return Size(
             width: min(width, proposal.width),
@@ -101,7 +101,9 @@ public struct BorderView<Content: View>: View {
 
         if let titleText = title, rect.width > 4 {
             let available = rect.width - 4
-            let trimmed = DisplayWidth.truncate(" " + titleText + " ", to: available + 2)
+            // 幅で切り詰める前に展開しないと、タブの分だけ桁数の計算がずれる。
+            let expanded = TabExpansion.expand(" " + titleText + " ")
+            let trimmed = DisplayWidth.truncate(expanded, to: available + 2)
             buffer.write(
                 trimmed,
                 at: Point(x: left + 1, y: top),

@@ -63,6 +63,9 @@ public struct Buffer: Hashable, Sendable {
     ///   - style: 文字のスタイル。
     ///   - clip: 描画を制限する矩形。省略時はバッファ全体。
     /// - Returns: 進んだ桁数（クリップされた分も含む）。
+    ///
+    /// タブなどの幅を持たない制御文字は描画されない。タブを表示したい場合は、
+    /// 呼び出す前に `TabExpansion.expand(_:tabSize:)` で空白へ展開しておく。
     @discardableResult
     public mutating func write(
         _ text: String,
@@ -113,6 +116,15 @@ public struct Buffer: Hashable, Sendable {
     }
 
     /// 複数行の文字列を、`rect` の中に指定の揃えで描画する。
+    ///
+    /// - Parameters:
+    ///   - lines: 各行の文字列。`rect` の高さに収まらない行は描画されない。
+    ///   - rect: 描画する矩形。
+    ///   - style: 文字のスタイル。
+    ///   - alignment: 行の水平方向の揃え。
+    ///
+    /// タブなどの幅を持たない制御文字は描画されない。タブを表示したい場合は、
+    /// 呼び出す前に `TabExpansion.expand(_:tabSize:)` で空白へ展開しておく。
     public mutating func write(
         lines: [String],
         in rect: Rect,

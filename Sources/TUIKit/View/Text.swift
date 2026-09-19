@@ -4,28 +4,33 @@ public struct Text: View {
     public var style: Style
     public var wrap: WrapMode
     public var alignment: HorizontalAlignment
+    /// タブストップの間隔。タブはこの桁数ごとの位置まで空白で埋められる。
+    public var tabSize: Int
 
     public init(
         _ content: String,
         style: Style = .plain,
         wrap: WrapMode = .truncate,
-        alignment: HorizontalAlignment = .leading
+        alignment: HorizontalAlignment = .leading,
+        tabSize: Int = TabExpansion.defaultSize
     ) {
         self.content = content
         self.style = style
         self.wrap = wrap
         self.alignment = alignment
+        self.tabSize = tabSize
     }
 
     public func sizeThatFits(_ proposal: Size) -> Size {
-        let lines = TextWrapping.wrap(content, width: proposal.width, mode: wrap)
+        let lines = TextWrapping.wrap(content, width: proposal.width, mode: wrap, tabSize: tabSize)
         let width = lines.reduce(0) { max($0, DisplayWidth.width(of: $1)) }
         return Size(width: min(width, proposal.width), height: lines.count)
     }
 
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard !rect.isEmpty else { return }
-        let lines = TextWrapping.wrap(content, width: rect.width, mode: wrap)
+        let lines = TextWrapping.wrap(content, width: rect.width, mode: wrap, tabSize: tabSize)
+        // 行は TextWrapping.wrap がタブを展開済み。
         buffer.write(lines: Array(lines.prefix(rect.height)), in: rect, style: style, alignment: alignment)
     }
 
@@ -70,6 +75,13 @@ public struct Text: View {
     public func aligned(_ alignment: HorizontalAlignment) -> Text {
         var copy = self
         copy.alignment = alignment
+        return copy
+    }
+
+    /// タブストップの間隔を変える。0 を渡すとタブを取り除く。
+    public func tabStops(every size: Int) -> Text {
+        var copy = self
+        copy.tabSize = size
         return copy
     }
 }

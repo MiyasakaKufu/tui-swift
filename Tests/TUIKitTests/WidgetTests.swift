@@ -228,6 +228,12 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursor, 3)
     }
 
+    /// プレースホルダも入力文字と同じ規則で整える（タブは空白 1 個）。
+    func testTextFieldPlaceholderIsSanitized() {
+        let field = TextField(state: TextFieldState(), placeholder: "a\tb", showsCursor: false)
+        XCTAssertEqual(render(field, width: 5, height: 1), "a b  ")
+    }
+
     func testTextFieldRendersPlaceholder() {
         let state = TextFieldState()
         let field = TextField(state: state, placeholder: "name", showsCursor: false)
