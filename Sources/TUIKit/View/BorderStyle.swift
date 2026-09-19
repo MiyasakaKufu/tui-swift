@@ -1,7 +1,6 @@
 /// 枠線に使う文字の組み合わせ。
 ///
 /// 枠線は 1 セルずつ書き込まれるので、どの文字も表示幅が 1 桁でなければならない。
-/// 全角文字や絵文字を渡した場合は、対応する位置の既定の文字（細い実線）へ置き換える。
 public struct BorderStyle: Hashable, Sendable {
     public private(set) var topLeft: Character
     public private(set) var top: Character
@@ -12,6 +11,10 @@ public struct BorderStyle: Hashable, Sendable {
     public private(set) var bottom: Character
     public private(set) var bottomRight: Character
 
+    /// 8 方向の文字を指定して作る。
+    ///
+    /// 表示幅が 1 桁でない文字（全角文字や絵文字）を渡した場合は、その位置の既定の文字
+    /// （`single` と同じ細い実線）へ置き換える。
     public init(
         topLeft: Character,
         top: Character,

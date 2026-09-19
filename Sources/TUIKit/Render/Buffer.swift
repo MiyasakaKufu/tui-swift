@@ -58,8 +58,12 @@ public struct Buffer: Hashable, Sendable {
     /// 矩形領域を 1 文字の繰り返しで埋める。
     ///
     /// 全角文字は 2 桁を占めるので、先頭のセルに文字を置き、次のセルを継続セルにする。
-    /// 行の末尾に幅が足りずに半端な桁が残る場合は、そこを空白で埋める。
-    /// 幅 0 の文字は繰り返せないため、領域全体を空白で埋める。
+    /// 行の末尾に文字の幅より狭い桁が残った場合は、そこを空白で埋める。
+    ///
+    /// - Parameters:
+    ///   - rect: 埋める領域。バッファの外へはみ出した分は無視される。
+    ///   - character: 繰り返す文字。表示幅が 0 の文字は繰り返せないため、領域全体を空白で埋める。
+    ///   - style: 書き込むセルのスタイル。
     public mutating func fill(_ rect: Rect, repeating character: Character, style: Style = .plain) {
         let region = rect.intersection(bounds)
         guard !region.isEmpty else { return }
