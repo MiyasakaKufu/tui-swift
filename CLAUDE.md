@@ -18,3 +18,7 @@ DocC・コメント・コミットログは `CONTRIBUTING.md` に従う。コー
 
 `Tests/TUIKitTests/DocumentationStyleTests.swift` が、指針のうち機械的に判定できる分を検査する。
 コメントや DocC を直したら `swift test` を通す。
+
+`swift test` が見るのは書式だけなので、中身は `comment-review` スキルで見る。コメントや DocC を
+足した・直した差分は、コミットする前にこのスキルを通す。1 か所だけ指摘されたときも、同じ種類が
+差分全体に残っていないかを掃き出す。
