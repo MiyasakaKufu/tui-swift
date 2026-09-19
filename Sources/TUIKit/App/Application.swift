@@ -18,6 +18,12 @@ public final class Application<Root: Component> {
     private var reportedSize = Size.zero
     private var isRunning = false
 
+    /// ルートと設定を指定してアプリケーションを作る。
+    ///
+    /// - Parameters:
+    ///   - root: 画面を組み立て、イベントを受け取るルート。
+    ///   - options: 起動時の設定。
+    ///   - terminal: 使用する端末。テストでは差し替える。
     public init(
         root: Root,
         options: ApplicationOptions = .default,
@@ -36,6 +42,11 @@ public final class Application<Root: Component> {
     }
 
     /// 端末を初期化し、終了するまでイベントループを回す。
+    ///
+    /// - Throws: 入出力が端末でなければ `TerminalError.notATerminal`、
+    ///   raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
+    /// - Postcondition: 起動直後に一度、そのときの画面サイズで `.resize` を通知する。
+    ///   戻るときは端末を起動前の状態へ戻し、カーソルを表示に戻す。
     public func run() throws {
         guard terminal.isTerminal else { throw TerminalError.notATerminal }
 
@@ -53,7 +64,6 @@ public final class Application<Root: Component> {
         buffer.resize(to: terminal.size())
         renderer.invalidate()
 
-        // 起動直後の画面サイズもリサイズイベントとして通知する。
         reportedSize = buffer.size
         _ = root.handle(.resize(buffer.size))
 
@@ -91,11 +101,14 @@ public final class Application<Root: Component> {
             lastFrame = now
         }
 
-        // 画面をきれいにしてから戻す。
         terminal.setCursorVisible(true)
     }
 
-    /// イベントをルートへ渡す。ループを続けるなら `true` を返す。
+    /// イベントをルートへ渡す。
+    ///
+    /// - Parameters:
+    ///   - event: ルートへ渡すイベント。
+    /// - Returns: ループを続けるなら `true`。
     private func deliver(_ event: InputEvent) -> Bool {
         switch root.handle(event) {
         case .quit:

@@ -17,13 +17,22 @@ public enum TextWrapping {
     ///
     /// 改行文字は常に行の区切りとして扱う。LF（`\n`）だけでなく、
     /// CRLF（`\r\n`）・単独の CR（`\r`）も 1 つの改行として扱う。
-    /// タブは幅を計算する前に、`tabSize` 桁ごとのタブストップまでの空白へ展開する。
+    /// タブは `tabSize` 桁ごとのタブストップまでの空白へ展開する。
+    ///
+    /// - Parameters:
+    ///   - text: 分割する文字列。
+    ///   - width: 1 行に許す表示幅。0 以下なら、各段落を空行として返す。
+    ///   - mode: 折り返しの方法。
+    ///   - tabSize: タブストップの間隔。
+    /// - Returns: 各行の文字列。タブは展開済み。
     public static func wrap(
         _ text: String,
         width: Int,
         mode: WrapMode,
         tabSize: Int = TabExpansion.defaultSize
     ) -> [String] {
+        // 幅を計算する前に展開する。あとで展開すると、`DisplayWidth` が計算した幅と
+        // 実際に描画される幅が食い違う。
         let paragraphs = TabExpansion.expand(text, tabSize: tabSize)
             .split(omittingEmptySubsequences: false, whereSeparator: { $0.isNewline })
             .map(String.init)
@@ -72,7 +81,6 @@ public enum TextWrapping {
         var current = ""
         var used = 0
 
-        // 折り返し位置に残った空白は行末に残さない。
         func flush() {
             lines.append(trimmingTrailingSpaces(current))
             current = ""
@@ -83,7 +91,6 @@ public enum TextWrapping {
             let wordWidth = DisplayWidth.width(of: word)
 
             if word.allSatisfy({ $0 == " " }) {
-                // 行頭の空白は落とし、それ以外は追加する（幅を超えるなら折り返し位置とみなす）。
                 if current.isEmpty { continue }
                 if used + wordWidth > width {
                     flush()
@@ -108,7 +115,6 @@ public enum TextWrapping {
                 current = word
                 used = wordWidth
             } else {
-                // 1 行に収まらない単語は文字単位で分割する。
                 let pieces = splitByCharacter(word, width: width)
                 lines.append(contentsOf: pieces.dropLast())
                 current = pieces.last ?? ""

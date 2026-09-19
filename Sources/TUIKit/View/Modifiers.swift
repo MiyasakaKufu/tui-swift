@@ -1,15 +1,28 @@
 /// 内容の周囲に余白を取るビュー。
 public struct PaddingView<Content: View>: View {
+    /// 余白の内側に置く内容。
     public var content: Content
+    /// 内容の周囲に取る余白。
     public var insets: EdgeInsets
 
+    /// 内容と余白を指定して作る。
+    ///
+    /// - Parameters:
+    ///   - content: 余白の内側に置く内容。
+    ///   - insets: 内容の周囲に取る余白。
     public init(content: Content, insets: EdgeInsets) {
         self.content = content
         self.insets = insets
     }
 
+    /// 内容と同じ。
     public var layoutTraits: LayoutTraits { content.layoutTraits }
 
+    /// 余白の分を足した希望サイズを返す。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    /// - Returns: 内容の希望サイズに余白を足したサイズ。`proposal` は超えない。
     public func sizeThatFits(_ proposal: Size) -> Size {
         let inner = Size(
             width: proposal.width - insets.horizontal,
@@ -22,6 +35,11 @@ public struct PaddingView<Content: View>: View {
         )
     }
 
+    /// 余白の内側へ内容を描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 余白を含めた矩形。
     public func render(into buffer: inout Buffer, rect: Rect) {
         let inner = rect.inset(by: insets)
         guard !inner.isEmpty else { return }
@@ -31,12 +49,25 @@ public struct PaddingView<Content: View>: View {
 
 /// 内容を枠線で囲むビュー。
 public struct BorderView<Content: View>: View {
+    /// 枠線の内側に置く内容。
     public var content: Content
+    /// 枠線に使う文字の組み合わせ。
     public var borderStyle: BorderStyle
+    /// 枠線のスタイル。
     public var style: Style
+    /// 上辺に重ねる見出し。`nil` なら見出しを出さない。
     public var title: String?
+    /// 見出しのスタイル。`nil` なら枠線と同じスタイル。
     public var titleStyle: Style?
 
+    /// 内容と枠線の見た目を指定して作る。
+    ///
+    /// - Parameters:
+    ///   - content: 枠線の内側に置く内容。
+    ///   - borderStyle: 枠線に使う文字の組み合わせ。
+    ///   - style: 枠線のスタイル。
+    ///   - title: 上辺に重ねる見出し。
+    ///   - titleStyle: 見出しのスタイル。`nil` なら枠線と同じスタイル。
     public init(
         content: Content,
         borderStyle: BorderStyle = .single,
@@ -51,8 +82,14 @@ public struct BorderView<Content: View>: View {
         self.titleStyle = titleStyle
     }
 
+    /// 内容と同じ。
     public var layoutTraits: LayoutTraits { content.layoutTraits }
 
+    /// 枠線の 2 桁・2 行を足した希望サイズを返す。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    /// - Returns: 内容の希望サイズに枠線を足したサイズ。見出しがあれば、それが収まる幅まで広げる。
     public func sizeThatFits(_ proposal: Size) -> Size {
         let inner = Size(width: proposal.width - 2, height: proposal.height - 2)
         let desired = content.sizeThatFits(inner)
@@ -66,6 +103,11 @@ public struct BorderView<Content: View>: View {
         )
     }
 
+    /// 枠線と見出しを描き、内側へ内容を描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 枠線を含めた矩形。幅・高さが 2 未満なら何も描かない。
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard rect.width >= 2, rect.height >= 2 else { return }
         drawFrame(into: &buffer, rect: rect)
@@ -82,6 +124,11 @@ public struct BorderView<Content: View>: View {
         borderStyle.fitsInSingleColumn ? borderStyle : .ascii
     }
 
+    /// 枠線と見出しを描く。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 枠線を含めた矩形。
     private func drawFrame(into buffer: inout Buffer, rect: Rect) {
         let border = effectiveBorderStyle
         let top = rect.minY
@@ -124,20 +171,38 @@ public struct BorderView<Content: View>: View {
 
 /// 背景を塗るビュー。
 public struct BackgroundView<Content: View>: View {
+    /// 背景の上に置く内容。
     public var content: Content
+    /// 背景を塗るスタイル。
     public var style: Style
 
+    /// 内容と背景のスタイルを指定して作る。
+    ///
+    /// - Parameters:
+    ///   - content: 背景の上に置く内容。
+    ///   - style: 背景を塗るスタイル。
     public init(content: Content, style: Style) {
         self.content = content
         self.style = style
     }
 
+    /// 内容と同じ。
     public var layoutTraits: LayoutTraits { content.layoutTraits }
 
+    /// 内容の希望サイズをそのまま返す。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    /// - Returns: 内容の希望サイズ。
     public func sizeThatFits(_ proposal: Size) -> Size {
         content.sizeThatFits(proposal)
     }
 
+    /// 領域を塗ってから内容を描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 描画する矩形。
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard !rect.isEmpty else { return }
         buffer.fill(rect, style: style)
@@ -147,16 +212,29 @@ public struct BackgroundView<Content: View>: View {
 
 /// サイズを固定するビュー。負の幅・高さは 0 に丸められる。
 public struct FrameView<Content: View>: View {
+    /// 固定した領域に置く内容。
     public var content: Content
+    /// 固定する幅。`nil` なら内容の希望に任せる。負の値は 0 に丸められる。
     public var width: Int? {
         didSet { width = width.map { max(0, $0) } }
     }
+    /// 固定する高さ。`nil` なら内容の希望に任せる。負の値は 0 に丸められる。
     public var height: Int? {
         didSet { height = height.map { max(0, $0) } }
     }
+    /// 領域の中で内容を横に寄せる向き。
     public var horizontalAlignment: HorizontalAlignment
+    /// 領域の中で内容を縦に寄せる向き。
     public var verticalAlignment: VerticalAlignment
 
+    /// 内容と固定するサイズを指定して作る。
+    ///
+    /// - Parameters:
+    ///   - content: 固定した領域に置く内容。
+    ///   - width: 固定する幅。`nil` なら内容の希望に任せる。
+    ///   - height: 固定する高さ。`nil` なら内容の希望に任せる。
+    ///   - horizontalAlignment: 領域の中で内容を横に寄せる向き。
+    ///   - verticalAlignment: 領域の中で内容を縦に寄せる向き。
     public init(
         content: Content,
         width: Int? = nil,
@@ -171,6 +249,7 @@ public struct FrameView<Content: View>: View {
         self.verticalAlignment = verticalAlignment
     }
 
+    /// サイズを固定した方向は伸びず、固定していない方向は内容と同じ。
     public var layoutTraits: LayoutTraits {
         LayoutTraits(
             horizontalFlex: width == nil ? content.layoutTraits.horizontalFlex : 0,
@@ -178,6 +257,11 @@ public struct FrameView<Content: View>: View {
         )
     }
 
+    /// 固定したサイズ、または内容の希望サイズを返す。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    /// - Returns: 固定した方向はその値、固定していない方向は内容の希望サイズ。
     public func sizeThatFits(_ proposal: Size) -> Size {
         let desired = content.sizeThatFits(proposal)
         return Size(
@@ -186,6 +270,11 @@ public struct FrameView<Content: View>: View {
         )
     }
 
+    /// 固定したサイズの領域へ内容を寄せて描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 描画する矩形。
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard !rect.isEmpty else { return }
         let contentWidth = min(width ?? rect.width, rect.width)
@@ -198,20 +287,38 @@ public struct FrameView<Content: View>: View {
 
 /// 余白の分配ルールだけを差し替えるビュー。
 public struct FlexibleView<Content: View>: View {
+    /// 分配ルールを差し替える対象の内容。
     public var content: Content
+    /// 内容の代わりに使う、余白の分配に関する性質。
     public var traits: LayoutTraits
 
+    /// 内容と分配ルールを指定して作る。
+    ///
+    /// - Parameters:
+    ///   - content: 分配ルールを差し替える対象の内容。
+    ///   - traits: 内容の代わりに使う性質。
     public init(content: Content, traits: LayoutTraits) {
         self.content = content
         self.traits = traits
     }
 
+    /// `traits` に差し替えた性質。
     public var layoutTraits: LayoutTraits { traits }
 
+    /// 内容の希望サイズをそのまま返す。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    /// - Returns: 内容の希望サイズ。
     public func sizeThatFits(_ proposal: Size) -> Size {
         content.sizeThatFits(proposal)
     }
 
+    /// 領域へ内容をそのまま描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 描画する矩形。
     public func render(into buffer: inout Buffer, rect: Rect) {
         content.render(into: &buffer, rect: rect)
     }
@@ -219,20 +326,40 @@ public struct FlexibleView<Content: View>: View {
 
 /// 与えられた領域の中で内容を寄せるビュー。
 public struct AlignedView<Content: View>: View {
+    /// 領域の中に寄せて置く内容。
     public var content: Content
+    /// 横に寄せる向き。
     public var horizontal: HorizontalAlignment
+    /// 縦に寄せる向き。
     public var vertical: VerticalAlignment
 
+    /// 内容と寄せる向きを指定して作る。
+    ///
+    /// - Parameters:
+    ///   - content: 領域の中に寄せて置く内容。
+    ///   - horizontal: 横に寄せる向き。
+    ///   - vertical: 縦に寄せる向き。
     public init(content: Content, horizontal: HorizontalAlignment, vertical: VerticalAlignment) {
         self.content = content
         self.horizontal = horizontal
         self.vertical = vertical
     }
 
+    /// 両方向に伸びる。
     public var layoutTraits: LayoutTraits { .flexible }
 
+    /// 提案された領域をそのまま受け取る。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    /// - Returns: `proposal` と同じサイズ。
     public func sizeThatFits(_ proposal: Size) -> Size { proposal }
 
+    /// 領域の中で内容を寄せて描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 描画する矩形。
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard !rect.isEmpty else { return }
         let desired = content.sizeThatFits(rect.size).clamped(to: rect.size)
@@ -244,19 +371,41 @@ public struct AlignedView<Content: View>: View {
 
 extension View {
     /// 周囲に余白を取る。
+    ///
+    /// - Parameters:
+    ///   - insets: 四辺に取る余白。
+    /// - Returns: 余白で囲んだビュー。
     public func padding(_ insets: EdgeInsets) -> PaddingView<Self> {
         PaddingView(content: self, insets: insets)
     }
 
+    /// 四辺に同じ余白を取る。
+    ///
+    /// - Parameters:
+    ///   - amount: 各辺に取る余白。
+    /// - Returns: 余白で囲んだビュー。
     public func padding(_ amount: Int) -> PaddingView<Self> {
         PaddingView(content: self, insets: EdgeInsets(all: amount))
     }
 
+    /// 左右と上下で余白を分けて取る。
+    ///
+    /// - Parameters:
+    ///   - horizontal: 左右の余白。
+    ///   - vertical: 上下の余白。
+    /// - Returns: 余白で囲んだビュー。
     public func padding(horizontal: Int = 0, vertical: Int = 0) -> PaddingView<Self> {
         PaddingView(content: self, insets: EdgeInsets(horizontal: horizontal, vertical: vertical))
     }
 
     /// 枠線で囲む。
+    ///
+    /// - Parameters:
+    ///   - borderStyle: 枠線に使う文字の組み合わせ。
+    ///   - style: 枠線のスタイル。
+    ///   - title: 上辺に重ねる見出し。
+    ///   - titleStyle: 見出しのスタイル。`nil` なら枠線と同じスタイル。
+    /// - Returns: 枠線で囲んだビュー。
     public func border(
         _ borderStyle: BorderStyle = .single,
         style: Style = .plain,
@@ -267,15 +416,31 @@ extension View {
     }
 
     /// 背景色を塗る。
+    ///
+    /// - Parameters:
+    ///   - color: 背景色。
+    /// - Returns: 背景を塗ったビュー。
     public func background(_ color: Color) -> BackgroundView<Self> {
         BackgroundView(content: self, style: Style(background: color))
     }
 
+    /// 背景をスタイルごと塗る。
+    ///
+    /// - Parameters:
+    ///   - style: 背景を塗るスタイル。
+    /// - Returns: 背景を塗ったビュー。
     public func background(style: Style) -> BackgroundView<Self> {
         BackgroundView(content: self, style: style)
     }
 
     /// 幅・高さを固定する。
+    ///
+    /// - Parameters:
+    ///   - width: 固定する幅。`nil` なら内容の希望に任せる。
+    ///   - height: 固定する高さ。`nil` なら内容の希望に任せる。
+    ///   - horizontalAlignment: 領域の中で内容を横に寄せる向き。
+    ///   - verticalAlignment: 領域の中で内容を縦に寄せる向き。
+    /// - Returns: サイズを固定したビュー。
     public func frame(
         width: Int? = nil,
         height: Int? = nil,
@@ -292,6 +457,11 @@ extension View {
     }
 
     /// 余った領域を引き取るようにする。
+    ///
+    /// - Parameters:
+    ///   - horizontal: 横方向の重み。
+    ///   - vertical: 縦方向の重み。
+    /// - Returns: 分配ルールを差し替えたビュー。
     public func flexible(horizontal: Int = 1, vertical: Int = 1) -> FlexibleView<Self> {
         FlexibleView(
             content: self,
@@ -300,6 +470,11 @@ extension View {
     }
 
     /// 領域いっぱいを受け取り、その中で内容を寄せる。
+    ///
+    /// - Parameters:
+    ///   - horizontal: 横に寄せる向き。
+    ///   - vertical: 縦に寄せる向き。
+    /// - Returns: 内容を寄せて置くビュー。
     public func aligned(
         horizontal: HorizontalAlignment = .center,
         vertical: VerticalAlignment = .center

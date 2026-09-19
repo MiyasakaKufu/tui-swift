@@ -1,8 +1,14 @@
 /// 画面 1 枚分のセル配列。描画はすべてこのバッファに対して行う。
 public struct Buffer: Hashable, Sendable {
+    /// バッファの大きさ。
     public private(set) var size: Size
     private var cells: [Cell]
 
+    /// 指定したサイズのバッファを作る。
+    ///
+    /// - Parameters:
+    ///   - size: バッファの大きさ。
+    ///   - cell: 全体を埋めるセル。
     public init(size: Size, filledWith cell: Cell = .empty) {
         self.size = size
         self.cells = [Cell](repeating: cell, count: size.width * size.height)
@@ -13,7 +19,12 @@ public struct Buffer: Hashable, Sendable {
         Rect(x: 0, y: 0, width: size.width, height: size.height)
     }
 
-    /// 範囲外の読み取りは `.empty`、範囲外への書き込みは無視される。
+    /// 指定した桁・行のセルへアクセスする。
+    ///
+    /// - Parameters:
+    ///   - x: 桁。左端が 0。
+    ///   - y: 行。上端が 0。
+    /// - Note: 範囲外の読み取りは `.empty` を返し、範囲外への書き込みは無視される。
     public subscript(x: Int, y: Int) -> Cell {
         get {
             guard x >= 0, y >= 0, x < size.width, y < size.height else { return .empty }
@@ -26,12 +37,19 @@ public struct Buffer: Hashable, Sendable {
     }
 
     /// サイズを変更し、内容を初期化する。
+    ///
+    /// - Parameters:
+    ///   - newSize: 変更後の大きさ。
+    ///   - cell: 全体を埋めるセル。
     public mutating func resize(to newSize: Size, filledWith cell: Cell = .empty) {
         size = newSize
         cells = [Cell](repeating: cell, count: newSize.width * newSize.height)
     }
 
     /// 全体を空白で塗りつぶす。
+    ///
+    /// - Parameters:
+    ///   - style: 空白に付けるスタイル。
     public mutating func clear(with style: Style = .plain) {
         let cell = Cell(character: " ", style: style)
         for index in cells.indices {
@@ -40,6 +58,10 @@ public struct Buffer: Hashable, Sendable {
     }
 
     /// 矩形領域を塗りつぶす。
+    ///
+    /// - Parameters:
+    ///   - rect: 塗りつぶす矩形。バッファの外へはみ出した部分は無視される。
+    ///   - cell: 埋めるセル。
     public mutating func fill(_ rect: Rect, with cell: Cell) {
         let region = rect.intersection(bounds)
         guard !region.isEmpty else { return }
@@ -51,14 +73,21 @@ public struct Buffer: Hashable, Sendable {
     }
 
     /// 矩形領域の背景スタイルだけを差し替える。
+    ///
+    /// - Parameters:
+    ///   - rect: 差し替える矩形。バッファの外へはみ出した部分は無視される。
+    ///   - style: 塗るスタイル。
     public mutating func fill(_ rect: Rect, style: Style) {
         fill(rect, with: Cell(character: " ", style: style))
     }
 
     /// 矩形領域を 1 文字の繰り返しで埋める。
     ///
-    /// - Parameter character: 繰り返す文字。領域の幅が表示幅で割り切れない場合、行末に残った桁は
-    ///   空白になる。表示幅が 0 の文字は繰り返せないため、領域全体を空白で埋める。
+    /// - Parameters:
+    ///   - rect: 埋める矩形。バッファの外へはみ出した部分は無視される。
+    ///   - character: 繰り返す文字。表示幅が 0 の文字は繰り返せないため、領域全体を空白で埋める。
+    ///   - style: 文字に付けるスタイル。
+    /// - Postcondition: 領域の幅が文字の表示幅で割り切れないとき、行末に残った桁は空白になる。
     public mutating func fill(_ rect: Rect, repeating character: Character, style: Style = .plain) {
         let region = rect.intersection(bounds)
         guard !region.isEmpty else { return }
@@ -102,9 +131,9 @@ public struct Buffer: Hashable, Sendable {
     ///   - style: 文字のスタイル。
     ///   - clip: 描画を制限する矩形。省略時はバッファ全体。
     /// - Returns: 進んだ桁数（クリップされた分も含む）。
-    ///
-    /// タブなどの幅を持たない制御文字は描画されない。タブを表示したい場合は、
-    /// 呼び出す前に `TabExpansion.expand(_:tabSize:)` で空白へ展開しておく。
+    /// - Postcondition: 領域の端に半分だけかかる全角文字は、空白に置き換わる。
+    /// - Note: タブなどの幅を持たない制御文字は描画されない。タブを表示したい場合は、
+    ///   呼び出す前に `TabExpansion.expand(_:tabSize:)` で空白へ展開しておく。
     @discardableResult
     public mutating func write(
         _ text: String,
@@ -127,25 +156,24 @@ public struct Buffer: Hashable, Sendable {
             if x >= region.maxX { break }
 
             if x + characterWidth <= region.minX {
-                // 完全に左側へはみ出している。
                 x += characterWidth
                 continue
             }
 
+            // 端末は全角文字を半分だけ描けない。領域の端に半分だけかかる文字を、
+            // その文字で埋めてはいけない。
             if x >= region.minX {
                 if characterWidth == 2 {
                     if x + 1 < region.maxX {
                         self[x, y] = Cell(character: character, style: style)
                         self[x + 1, y] = Cell(character: " ", style: style, isContinuation: true)
                     } else {
-                        // 右端に半分しか入らない全角文字は空白で埋める。
                         self[x, y] = Cell(character: " ", style: style)
                     }
                 } else {
                     self[x, y] = Cell(character: character, style: style)
                 }
             } else {
-                // 左端をまたぐ全角文字。右半分だけを空白で埋める。
                 self[region.minX, y] = Cell(character: " ", style: style)
             }
 
@@ -161,9 +189,8 @@ public struct Buffer: Hashable, Sendable {
     ///   - rect: 描画する矩形。
     ///   - style: 文字のスタイル。
     ///   - alignment: 行の水平方向の揃え。
-    ///
-    /// タブなどの幅を持たない制御文字は描画されない。タブを表示したい場合は、
-    /// 呼び出す前に `TabExpansion.expand(_:tabSize:)` で空白へ展開しておく。
+    /// - Note: タブなどの幅を持たない制御文字は描画されない。タブを表示したい場合は、
+    ///   呼び出す前に `TabExpansion.expand(_:tabSize:)` で空白へ展開しておく。
     public mutating func write(
         lines: [String],
         in rect: Rect,
@@ -183,7 +210,12 @@ public struct Buffer: Hashable, Sendable {
         }
     }
 
-    /// デバッグ・テスト用に 1 行を文字列として取り出す（継続セルは除く）。
+    /// デバッグ・テスト用に 1 行を文字列として取り出す。
+    ///
+    /// - Parameters:
+    ///   - y: 取り出す行。上端が 0。
+    /// - Returns: その行の文字を並べた文字列。継続セルの分は含まない。
+    ///   範囲外の行を指定すると空文字列。
     public func text(ofRow y: Int) -> String {
         guard y >= 0, y < size.height else { return "" }
         var result = ""
@@ -196,6 +228,8 @@ public struct Buffer: Hashable, Sendable {
     }
 
     /// デバッグ・テスト用に全体を文字列化する。
+    ///
+    /// - Returns: 各行を改行で連ねた文字列。
     public func debugText() -> String {
         (0..<size.height).map { text(ofRow: $0) }.joined(separator: "\n")
     }

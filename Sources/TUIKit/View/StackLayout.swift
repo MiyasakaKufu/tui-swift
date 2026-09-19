@@ -2,6 +2,15 @@
 enum StackLayout {
 
     /// 各子ビューに割り当てる主軸方向のサイズを求める。
+    ///
+    /// - Parameters:
+    ///   - children: 並べる子ビュー。
+    ///   - axis: 主軸の方向。
+    ///   - available: 主軸方向に使える長さ。
+    ///   - crossAvailable: 交差軸方向に使える長さ。
+    ///   - spacing: 子ビューの間隔。
+    /// - Returns: `children` と同じ順序・同じ個数の、主軸方向のサイズ。
+    /// - Postcondition: 間隔を含めた合計は `available` を超えない。
     static func mainAxisSizes(
         children: [any View],
         axis: Axis,
@@ -44,6 +53,13 @@ enum StackLayout {
     }
 
     /// 余った領域を flex の重みに応じて配る。
+    ///
+    /// - Parameters:
+    ///   - extra: 配る長さ。
+    ///   - sizes: 配り先のサイズ。重みを持つ要素だけが増える。
+    ///   - children: `sizes` に対応する子ビュー。
+    ///   - axis: 重みを読む軸。
+    /// - Postcondition: 重みを持つ子が 1 つ以上あれば、`extra` をすべて配り切る。
     private static func distribute(extra: Int, to sizes: inout [Int], children: [any View], axis: Axis) {
         let weights = children.map { $0.layoutTraits.flex(on: axis) }
         let totalWeight = weights.reduce(0, +)
@@ -58,7 +74,6 @@ enum StackLayout {
             distributed += share
         }
 
-        // 整数除算で配りきれなかった分を先頭から 1 ずつ足す。
         var leftover = extra - distributed
         var cursor = 0
         while leftover > 0 && !flexibleIndices.isEmpty {
@@ -69,6 +84,10 @@ enum StackLayout {
     }
 
     /// 領域が足りない場合、後ろの子から削る。
+    ///
+    /// - Parameters:
+    ///   - amount: 削る長さ。
+    ///   - sizes: 削り先のサイズ。
     private static func shrink(by amount: Int, sizes: inout [Int]) {
         var excess = amount
         var index = sizes.count - 1
@@ -83,10 +102,19 @@ enum StackLayout {
 
 /// 子ビューを縦に並べる。
 public struct VStack: View {
+    /// 並べる子ビュー。
     public var children: [any View]
+    /// 子ビューの間隔。負の値は 0 に丸められる。
     public var spacing: Int
+    /// 子ビューの水平方向の揃え。
     public var alignment: HorizontalAlignment
 
+    /// 間隔と揃えを指定し、クロージャで子ビューを並べる。
+    ///
+    /// - Parameters:
+    ///   - spacing: 子ビューの間隔。
+    ///   - alignment: 子ビューの水平方向の揃え。
+    ///   - content: 並べる子ビューを返すクロージャ。
     public init(
         spacing: Int = 0,
         alignment: HorizontalAlignment = .leading,
@@ -97,12 +125,19 @@ public struct VStack: View {
         self.alignment = alignment
     }
 
+    /// 子ビューの配列を直接渡して作る。
+    ///
+    /// - Parameters:
+    ///   - children: 並べる子ビュー。
+    ///   - spacing: 子ビューの間隔。
+    ///   - alignment: 子ビューの水平方向の揃え。
     public init(children: [any View], spacing: Int = 0, alignment: HorizontalAlignment = .leading) {
         self.children = children
         self.spacing = max(0, spacing)
         self.alignment = alignment
     }
 
+    /// 子ビューのうち最も大きい重み。
     public var layoutTraits: LayoutTraits {
         LayoutTraits(
             horizontalFlex: children.map { $0.layoutTraits.horizontalFlex }.max() ?? 0,
@@ -110,6 +145,11 @@ public struct VStack: View {
         )
     }
 
+    /// 子ビューを縦に積んだときに必要なサイズを返す。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    /// - Returns: 間隔を含めた高さの合計と、最も広い子の幅から決まるサイズ。
     public func sizeThatFits(_ proposal: Size) -> Size {
         guard !children.isEmpty else { return .zero }
         var width = 0
@@ -125,6 +165,11 @@ public struct VStack: View {
         return Size(width: min(width, proposal.width), height: min(height, proposal.height))
     }
 
+    /// 子ビューを縦に並べて描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 描画する矩形。はみ出す子ビューは描画されない。
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard !rect.isEmpty else { return }
         let sizes = StackLayout.mainAxisSizes(
@@ -154,10 +199,19 @@ public struct VStack: View {
 
 /// 子ビューを横に並べる。
 public struct HStack: View {
+    /// 並べる子ビュー。
     public var children: [any View]
+    /// 子ビューの間隔。負の値は 0 に丸められる。
     public var spacing: Int
+    /// 子ビューの垂直方向の揃え。
     public var alignment: VerticalAlignment
 
+    /// 間隔と揃えを指定し、クロージャで子ビューを並べる。
+    ///
+    /// - Parameters:
+    ///   - spacing: 子ビューの間隔。
+    ///   - alignment: 子ビューの垂直方向の揃え。
+    ///   - content: 並べる子ビューを返すクロージャ。
     public init(
         spacing: Int = 0,
         alignment: VerticalAlignment = .top,
@@ -168,12 +222,19 @@ public struct HStack: View {
         self.alignment = alignment
     }
 
+    /// 子ビューの配列を直接渡して作る。
+    ///
+    /// - Parameters:
+    ///   - children: 並べる子ビュー。
+    ///   - spacing: 子ビューの間隔。
+    ///   - alignment: 子ビューの垂直方向の揃え。
     public init(children: [any View], spacing: Int = 0, alignment: VerticalAlignment = .top) {
         self.children = children
         self.spacing = max(0, spacing)
         self.alignment = alignment
     }
 
+    /// 子ビューのうち最も大きい重み。
     public var layoutTraits: LayoutTraits {
         LayoutTraits(
             horizontalFlex: children.map { $0.layoutTraits.horizontalFlex }.max() ?? 0,
@@ -181,6 +242,11 @@ public struct HStack: View {
         )
     }
 
+    /// 子ビューを横に積んだときに必要なサイズを返す。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    /// - Returns: 間隔を含めた幅の合計と、最も高い子の高さから決まるサイズ。
     public func sizeThatFits(_ proposal: Size) -> Size {
         guard !children.isEmpty else { return .zero }
         var height = 0
@@ -196,6 +262,11 @@ public struct HStack: View {
         return Size(width: min(width, proposal.width), height: min(height, proposal.height))
     }
 
+    /// 子ビューを横に並べて描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 描画する矩形。はみ出す子ビューは描画されない。
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard !rect.isEmpty else { return }
         let sizes = StackLayout.mainAxisSizes(

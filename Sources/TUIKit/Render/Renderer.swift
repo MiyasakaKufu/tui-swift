@@ -3,6 +3,10 @@ public final class Renderer {
     private let output: TerminalOutput
     private var previous: Buffer?
 
+    /// 書き出し先を指定してレンダラを作る。
+    ///
+    /// - Parameters:
+    ///   - output: 差分を書き出す先。
     public init(output: TerminalOutput) {
         self.output = output
     }
@@ -12,7 +16,7 @@ public final class Renderer {
         previous = nil
     }
 
-    /// バッファを描画する。
+    /// バッファを描画し、直前のフレームとの差分だけを書き出す。
     ///
     /// - Parameters:
     ///   - buffer: 描画したい画面内容。
@@ -40,7 +44,7 @@ public final class Renderer {
                 for x in 0..<width {
                     dirty[x] = buffer[x, y] != previousBuffer[x, y]
                 }
-                // 継続セルだけが変化した場合は、その全角文字の基底セルから描き直す。
+                // 継続セルだけを描き直しても全角文字は直らない。基底セルから描き直す。
                 for x in 1..<max(1, width) where dirty[x] && buffer[x, y].isContinuation {
                     dirty[x - 1] = true
                 }

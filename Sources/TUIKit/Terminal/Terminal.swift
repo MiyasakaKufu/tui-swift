@@ -18,7 +18,9 @@ public enum TerminalError: Error, Equatable {
 
 /// 端末そのものを表し、raw モードや代替画面の切り替えと出力を担当する。
 public final class Terminal: TerminalOutput {
+    /// 入力を読み取るファイル記述子。
     public let inputDescriptor: Int32
+    /// 出力を書き出すファイル記述子。
     public let outputDescriptor: Int32
 
     private var originalAttributes: termios?
@@ -28,6 +30,11 @@ public final class Terminal: TerminalOutput {
     private var isMouseTrackingEnabled = false
     private var isBracketedPasteEnabled = false
 
+    /// 入出力のファイル記述子を指定して端末を作る。
+    ///
+    /// - Parameters:
+    ///   - input: 入力を読み取るファイル記述子。
+    ///   - output: 出力を書き出すファイル記述子。
     public init(input: Int32 = 0, output: Int32 = 1) {
         self.inputDescriptor = input
         self.outputDescriptor = output
@@ -49,7 +56,10 @@ public final class Terminal: TerminalOutput {
 
     // MARK: - サイズ
 
-    /// 現在の端末サイズ。取得できない場合は環境変数、それも無ければ 80x24 を返す。
+    /// 現在の端末サイズを問い合わせる。
+    ///
+    /// - Returns: 端末サイズ。問い合わせに失敗した場合は環境変数 `COLUMNS` / `LINES`、
+    ///   それも無ければ 80x24。
     public func size() -> Size {
         var columns: Int32 = 0
         var rows: Int32 = 0
@@ -61,6 +71,11 @@ public final class Terminal: TerminalOutput {
         return Size(width: fallbackColumns, height: fallbackRows)
     }
 
+    /// 環境変数の値を整数として読む。
+    ///
+    /// - Parameters:
+    ///   - name: 環境変数の名前。
+    /// - Returns: 整数として読めた値。未設定か整数でなければ `nil`。
     private func environmentInt(_ name: String) -> Int? {
         guard let raw = getenv(name) else { return nil }
         return Int(String(cString: raw))
@@ -69,6 +84,11 @@ public final class Terminal: TerminalOutput {
     // MARK: - raw モード
 
     /// canonical モードとエコーを無効にし、1 バイトずつ入力を受け取れるようにする。
+    ///
+    /// - Throws: 入出力が端末でなければ `TerminalError.notATerminal`、
+    ///   termios の取得・設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
+    /// - Postcondition: 元の端末属性を覚えるため、`disableRawMode()` で戻せる。
+    ///   すでに raw モードなら何もしない。
     public func enableRawMode() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
         guard originalAttributes == nil else { return }
@@ -108,6 +128,7 @@ public final class Terminal: TerminalOutput {
 
     // MARK: - 画面モード
 
+    /// 代替画面バッファへ切り替え、画面を消す。
     public func enterAlternateScreen() {
         guard !isInAlternateScreen else { return }
         isInAlternateScreen = true
@@ -116,6 +137,7 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
+    /// 代替画面バッファから元の画面へ戻る。
     public func leaveAlternateScreen() {
         guard isInAlternateScreen else { return }
         isInAlternateScreen = false
@@ -123,11 +145,19 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
+    /// カーソルの表示を切り替える。
+    ///
+    /// - Parameters:
+    ///   - visible: 表示するなら `true`。
     public func setCursorVisible(_ visible: Bool) {
         write(visible ? ANSI.showCursor : ANSI.hideCursor)
         flush()
     }
 
+    /// マウスイベントの通知を切り替える。
+    ///
+    /// - Parameters:
+    ///   - enabled: 受け取るなら `true`。
     public func setMouseTrackingEnabled(_ enabled: Bool) {
         guard enabled != isMouseTrackingEnabled else { return }
         isMouseTrackingEnabled = enabled
@@ -135,6 +165,10 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
+    /// ブラケットペーストを切り替える。
+    ///
+    /// - Parameters:
+    ///   - enabled: 有効にするなら `true`。
     public func setBracketedPasteEnabled(_ enabled: Bool) {
         guard enabled != isBracketedPasteEnabled else { return }
         isBracketedPasteEnabled = enabled
@@ -142,7 +176,9 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
-    /// 端末を起動前の状態へ戻す。二重に呼んでも安全。
+    /// 端末を起動前の状態へ戻す。
+    ///
+    /// - Note: 二重に呼んでも安全。
     public func restore() {
         setMouseTrackingEnabled(false)
         setBracketedPasteEnabled(false)
@@ -157,10 +193,15 @@ public final class Terminal: TerminalOutput {
 
     // MARK: - 出力
 
+    /// 文字列を出力バッファへ追加する。
+    ///
+    /// - Parameters:
+    ///   - text: 追加する文字列。
     public func write(_ text: String) {
         pendingOutput.append(contentsOf: Array(text.utf8))
     }
 
+    /// 溜めた出力を端末へ書き出す。
     public func flush() {
         guard !pendingOutput.isEmpty else { return }
         let bytes = pendingOutput
@@ -169,9 +210,14 @@ public final class Terminal: TerminalOutput {
     }
 }
 
+// `Terminal` のメソッドにしてはいけない。`Terminal.write(_:)` が先に見つかり、
+// 自分自身を呼び続ける。
+
 /// `write(2)` を最後まで書き切るまで繰り返す。
 ///
-/// `Terminal.write(_:)` と名前が衝突しないよう、ファイルスコープの関数として定義している。
+/// - Parameters:
+///   - descriptor: 書き出す先のファイル記述子。
+///   - bytes: 書き出すバイト列。
 private func writeAllBytes(_ descriptor: Int32, _ bytes: [UInt8]) {
     bytes.withUnsafeBufferPointer { buffer in
         guard let base = buffer.baseAddress else { return }

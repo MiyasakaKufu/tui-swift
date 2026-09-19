@@ -2,13 +2,28 @@
 public struct ProgressBar: View {
     /// 0.0 〜 1.0 に丸められた進捗。
     public var progress: Double
+    /// 進んだ部分を埋める文字。
     public var filledCharacter: Character
+    /// まだ進んでいない部分を埋める文字。
     public var emptyCharacter: Character
+    /// 進んだ部分のスタイル。
     public var filledStyle: Style
+    /// まだ進んでいない部分のスタイル。
     public var emptyStyle: Style
     /// 右端に "42%" のような表示を付ける。
     public var showsPercentage: Bool
 
+    /// 進捗と見た目を指定してバーを作る。
+    ///
+    /// - Parameters:
+    ///   - value: 現在の値。
+    ///   - total: 全体の値。0 以下なら進捗を 0 として扱う。
+    ///   - filledCharacter: 進んだ部分を埋める文字。
+    ///   - emptyCharacter: まだ進んでいない部分を埋める文字。
+    ///   - filledStyle: 進んだ部分のスタイル。
+    ///   - emptyStyle: まだ進んでいない部分のスタイル。
+    ///   - showsPercentage: 右端に百分率を付けるか。
+    /// - Postcondition: `progress` は 0.0 〜 1.0 に丸められる。
     public init(
         value: Double,
         total: Double = 1.0,
@@ -27,12 +42,23 @@ public struct ProgressBar: View {
         self.showsPercentage = showsPercentage
     }
 
+    /// 横方向にだけ伸びる。
     public var layoutTraits: LayoutTraits { LayoutTraits(horizontalFlex: 1, verticalFlex: 0) }
 
+    /// 与えられた幅いっぱい、高さ 1 行を希望する。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    /// - Returns: `proposal` の幅と、高さ 1 行のサイズ。
     public func sizeThatFits(_ proposal: Size) -> Size {
         Size(width: proposal.width, height: min(1, proposal.height))
     }
 
+    /// バーと、必要なら百分率を描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 描画する矩形。使うのは最初の 1 行だけ。
     public func render(into buffer: inout Buffer, rect: Rect) {
         guard rect.width > 0, rect.height > 0 else { return }
 

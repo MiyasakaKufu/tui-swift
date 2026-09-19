@@ -9,12 +9,17 @@ public struct InputParser {
     /// ブラケットペーストの終端 `ESC [ 201 ~`。
     private static let pasteTerminator: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
 
+    /// 何も読み取っていないパーサを作る。
     public init() {}
 
     /// 未解釈のバイトが残っているか。
     public var hasPendingBytes: Bool { !pending.isEmpty }
 
     /// バイト列を流し込み、確定したイベントを取り出す。
+    ///
+    /// - Parameters:
+    ///   - bytes: 端末から読み取ったバイト列。
+    /// - Returns: 確定したイベント。途中までのエスケープシーケンスは内部に残る。
     public mutating func feed(_ bytes: [UInt8]) -> [InputEvent] {
         pending.append(contentsOf: bytes)
         var events: [InputEvent] = []
@@ -46,6 +51,8 @@ public struct InputParser {
     }
 
     /// 入力が途切れたときに呼び、単独の ESC を Escape キーとして確定させる。
+    ///
+    /// - Returns: 確定したイベント。確定するものがなければ空配列。
     public mutating func flush() -> [InputEvent] {
         guard !isInPaste, let first = pending.first, first == 0x1B else { return [] }
         pending.removeFirst()
