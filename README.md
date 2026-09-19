@@ -16,8 +16,8 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
 - **差分レンダリング** — 前フレームとの差分だけをエスケープシーケンスで送るため、
   ちらつかず、大きな画面でも出力量が小さい。
 - **全角文字と絵文字に対応** — East Asian Width と結合文字を考慮して桁数を計算し、
-  全角文字がセルの境界で割れないように描画する。`TextField` は国旗や ZWJ で
-  結合した絵文字を書記素クラスタ単位で 1 文字として扱う。
+  全角文字がセルの境界で割れないように描画する。曖昧幅の文字は 1 桁と 2 桁から選べる。
+  `TextField` は国旗や ZWJ で結合した絵文字を書記素クラスタ単位で 1 文字として扱う。
 - **タブの展開** — タブは幅を計算する前に次のタブストップまでの空白へ展開する。
   既定のタブ幅は 4 桁で、`Text(_:tabSize:)` や `.tabStops(every:)` で変えられる。
 - **宣言的なレイアウト** — `VStack` / `HStack` / `Spacer` / `border` などを組み合わせて画面を記述する。
@@ -98,6 +98,31 @@ try Application(root: Counter(), options: .default).run()
 ```
 swift run tui-demo
 ```
+
+## 曖昧幅（East Asian Ambiguous）
+
+罫線素片（`─` `│` `╭`）、`…`、`█`、矢印などは East Asian Width が Ambiguous で、
+端末の設定によって 1 桁にも 2 桁にも表示される。TUIKit は既定で 1 桁として扱う。
+
+```swift
+DisplayWidth.ambiguousWidth = .wide   // 全角として扱う
+```
+
+環境変数 `RUNEWIDTH_EASTASIAN` が `1` なら、最初の計算時に自動で `.wide` になる
+（go-runewidth や tcell と同じ規則）。ロケールからの推測は端末側の設定と食い違うと
+かえって崩れるため自動では行わないが、必要なら明示的に呼べる。
+
+```swift
+DisplayWidth.ambiguousWidth = DisplayWidth.resolveAmbiguousWidth(usingLocale: true)
+```
+
+1 回の計算だけ切り替えたい場合は `ambiguous:` を渡す。
+
+```swift
+DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
+```
+
+`.wide` のときは枠線の罫線素片も 2 桁になるため、枠線は ASCII 版（`+-|`）へ自動で切り替わる。
 
 ## 構成
 

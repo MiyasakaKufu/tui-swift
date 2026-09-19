@@ -75,27 +75,35 @@ public struct BorderView<Content: View>: View {
         }
     }
 
+    /// 実際に枠として描く文字の組み合わせ。
+    ///
+    /// `borderStyle` が 1 桁に収まらないときは `.ascii` になる。
+    var effectiveBorderStyle: BorderStyle {
+        borderStyle.fitsInSingleColumn ? borderStyle : .ascii
+    }
+
     private func drawFrame(into buffer: inout Buffer, rect: Rect) {
+        let border = effectiveBorderStyle
         let top = rect.minY
         let bottom = rect.maxY - 1
         let left = rect.minX
         let right = rect.maxX - 1
 
-        buffer[left, top] = Cell(character: borderStyle.topLeft, style: style)
-        buffer[right, top] = Cell(character: borderStyle.topRight, style: style)
-        buffer[left, bottom] = Cell(character: borderStyle.bottomLeft, style: style)
-        buffer[right, bottom] = Cell(character: borderStyle.bottomRight, style: style)
+        buffer[left, top] = Cell(character: border.topLeft, style: style)
+        buffer[right, top] = Cell(character: border.topRight, style: style)
+        buffer[left, bottom] = Cell(character: border.bottomLeft, style: style)
+        buffer[right, bottom] = Cell(character: border.bottomRight, style: style)
 
         if right > left + 1 {
             for x in (left + 1)...(right - 1) {
-                buffer[x, top] = Cell(character: borderStyle.top, style: style)
-                buffer[x, bottom] = Cell(character: borderStyle.bottom, style: style)
+                buffer[x, top] = Cell(character: border.top, style: style)
+                buffer[x, bottom] = Cell(character: border.bottom, style: style)
             }
         }
         if bottom > top + 1 {
             for y in (top + 1)...(bottom - 1) {
-                buffer[left, y] = Cell(character: borderStyle.left, style: style)
-                buffer[right, y] = Cell(character: borderStyle.right, style: style)
+                buffer[left, y] = Cell(character: border.left, style: style)
+                buffer[right, y] = Cell(character: border.right, style: style)
             }
         }
 
