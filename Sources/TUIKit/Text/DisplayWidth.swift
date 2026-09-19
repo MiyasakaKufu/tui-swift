@@ -200,7 +200,8 @@ public enum DisplayWidth {
     ///   - string: 切り出す元の文字列。
     ///   - limit: 許容する表示幅。0 以下なら空の `Substring` を返す。
     ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `ambiguousWidth` に従う。
-    /// - Returns: 表示幅が `limit` 以下になる最長の接頭辞。全角文字を途中で割ることはない。
+    /// - Returns: 表示幅が `limit` 以下になる最長の接頭辞。
+    /// - Postcondition: 全角文字を途中で割らない。
     public static func prefix(
         of string: String,
         width limit: Int,
