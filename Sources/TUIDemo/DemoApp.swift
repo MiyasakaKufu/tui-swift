@@ -84,6 +84,7 @@ final class DemoApp: TerminalApp {
             Text(" ↑↓/jk 選択 ").styled(Style(foreground: .black, background: .white))
             Text(" ホイール スクロール ").styled(Style(foreground: .black, background: .white))
             Text(" Tab 切り替え ").styled(Style(foreground: .black, background: .white))
+            Text(" Ctrl+Z 一時停止 ").styled(Style(foreground: .black, background: .white))
             Text(" q 終了 ").styled(Style(foreground: .black, background: .white))
             Spacer()
         }

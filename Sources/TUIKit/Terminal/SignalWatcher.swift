@@ -8,6 +8,8 @@ import Glibc
 /// シグナルハンドラ内で行えるのはこの種のフラグ更新だけなので、実際の処理はイベントループ側で行う。
 private var windowResizeFlag: sig_atomic_t = 0
 private var terminationFlag: sig_atomic_t = 0
+private var suspendFlag: sig_atomic_t = 0
+private var continueFlag: sig_atomic_t = 0
 
 /// 自己パイプ（self-pipe）の両端。
 private var wakeupReadDescriptor: Int32 = -1
@@ -37,10 +39,23 @@ private func handleTerminationSignal(_ signalNumber: Int32) {
     wakeUpEventLoop()
 }
 
-/// ウィンドウサイズ変更・終了シグナルの監視。
+private func handleSuspendSignal(_ signalNumber: Int32) {
+    suspendFlag = 1
+    wakeUpEventLoop()
+}
+
+private func handleContinueSignal(_ signalNumber: Int32) {
+    continueFlag = 1
+    wakeUpEventLoop()
+}
+
+/// ウィンドウサイズ変更・終了・一時停止のシグナルの監視。
 public enum SignalWatcher {
 
-    /// SIGWINCH と SIGTERM / SIGHUP のハンドラを登録する。
+    /// SIGWINCH、終了シグナル、SIGTSTP / SIGCONT のハンドラを登録する。
+    ///
+    /// 終了シグナルは SIGTERM / SIGHUP / SIGINT / SIGQUIT。既定の動作のまま受けると、
+    /// `Application` の終了処理が行われず、端末が raw モードのまま残る。
     ///
     /// - Postcondition: `wakeupDescriptor` が使えるようになる。SIGPIPE は無視される。
     public static func install() {
@@ -49,8 +64,25 @@ public enum SignalWatcher {
         _ = signal(SIGWINCH, handleWindowResizeSignal)
         _ = signal(SIGTERM, handleTerminationSignal)
         _ = signal(SIGHUP, handleTerminationSignal)
+        _ = signal(SIGINT, handleTerminationSignal)
+        _ = signal(SIGQUIT, handleTerminationSignal)
+        _ = signal(SIGTSTP, handleSuspendSignal)
+        _ = signal(SIGCONT, handleContinueSignal)
         // 出力先が閉じられてもプロセスを落とさない。
         _ = signal(SIGPIPE, SIG_IGN)
+        #endif
+    }
+
+    /// 自分自身を止め、再開されるまで戻らない。
+    ///
+    /// - Precondition: 呼ぶ前に端末を元へ戻しておく。
+    /// - Postcondition: 戻るときに SIGTSTP のハンドラを登録し直す。
+    public static func stopProcess() {
+        #if canImport(Darwin) || canImport(Glibc)
+        _ = signal(SIGTSTP, SIG_DFL)
+        // プロセスグループごと止めてはいけない。同じ端末を使う他のプロセスまで巻き込む。
+        _ = raise(SIGTSTP)
+        _ = signal(SIGTSTP, handleSuspendSignal)
         #endif
     }
 
@@ -77,11 +109,37 @@ public enum SignalWatcher {
 
     /// 終了シグナルの通知を受け取る。
     ///
-    /// - Returns: 前回の呼び出し以降に SIGTERM または SIGHUP が届いていれば `true`。
+    /// - Returns: 前回の呼び出し以降に SIGTERM / SIGHUP / SIGINT / SIGQUIT の
+    ///   いずれかが届いていれば `true`。
     /// - Postcondition: 同じ通知を二度受け取ることはない。
     public static func consumeTermination() -> Bool {
         if terminationFlag != 0 {
             terminationFlag = 0
+            return true
+        }
+        return false
+    }
+
+    /// 一時停止シグナルの通知を受け取る。
+    ///
+    /// - Returns: 前回の呼び出し以降に SIGTSTP が届いていれば `true`。
+    /// - Postcondition: 同じ通知を二度受け取ることはない。
+    public static func consumeSuspend() -> Bool {
+        if suspendFlag != 0 {
+            suspendFlag = 0
+            return true
+        }
+        return false
+    }
+
+    /// 再開シグナルの通知を受け取る。
+    ///
+    /// - Returns: 前回の呼び出し以降に SIGCONT が届いていれば `true`。
+    /// - Postcondition: 同じ通知を二度受け取ることはない。
+    /// - Note: 捕まえられない SIGSTOP で止められた場合も、再開されればこれで分かる。
+    public static func consumeContinue() -> Bool {
+        if continueFlag != 0 {
+            continueFlag = 0
             return true
         }
         return false

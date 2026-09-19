@@ -113,6 +113,105 @@ final class ApplicationBugReproductionTests: XCTestCase {
             "終了時にフォーカス通知が止められていない"
         )
     }
+
+    /// Ctrl+Z を受けると端末をシェルへ返し、再開したら設定と画面を取り戻す。
+    func testControlZSuspendsAndResumesTerminal() throws {
+        var masterDescriptor: Int32 = -1
+        var slaveDescriptor: Int32 = -1
+        let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
+        try XCTSkipIf(openResult != 0, "疑似端末を開けない環境のため飛ばす")
+        let master = masterDescriptor
+        let slave = slaveDescriptor
+        defer {
+            close(slave)
+            close(master)
+        }
+
+        XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
+
+        // 出力先が詰まるとループが止まるので、master 側は読み捨て続ける。
+        let drain = OutputDrain(descriptor: master)
+        drain.start()
+        defer { drain.stop() }
+
+        let terminal = Terminal(input: slave, output: slave)
+        let component = SuspendRecordingComponent()
+        let application = Application(
+            root: component,
+            options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
+            terminal: terminal
+        )
+        component.onTimeout = { [weak application] in application?.stop() }
+
+        // 本当に止めるとテストプロセスまで止まるので、止める処理だけ差し替える。
+        var isRawModeWhileStopped = true
+        var isCanonicalWhileStopped = false
+        application.stopProcess = {
+            isRawModeWhileStopped = terminal.isRawModeEnabled
+            isCanonicalWhileStopped = isCanonicalMode(slave)
+        }
+
+        var isRawModeAfterResume = false
+        var isCanonicalAfterResume = true
+        component.onResume = {
+            isRawModeAfterResume = terminal.isRawModeEnabled
+            isCanonicalAfterResume = isCanonicalMode(slave)
+        }
+
+        // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+        let sender = Thread {
+            guard component.hasStartedLoop.wait(timeout: 5) else { return }
+            writeByte(master, 0x1A)
+        }
+        sender.start()
+
+        try application.run()
+
+        XCTAssertFalse(isRawModeWhileStopped, "止まる前に raw モードを解いていない")
+        XCTAssertTrue(isCanonicalWhileStopped, "止まる前に端末属性を戻していない")
+        XCTAssertTrue(isRawModeAfterResume, "再開後に raw モードへ戻っていない")
+        XCTAssertFalse(isCanonicalAfterResume, "再開後に端末属性を設定し直していない")
+        XCTAssertEqual(
+            component.reportedSizes,
+            [Size(width: 80, height: 24), Size(width: 80, height: 24)],
+            "再開後に .resize が通知されていない"
+        )
+    }
+
+    /// クラッシュしたときの手順で端末が元に戻る。
+    func testCrashRestoreReturnsTerminalToNormalMode() throws {
+        var masterDescriptor: Int32 = -1
+        var slaveDescriptor: Int32 = -1
+        let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
+        try XCTSkipIf(openResult != 0, "疑似端末を開けない環境のため飛ばす")
+        let master = masterDescriptor
+        let slave = slaveDescriptor
+        defer {
+            close(slave)
+            close(master)
+        }
+
+        let drain = OutputDrain(descriptor: master, recordsOutput: true)
+        drain.start()
+        defer { drain.stop() }
+
+        let terminal = Terminal(input: slave, output: slave)
+        try terminal.enableRawMode()
+        defer { terminal.restore() }
+        terminal.enterAlternateScreen()
+
+        XCTAssertFalse(isCanonicalMode(slave), "raw モードになっていない")
+
+        // クラッシュのシグナルを送るとテストプロセスごと落ちるため、
+        // ハンドラが呼ぶ処理だけを直接確かめる。
+        CrashRestorer.restoreTerminal()
+
+        XCTAssertTrue(isCanonicalMode(slave), "クラッシュしても端末属性が戻らない")
+        XCTAssertTrue(
+            drain.waitForOutput(containing: CrashRestorer.restoreSequence, timeout: 2),
+            "クラッシュしても復元用の制御コードが書き出されない"
+        )
+    }
 }
 
 // MARK: - テスト用のコンポーネント
@@ -180,6 +279,42 @@ private final class FocusRecordingComponent: Component {
         guard case .focus(let gained) = event else { return .ignored }
         focusChanges.append(gained)
         return gained ? .handled : .quit
+    }
+
+    func update(elapsed: Double) {
+        hasStartedLoop.set()
+        elapsedTotal += elapsed
+        if elapsedTotal > 5 { onTimeout() }
+    }
+}
+
+/// 受け取った `.resize` を記録し、再開後の 2 度目で終了するコンポーネント。
+///
+/// Ctrl+Z を処理しないので、`Application` が一時停止する。
+private final class SuspendRecordingComponent: Component {
+
+    /// 受け取った `.resize` のサイズを届いた順に並べたもの。
+    private(set) var reportedSizes: [Size] = []
+    /// イベントループが 1 周したら立つ。
+    let hasStartedLoop = Latch()
+
+    /// 一時停止から戻って `.resize` が届いたときに呼ばれる。
+    var onResume: () -> Void = {}
+    /// 入力が届かないまま時間切れになったときの脱出口。
+    var onTimeout: () -> Void = {}
+
+    private var elapsedTotal = 0.0
+
+    var body: some View {
+        Text("一時停止の確認")
+    }
+
+    func handle(_ event: InputEvent) -> EventResult {
+        guard case .resize(let size) = event else { return .ignored }
+        reportedSizes.append(size)
+        guard reportedSizes.count >= 2 else { return .handled }
+        onResume()
+        return .quit
     }
 
     func update(elapsed: Double) {
@@ -298,4 +433,15 @@ private func writeByte(_ descriptor: Int32, _ byte: UInt8) {
 private func writeBytes(_ descriptor: Int32, _ bytes: [UInt8]) {
     var values = bytes
     _ = write(descriptor, &values, values.count)
+}
+
+/// canonical モードかどうか。raw モードなら `false`。
+///
+/// - Parameters:
+///   - descriptor: 調べるファイル記述子。
+/// - Returns: canonical モードなら `true`。
+private func isCanonicalMode(_ descriptor: Int32) -> Bool {
+    var attributes = termios()
+    guard tcgetattr(descriptor, &attributes) == 0 else { return false }
+    return attributes.c_lflag & tcflag_t(ICANON) != 0
 }

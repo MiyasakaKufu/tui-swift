@@ -58,6 +58,51 @@ final class ApplicationSignalTests: XCTestCase {
         XCTAssertNil(run.error.value)
     }
 
+    /// 外から送られた SIGINT / SIGQUIT を終了シグナルとして受け取る。
+    func testInterruptAndQuitAreTreatedAsTermination() throws {
+        SignalWatcher.install()
+        let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
+
+        // 他のテストが残した合図を片付けてから確かめる。
+        discard(descriptor)
+        _ = SignalWatcher.consumeTermination()
+
+        raise(SIGINT)
+
+        XCTAssertTrue(SignalWatcher.consumeTermination(), "SIGINT が終了として扱われていない")
+        XCTAssertTrue(isReadable(descriptor), "SIGINT でイベント待ちが起こされない")
+        discard(descriptor)
+
+        raise(SIGQUIT)
+
+        XCTAssertTrue(SignalWatcher.consumeTermination(), "SIGQUIT が終了として扱われていない")
+        XCTAssertTrue(isReadable(descriptor), "SIGQUIT でイベント待ちが起こされない")
+        discard(descriptor)
+    }
+
+    /// 外から送られた SIGTSTP / SIGCONT を一時停止・再開として受け取る。
+    func testSuspendAndContinueAreReported() throws {
+        SignalWatcher.install()
+        let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
+
+        discard(descriptor)
+        _ = SignalWatcher.consumeSuspend()
+        _ = SignalWatcher.consumeContinue()
+
+        // ハンドラを登録してあるので、プロセスは止まらずフラグが立つだけ。
+        raise(SIGTSTP)
+
+        XCTAssertTrue(SignalWatcher.consumeSuspend(), "SIGTSTP が一時停止として扱われていない")
+        XCTAssertTrue(isReadable(descriptor), "SIGTSTP でイベント待ちが起こされない")
+        discard(descriptor)
+
+        raise(SIGCONT)
+
+        XCTAssertTrue(SignalWatcher.consumeContinue(), "SIGCONT が再開として扱われていない")
+        XCTAssertTrue(isReadable(descriptor), "SIGCONT でイベント待ちが起こされない")
+        discard(descriptor)
+    }
+
     /// シグナルハンドラが、起こすためのパイプへ書き込む。
     func testSignalWritesToWakeupDescriptor() throws {
         SignalWatcher.install()

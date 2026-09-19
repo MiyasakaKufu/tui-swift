@@ -16,7 +16,14 @@ public final class Application<Root: Component> {
     private var buffer = Buffer(size: .zero)
     /// 最後に `.resize` として通知したサイズ。
     private var reportedSize = Size.zero
+    /// 最後にフレームを数えた時刻。
+    private var lastFrameTime = 0.0
     private var isRunning = false
+
+    /// 端末を戻した後にプロセスを止める処理。
+    ///
+    /// - Note: 実際に止めるとテストプロセスまで止まるため、テストでは差し替える。
+    var stopProcess: () -> Void = { SignalWatcher.stopProcess() }
 
     /// ルートと設定を指定してアプリケーションを作る。
     ///
@@ -39,6 +46,23 @@ public final class Application<Root: Component> {
     /// ループを終了させる。イベントハンドラの中からも呼べる。
     public func stop() {
         isRunning = false
+    }
+
+    /// 端末をシェルへ返してプロセスを止め、再開したら端末を設定し直す。
+    ///
+    /// raw モードでは `ISIG` を無効にしているため、Ctrl+Z はシグナルにならずキーとして届く。
+    /// 一時停止したいアプリは、そのキーを受けたときにこれを呼ぶ。
+    ///
+    /// - Postcondition: 再開したら画面全体を描き直し、改めて `.resize` を通知する。
+    /// - Note: `ApplicationOptions.suspendsOnControlZ` が有効なら、
+    ///   ルートが処理しなかった Ctrl+Z で自動的に呼ばれる。
+    public func suspend() {
+        terminal.deactivate()
+        stopProcess()
+        // 自分で送った SIGTSTP と、再開の SIGCONT をループで二重に処理しない。
+        _ = SignalWatcher.consumeSuspend()
+        _ = SignalWatcher.consumeContinue()
+        resumeTerminal()
     }
 
     /// 端末を初期化し、終了するまでイベントループを回す。
@@ -69,7 +93,7 @@ public final class Application<Root: Component> {
         _ = root.handle(.resize(buffer.size))
 
         isRunning = true
-        var lastFrame = monotonicSeconds()
+        lastFrameTime = monotonicSeconds()
 
         while isRunning {
             // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
@@ -86,6 +110,17 @@ public final class Application<Root: Component> {
                 break
             }
 
+            if SignalWatcher.consumeSuspend() {
+                suspend()
+                if !isRunning { break }
+            }
+
+            // 捕まえられない SIGSTOP で止められた後は、端末の設定だけが失われている。
+            if SignalWatcher.consumeContinue() {
+                resumeTerminal()
+                if !isRunning { break }
+            }
+
             if SignalWatcher.consumeWindowResize(), !synchronizeSize() {
                 isRunning = false
                 break
@@ -98,8 +133,8 @@ public final class Application<Root: Component> {
             }
 
             let now = monotonicSeconds()
-            root.update(elapsed: now - lastFrame)
-            lastFrame = now
+            root.update(elapsed: now - lastFrameTime)
+            lastFrameTime = now
         }
 
         terminal.setCursorVisible(true)
@@ -117,9 +152,34 @@ public final class Application<Root: Component> {
         case .handled:
             return true
         case .ignored:
+            if options.suspends(onUnhandled: event) {
+                suspend()
+                return isRunning
+            }
             // ルートが処理しなかった Ctrl+C は最後の脱出口として扱う。
             return !options.quits(onUnhandled: event)
         }
+    }
+
+    /// 一時停止から戻り、端末と画面を元の状態へ戻す。
+    ///
+    /// - Postcondition: 画面全体を描き直し、改めて `.resize` を通知する。
+    ///   止まっていた時間は `update(elapsed:)` の経過時間に含めない。
+    ///   端末を取り戻せなければループを終える。
+    private func resumeTerminal() {
+        do {
+            try terminal.reactivate()
+        } catch {
+            // 端末を取り戻せないまま続けると、壊れた画面へ描き続けることになる。
+            isRunning = false
+            return
+        }
+
+        terminal.setCursorVisible(false)
+        renderer.invalidate()
+        // 止まっている間のサイズ変更では SIGWINCH が届かない。次のループで取り直す。
+        reportedSize = .zero
+        lastFrameTime = monotonicSeconds()
     }
 
     /// 端末サイズの変化を検出し、バッファを作り直して `.resize` を通知する。
