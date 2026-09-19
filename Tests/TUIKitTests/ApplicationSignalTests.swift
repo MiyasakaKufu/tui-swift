@@ -18,12 +18,12 @@ final class ApplicationSignalTests: XCTestCase {
         let pty = try PseudoTerminal()
         defer { pty.close() }
 
-        XCTAssertEqual(ctui_set_terminal_size(pty.master, 20, 5), 0, "初期サイズを設定できない")
+        XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 20, 5), 0, "初期サイズを設定できない")
 
         // `body` はサイズを確認した後・イベント待ちに入る前に呼ばれる。
         // ここでリサイズすることで、シグナルが届くタイミングを狙って揃えられる。
         let probe = ResizeProbe {
-            XCTAssertEqual(ctui_set_terminal_size(pty.master, 30, 8), 0, "サイズを変更できない")
+            XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 30, 8), 0, "サイズを変更できない")
             kill(getpid(), SIGWINCH)
         }
 
@@ -44,7 +44,7 @@ final class ApplicationSignalTests: XCTestCase {
         let pty = try PseudoTerminal()
         defer { pty.close() }
 
-        XCTAssertEqual(ctui_set_terminal_size(pty.master, 20, 5), 0, "初期サイズを設定できない")
+        XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 20, 5), 0, "初期サイズを設定できない")
 
         let probe = TerminationProbe {
             kill(getpid(), SIGTERM)
@@ -204,7 +204,7 @@ private final class PseudoTerminal {
     init() throws {
         var master: Int32 = -1
         var slave: Int32 = -1
-        guard ctui_open_pty(&master, &slave) == 0 else {
+        guard ctui_test_open_pty(&master, &slave) == 0 else {
             throw Failure.unavailable(errno: errno)
         }
         self.master = master

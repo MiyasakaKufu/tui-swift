@@ -8,6 +8,51 @@ final class TextWrappingTests: XCTestCase {
         XCTAssertEqual(lines, ["a", "b"])
     }
 
+    func testTabsExpandBeforeWrapping() {
+        let lines = TextWrapping.wrap("a\tb", width: 10, mode: .none)
+        XCTAssertEqual(lines, ["a   b"])
+    }
+
+    func testTabsAlignToTabStopsOnEachLine() {
+        let lines = TextWrapping.wrap("ab\tc\nabcd\te", width: 20, mode: .none)
+        XCTAssertEqual(lines, ["ab  c", "abcd    e"])
+    }
+
+    func testTabStopsResetAfterCRLF() {
+        let lines = TextWrapping.wrap("ab\tc\r\nabcd\te", width: 20, mode: .none)
+        XCTAssertEqual(lines, ["ab  c", "abcd    e"])
+    }
+
+    func testExpandedTabsAreSubjectToWrapping() {
+        let lines = TextWrapping.wrap("a\tb", width: 4, mode: .character)
+        XCTAssertEqual(lines, ["a   ", "b"])
+    }
+
+    func testTabSizeIsConfigurable() {
+        XCTAssertEqual(TextWrapping.wrap("a\tb", width: 20, mode: .none, tabSize: 8), ["a       b"])
+        XCTAssertEqual(TextWrapping.wrap("a\tb", width: 20, mode: .none, tabSize: 0), ["ab"])
+    }
+
+    func testCRLFSplitsLines() {
+        let lines = TextWrapping.wrap("ab\r\ncd", width: 10, mode: .none)
+        XCTAssertEqual(lines, ["ab", "cd"])
+    }
+
+    func testLoneCarriageReturnSplitsLines() {
+        let lines = TextWrapping.wrap("ab\rcd", width: 10, mode: .none)
+        XCTAssertEqual(lines, ["ab", "cd"])
+    }
+
+    func testCRLFSplitsLinesInWordMode() {
+        let lines = TextWrapping.wrap("the quick\r\nbrown fox", width: 10, mode: .word)
+        XCTAssertEqual(lines, ["the quick", "brown fox"])
+    }
+
+    func testTrailingCRLFProducesEmptyLastLine() {
+        XCTAssertEqual(TextWrapping.wrap("ab\r\n", width: 10, mode: .none), ["ab", ""])
+        XCTAssertEqual(TextWrapping.wrap("ab\r", width: 10, mode: .none), ["ab", ""])
+    }
+
     func testNoneModeTruncates() {
         let lines = TextWrapping.wrap("abcdef", width: 3, mode: .none)
         XCTAssertEqual(lines, ["abc"])

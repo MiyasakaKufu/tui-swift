@@ -55,6 +55,45 @@ public struct Buffer: Hashable, Sendable {
         fill(rect, with: Cell(character: " ", style: style))
     }
 
+    /// 矩形領域を 1 文字の繰り返しで埋める。
+    ///
+    /// - Parameter character: 繰り返す文字。領域の幅が表示幅で割り切れない場合、行末に残った桁は
+    ///   空白になる。表示幅が 0 の文字は繰り返せないため、領域全体を空白で埋める。
+    public mutating func fill(_ rect: Rect, repeating character: Character, style: Style = .plain) {
+        let region = rect.intersection(bounds)
+        guard !region.isEmpty else { return }
+
+        let characterWidth = DisplayWidth.width(of: character)
+        guard characterWidth >= 1 else {
+            fill(region, with: Cell(character: " ", style: style))
+            return
+        }
+        guard characterWidth > 1 else {
+            fill(region, with: Cell(character: character, style: style))
+            return
+        }
+
+        let head = Cell(character: character, style: style)
+        let continuation = Cell(character: " ", style: style, isContinuation: true)
+        let blank = Cell(character: " ", style: style)
+
+        for y in region.minY..<region.maxY {
+            var x = region.minX
+            while x + characterWidth <= region.maxX {
+                self[x, y] = head
+                for offset in 1..<characterWidth {
+                    self[x + offset, y] = continuation
+                }
+                x += characterWidth
+            }
+            // 端末は全角文字を半分だけ描けない。半端に残った桁を文字で埋めてはいけない。
+            while x < region.maxX {
+                self[x, y] = blank
+                x += 1
+            }
+        }
+    }
+
     /// 1 行分の文字列を描画する。
     ///
     /// - Parameters:
@@ -63,6 +102,9 @@ public struct Buffer: Hashable, Sendable {
     ///   - style: 文字のスタイル。
     ///   - clip: 描画を制限する矩形。省略時はバッファ全体。
     /// - Returns: 進んだ桁数（クリップされた分も含む）。
+    ///
+    /// タブなどの幅を持たない制御文字は描画されない。タブを表示したい場合は、
+    /// 呼び出す前に `TabExpansion.expand(_:tabSize:)` で空白へ展開しておく。
     @discardableResult
     public mutating func write(
         _ text: String,
@@ -78,7 +120,7 @@ public struct Buffer: Hashable, Sendable {
 
         var x = position.x
         for character in text {
-            if character == "\n" { break }
+            if character.isNewline { break }
 
             let characterWidth = DisplayWidth.width(of: character)
             if characterWidth == 0 { continue }
@@ -113,6 +155,15 @@ public struct Buffer: Hashable, Sendable {
     }
 
     /// 複数行の文字列を、`rect` の中に指定の揃えで描画する。
+    ///
+    /// - Parameters:
+    ///   - lines: 各行の文字列。`rect` の高さに収まらない行は描画されない。
+    ///   - rect: 描画する矩形。
+    ///   - style: 文字のスタイル。
+    ///   - alignment: 行の水平方向の揃え。
+    ///
+    /// タブなどの幅を持たない制御文字は描画されない。タブを表示したい場合は、
+    /// 呼び出す前に `TabExpansion.expand(_:tabSize:)` で空白へ展開しておく。
     public mutating func write(
         lines: [String],
         in rect: Rect,

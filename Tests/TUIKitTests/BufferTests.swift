@@ -9,6 +9,14 @@ final class BufferTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), "abc  ")
     }
 
+    /// タブの展開は文字の層（`TabExpansion`）の仕事で、セルの層では行わない。
+    func testWriteDoesNotExpandTabs() {
+        var buffer = Buffer(size: Size(width: 5, height: 1))
+        let advanced = buffer.write("a\tb", at: Point(x: 0, y: 0))
+        XCTAssertEqual(buffer.text(ofRow: 0), "ab   ")
+        XCTAssertEqual(advanced, 2)
+    }
+
     func testWriteClipsAtRightEdge() {
         var buffer = Buffer(size: Size(width: 3, height: 1))
         buffer.write("abcdef", at: Point(x: 0, y: 0))
@@ -62,6 +70,18 @@ final class BufferTests: XCTestCase {
         buffer.write("ab", at: .zero)
         buffer.resize(to: Size(width: 3, height: 1))
         XCTAssertEqual(buffer.text(ofRow: 0), "   ")
+    }
+
+    func testWriteStopsAtCRLF() {
+        var buffer = Buffer(size: Size(width: 5, height: 1))
+        buffer.write("ab\r\ncd", at: Point(x: 0, y: 0))
+        XCTAssertEqual(buffer.text(ofRow: 0), "ab   ")
+    }
+
+    func testWriteStopsAtLoneCarriageReturn() {
+        var buffer = Buffer(size: Size(width: 5, height: 1))
+        buffer.write("ab\rcd", at: Point(x: 0, y: 0))
+        XCTAssertEqual(buffer.text(ofRow: 0), "ab   ")
     }
 
     func testWriteLinesWithAlignment() {
