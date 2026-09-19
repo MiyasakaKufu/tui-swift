@@ -60,11 +60,11 @@ public final class InputReader {
             if readiness.contains(.input) {
                 let (events, byteCount) = readAvailable()
                 pendingSince = parser.hasPendingBytes ? monotonicSeconds() : nil
-                // 読むものがないのに読み取り可能なのは、入力が閉じたとき。待ち続けても届かない。
+                // 閉じた記述子はいつでも読み取り可能になり、`read(2)` は 0 を返す。
+                // 読めたバイト数を見ずに待ち直すと、入力が閉じた後は待ちの中で回り続ける。
                 if !events.isEmpty || byteCount == 0 { return events }
             } else if readiness.contains(.wakeup) {
                 // 起こされただけのときに確定させてはいけない。届きかけの ESC が壊れる。
-                // 続きのバイトは次の待ちで受け取る。
                 return []
             } else {
                 let now = monotonicSeconds()

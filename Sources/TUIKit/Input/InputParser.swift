@@ -84,7 +84,6 @@ public struct InputParser {
         var events: [InputEvent] = []
         if pending.count == 2, pending[1] == 0x5B || pending[1] == 0x4F {
             // Alt+[ と Alt+O は `ESC [` / `ESC O` として届き、CSI / SS3 の始まりと同じ形になる。
-            // 見分けられるのは続きが届くかどうかだけで、届かなければ Alt を押したほう。
             let character = Character(Unicode.Scalar(pending[1]))
             events.append(.key(KeyEvent(.character(character), modifiers: .alt)))
         }
