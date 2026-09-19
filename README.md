@@ -23,7 +23,8 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
 - **宣言的なレイアウト** — `VStack` / `HStack` / `Spacer` / `border` などを組み合わせて画面を記述する。
 - **入力の解析** — 矢印キー、ファンクションキー、修飾キー、マウス（SGR 1006）、
   ブラケットペーストを解釈する。分割して届いたシーケンスも正しく扱う。
-- **端末の後始末** — raw モード・代替画面・マウストラッキングを終了時に必ず元へ戻す。
+- **端末の後始末** — raw モード・代替画面・マウストラッキング・フォーカス通知を
+  終了時に必ず元へ戻す。
 - **外部依存なし** — SwiftPM だけでビルドできる。
 
 ## 使い方
@@ -82,6 +83,9 @@ static var options: ApplicationOptions {
     ApplicationOptions(tracksMouse: true, frameInterval: 1.0 / 30)
 }
 ```
+
+マウス（`tracksMouse`）とフォーカス通知（`reportsFocus`）は既定で無効になっている。
+有効にした端末だけが `.mouse` / `.focus` を送ってくるため、使うアプリが明示的に有効にする。
 
 `handle(_:)` には既定実装（すべて `.ignored`）があるため、表示だけのアプリは `body` だけで書ける。
 raw モードでは Ctrl+C が SIGINT にならないので、`Component` が処理しなかった Ctrl+C は
@@ -167,7 +171,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | ファンクション | F1〜F12（SS3 形式・CSI `~` 形式の両方） |
 | 修飾 | Ctrl, Alt, Shift（CSI の修飾パラメータを解釈） |
 | マウス | 押下・解放・ドラッグ・ホイール 4 方向・拡張ボタン（SGR 1006） |
-| その他 | ブラケットペースト、フォーカス通知 |
+| その他 | ブラケットペースト、フォーカス通知（`reportsFocus` で有効にしたとき） |
 
 ## 動作環境
 

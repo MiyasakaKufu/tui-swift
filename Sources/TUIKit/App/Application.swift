@@ -59,6 +59,7 @@ public final class Application<Root: Component> {
         if options.usesAlternateScreen { terminal.enterAlternateScreen() }
         terminal.setMouseTrackingEnabled(options.tracksMouse)
         terminal.setBracketedPasteEnabled(options.usesBracketedPaste)
+        terminal.setFocusReportingEnabled(options.reportsFocus)
         terminal.setCursorVisible(false)
 
         buffer.resize(to: terminal.size())

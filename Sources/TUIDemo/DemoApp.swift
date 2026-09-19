@@ -7,7 +7,9 @@ import TUIKit
 /// 操作: ↑↓/jk で選択、Tab で入力欄と一覧を切り替え、+/- で進捗、q または Ctrl+C で終了。
 @main
 final class DemoApp: TerminalApp {
-    static var options: ApplicationOptions { ApplicationOptions(tracksMouse: true) }
+    static var options: ApplicationOptions {
+        ApplicationOptions(tracksMouse: true, reportsFocus: true)
+    }
 
     private let items = [
         "差分レンダリング",
