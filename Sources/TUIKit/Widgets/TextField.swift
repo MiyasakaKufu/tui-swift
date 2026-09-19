@@ -1,4 +1,7 @@
 /// 1 行のテキスト入力の状態。
+///
+/// - Invariant: 内容もカーソル位置も書記素クラスタ（`Character`）単位で、
+///   国旗や ZWJ で結合した絵文字も 1 文字として数える。
 public final class TextFieldState {
     private var characters: [Character]
     /// カーソルの文字インデックス（0 〜 文字数）。
@@ -28,15 +31,14 @@ public final class TextFieldState {
     /// 1 文字を挿入する。制御文字は `sanitized(_:)` の規則で置き換え、または捨てる。
     public func insert(_ character: Character) {
         guard let allowed = TextFieldState.sanitized(character) else { return }
-        characters.insert(allowed, at: cursor)
-        cursor += 1
+        replace(cursor..<cursor, with: String(allowed))
     }
 
     /// 文字列を挿入する。貼り付けもここを通る。
     public func insert(contentsOf text: String) {
-        for character in text {
-            insert(character)
-        }
+        let inserted = TextFieldState.sanitizedText(text)
+        guard !inserted.isEmpty else { return }
+        replace(cursor..<cursor, with: inserted)
     }
 
     /// 1 行の入力欄に置ける文字へ整える。捨てる文字には `nil` を返す。
@@ -54,7 +56,9 @@ public final class TextFieldState {
     }
 
     private static func sanitizedCharacters(of text: String) -> [Character] {
-        text.compactMap { sanitized($0) }
+        // 制御文字を取り除くと前後が 1 つの書記素クラスタになることがある。
+        // `compactMap` の結果をそのまま返してはいけない。
+        Array(String(text.compactMap { sanitized($0) }))
     }
 
     /// 1 行の入力欄に置ける文字だけにした文字列。プレースホルダにも同じ規則を使う。
@@ -65,21 +69,55 @@ public final class TextFieldState {
     @discardableResult
     public func deleteBackward() -> Bool {
         guard cursor > 0 else { return false }
-        characters.remove(at: cursor - 1)
-        cursor -= 1
+        replace((cursor - 1)..<cursor, with: "")
         return true
     }
 
     @discardableResult
     public func deleteForward() -> Bool {
         guard cursor < characters.count else { return false }
-        characters.remove(at: cursor)
+        replace(cursor..<(cursor + 1), with: "")
         return true
     }
 
     public func deleteToStart() {
-        characters.removeFirst(cursor)
-        cursor = 0
+        replace(0..<cursor, with: "")
+    }
+
+    /// カーソルから末尾までを削除する。
+    public func deleteToEnd() {
+        replace(cursor..<characters.count, with: "")
+    }
+
+    /// `range` の文字を `text` に置き換える。
+    ///
+    /// - Parameters:
+    ///   - range: 置き換える範囲の文字インデックス。
+    ///   - text: 置き換えたあとに入る文字列。
+    /// - Postcondition: 内容は書記素クラスタで区切り直され、カーソルは `text` の末尾に来る。
+    ///   `text` が前後と 1 つのクラスタに結合した場合は、そのクラスタの後ろに来る。
+    private func replace(_ range: Range<Int>, with text: String) {
+        let head = String(characters[..<range.lowerBound]) + text
+        let tail = String(characters[range.upperBound...])
+        characters = Array(head + tail)
+        cursor = TextFieldState.characterIndex(in: characters, afterUTF8Length: head.utf8.count)
+    }
+
+    /// 先頭から UTF-8 で `length` バイトの位置にあたる文字インデックス。
+    ///
+    /// - Parameters:
+    ///   - characters: 位置を探す文字の並び。
+    ///   - length: 先頭から数えた UTF-8 のバイト数。
+    /// - Returns: その位置の文字インデックス。位置が書記素クラスタの内部に来る場合は、
+    ///   そのクラスタの後ろ。
+    private static func characterIndex(in characters: [Character], afterUTF8Length length: Int) -> Int {
+        var consumed = 0
+        var index = 0
+        while index < characters.count && consumed < length {
+            consumed += String(characters[index]).utf8.count
+            index += 1
+        }
+        return index
     }
 
     public func moveLeft() {
@@ -124,7 +162,7 @@ public final class TextFieldState {
             case .character("h"):
                 deleteBackward()
             case .character("k"):
-                characters.removeLast(characters.count - cursor)
+                deleteToEnd()
             default:
                 return false
             }
