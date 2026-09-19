@@ -183,7 +183,8 @@ final class WidgetTests: XCTestCase {
         XCTAssertTrue(state.handle(.mouse(down)))
         XCTAssertEqual(state.scrollOffset, 2)
 
-        // 毎フレーム作り直しても、項目数の代入で表示位置が戻らないこと。
+        // `ListView` は描画のたびに作られ、`itemCount` が代入し直される。
+        // そこで表示位置が選択へ戻らないことを、本番と同じ形で確かめる。
         XCTAssertEqual(render(ListView(items: items, state: state), width: 5, height: 2), "  c  \n  d  ")
         XCTAssertEqual(state.scrollOffset, 2)
         XCTAssertEqual(state.selectedIndex, 0)

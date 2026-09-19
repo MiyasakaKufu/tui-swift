@@ -250,7 +250,6 @@ public struct ListView: View {
         guard !rect.isEmpty else { return }
 
         // 描画のたびに選択へ戻すと、ホイールで動かした表示位置が元に戻る。
-        // 表示できる行数が変わったときだけ選択を追いかける。
         let rowsChanged = state.visibleRows != rect.height
         state.renderedRect = rect
         if rowsChanged {

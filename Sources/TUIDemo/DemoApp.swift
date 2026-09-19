@@ -3,9 +3,6 @@ import TUIKit
 /// TUIKit の主な機能を一通り触れるデモ。
 ///
 ///   swift run tui-demo
-///
-/// 操作: ↑↓/jk で選択、一覧の上でホイールを回すと表示位置をスクロール、
-/// Tab で入力欄と一覧を切り替え、+/- で進捗、q または Ctrl+C で終了。
 @main
 final class DemoApp: TerminalApp {
     static var options: ApplicationOptions {
