@@ -41,6 +41,8 @@ private func handleTerminationSignal(_ signalNumber: Int32) {
 public enum SignalWatcher {
 
     /// SIGWINCH と SIGTERM / SIGHUP のハンドラを登録する。
+    ///
+    /// - Postcondition: `wakeupDescriptor` が使えるようになる。SIGPIPE は無視される。
     public static func install() {
         #if canImport(Darwin) || canImport(Glibc)
         openWakeupPipe()
@@ -61,7 +63,10 @@ public enum SignalWatcher {
         wakeupReadDescriptor >= 0 ? wakeupReadDescriptor : nil
     }
 
-    /// ウィンドウサイズ変更が発生していれば `true` を返し、フラグを下ろす。
+    /// ウィンドウサイズ変更の通知を受け取る。
+    ///
+    /// - Returns: 前回の呼び出し以降に SIGWINCH が届いていれば `true`。
+    /// - Postcondition: 同じ通知を二度受け取ることはない。
     public static func consumeWindowResize() -> Bool {
         if windowResizeFlag != 0 {
             windowResizeFlag = 0
@@ -70,7 +75,10 @@ public enum SignalWatcher {
         return false
     }
 
-    /// 終了シグナルを受け取っていれば `true` を返し、フラグを下ろす。
+    /// 終了シグナルの通知を受け取る。
+    ///
+    /// - Returns: 前回の呼び出し以降に SIGTERM または SIGHUP が届いていれば `true`。
+    /// - Postcondition: 同じ通知を二度受け取ることはない。
     public static func consumeTermination() -> Bool {
         if terminationFlag != 0 {
             terminationFlag = 0
@@ -84,7 +92,7 @@ public enum SignalWatcher {
 
 /// 自己パイプを用意する。
 ///
-/// 二度目以降の呼び出しでは何もしない。
+/// - Note: 二度目以降の呼び出しでは何もしない。
 private func openWakeupPipe() {
     guard wakeupReadDescriptor < 0 else { return }
 

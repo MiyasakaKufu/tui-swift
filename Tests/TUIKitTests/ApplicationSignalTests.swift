@@ -124,7 +124,7 @@ final class ApplicationSignalTests: XCTestCase {
 
 /// スレッドをまたいで結果を受け渡すための入れ物。
 ///
-/// 読み書きの順序は `XCTestExpectation` で揃える。
+/// - Warning: 読み書きの順序は `XCTestExpectation` で揃える。
 private final class ResultBox<Value>: @unchecked Sendable {
     var value: Value
 

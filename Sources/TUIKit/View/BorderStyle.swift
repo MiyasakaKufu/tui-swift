@@ -1,19 +1,37 @@
 /// 枠線に使う文字の組み合わせ。
 public struct BorderStyle: Hashable, Sendable {
     // var に戻すと幅 1 桁という不変条件が壊れる。差し替えはイニシャライザ経由で。
+
+    /// 左上の角の文字。
     public private(set) var topLeft: Character
+    /// 上辺の文字。
     public private(set) var top: Character
+    /// 右上の角の文字。
     public private(set) var topRight: Character
+    /// 左辺の文字。
     public private(set) var left: Character
+    /// 右辺の文字。
     public private(set) var right: Character
+    /// 左下の角の文字。
     public private(set) var bottomLeft: Character
+    /// 下辺の文字。
     public private(set) var bottom: Character
+    /// 右下の角の文字。
     public private(set) var bottomRight: Character
 
-    /// 8 方向の文字を指定して作る。
+    /// 8 方向の文字を指定して枠線の文字組みを作る。
     ///
-    /// 表示幅が 1 桁でない文字（全角文字や絵文字）を渡した場合は、その位置の既定の文字
-    /// （`single` と同じ細い実線）へ置き換える。
+    /// - Parameters:
+    ///   - topLeft: 左上の角に置く文字。
+    ///   - top: 上辺に並べる文字。
+    ///   - topRight: 右上の角に置く文字。
+    ///   - left: 左辺に並べる文字。
+    ///   - right: 右辺に並べる文字。
+    ///   - bottomLeft: 左下の角に置く文字。
+    ///   - bottom: 下辺に並べる文字。
+    ///   - bottomRight: 右下の角に置く文字。
+    /// - Postcondition: 表示幅が 1 桁でない文字（全角文字や絵文字）は、その位置の既定の文字
+    ///   （`single` と同じ細い実線）へ置き換わる。
     public init(
         topLeft: Character,
         top: Character,
