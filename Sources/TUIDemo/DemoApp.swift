@@ -69,7 +69,11 @@ final class DemoApp: TerminalApp {
 
             VStack(spacing: 0) {
                 Text(isEditing ? "入力中（Tab で戻る）" : "Tab で入力に切り替え").dim()
-                TextField(state: inputState, placeholder: "ここに入力…")
+                TextField(
+                    state: inputState,
+                    placeholder: "ここに入力…",
+                    showsCursor: !isEditing
+                )
                     .padding(horizontal: 1)
                     .border(.single, style: Style(foreground: isEditing ? .yellow : .brightBlack))
             }
@@ -90,6 +94,10 @@ final class DemoApp: TerminalApp {
         }
         .frame(height: 1)
         .flexible(horizontal: 1, vertical: 0)
+    }
+
+    var cursorPosition: Point? {
+        isEditing ? inputState.renderedCursorPoint : nil
     }
 
     func handle(_ event: InputEvent) -> EventResult {
