@@ -1,7 +1,6 @@
 /// 問い合わせに対して端末が返した応答。
 ///
-/// 利用者の操作ではないので `InputEvent` としては届かない。
-/// `InputParser.takeReplies()` で取り出す。
+/// `InputEvent` としては届かない。`InputParser.takeReplies()` で取り出す。
 public enum TerminalReply: Hashable, Sendable {
     /// kitty keyboard protocol の対応状況（`CSI ? <flags> u`）。
     ///

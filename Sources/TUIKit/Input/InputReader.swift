@@ -92,8 +92,7 @@ public final class InputReader {
     /// 端末へ送った問い合わせの応答を、装置属性の応答が届くまで待つ。
     ///
     /// 装置属性（`CSI c`）の応答は、それより前に送った問い合わせの応答が出揃った目印になる。
-    /// 対応していない問い合わせには応答が返らないので、これが無いと待ち時間を使い切るまで
-    /// 応答の有無を決められない。
+    /// 呼ぶ前に、確かめたい問い合わせと続けて `ANSI.queryDeviceAttributes` も送っておく。
     ///
     /// - Parameters:
     ///   - timeout: 待ち時間（秒）。
@@ -104,8 +103,8 @@ public final class InputReader {
         var replies: [TerminalReply] = []
 
         while monotonicSeconds() < deadline {
-            // シグナル通知の記述子は見ない。読み捨てないまま起こされ続けると、
-            // 時間切れまで待ちに入れずに回り続ける。
+            // シグナル通知の記述子は見ない。起こされても応答は進まないうえ、
+            // ここでは読み捨てないので、見ると `poll(2)` が即座に返り続ける。
             let readiness = waitForReadable(descriptor, nil, InputReader.milliseconds(until: deadline))
             guard readiness.contains(.input) else { continue }
 
@@ -114,7 +113,8 @@ public final class InputReader {
             pendingSince = parser.hasPendingBytes ? monotonicSeconds() : nil
             replies.append(contentsOf: parser.takeReplies())
 
-            // 閉じた記述子はいつでも読み取り可能になり、`read(2)` は 0 を返す。
+            // 閉じた記述子はいつでも読み取り可能になる。読めたバイト数を見ずに待ち直すと、
+            // 入力が閉じた後は時間切れまで回り続ける。
             if byteCount == 0 { break }
             if replies.contains(.deviceAttributes) { break }
         }

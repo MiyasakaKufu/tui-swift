@@ -234,6 +234,4 @@ public final class Application<Root: Component> {
 }
 
 /// 起動時の問い合わせに応答を待つ時間（秒）。
-///
-/// 装置属性の応答すら返さない端末のための上限で、ふつうはこれより早く応答が揃う。
 private let queryTimeout = 0.25

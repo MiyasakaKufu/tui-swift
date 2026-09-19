@@ -316,7 +316,7 @@ final class InputParserTests: XCTestCase {
         XCTAssertEqual(events(bytes("\u{1B}[57399u")), [.key(KeyEvent(.character("0")))])
         XCTAssertEqual(events(bytes("\u{1B}[57414u")), [.key(KeyEvent(.enter))])
         XCTAssertEqual(events(bytes("\u{1B}[57417u")), [.key(KeyEvent(.left))])
-        // Caps Lock。押しても文字は入らない。
+        // 57358 は Caps Lock。
         XCTAssertEqual(events(bytes("\u{1B}[57358u")), [])
     }
 
@@ -345,7 +345,7 @@ final class InputParserTests: XCTestCase {
     func testKeyboardProtocolReleaseIsIgnored() {
         XCTAssertEqual(events(bytes("\u{1B}[97;1:3u")), [])
         XCTAssertEqual(events(bytes("\u{1B}[97;1:1u")), [.key(KeyEvent(.character("a")))])
-        // 種別 2 はキーリピート。押したときと同じように届ける。
+        // 種別 2 はキーリピート。
         XCTAssertEqual(events(bytes("\u{1B}[97;1:2u")), [.key(KeyEvent(.character("a")))])
     }
 

@@ -281,15 +281,15 @@ public struct InputParser {
             return .event(.key(KeyEvent(.function(number), modifiers: modifiers)), consumed: consumed)
         case 0x49: return .event(.focus(true), consumed: consumed)
         case 0x4F: return .event(.focus(false), consumed: consumed)
-        case 0x75: // 'u' — kitty keyboard protocol のキー
-            // 修飾キーのパラメータに続く下位パラメータはイベント種別で、3 はキーを離した通知。
-            // 押したときと同じキーになるため、そのまま返すと 1 回の打鍵が 2 つ届く。
+        case 0x75: // 'u'
+            // 修飾キーに続く下位パラメータはイベント種別で、3 はキーを離した通知。
+            // 捨てないと、1 回の打鍵が押下と解放の 2 つのキーになる。
             if parameters[1, 1] == 3 { return .skip(consumed: consumed) }
             guard let code = parameters[0], let key = InputParser.keyboardProtocolKey(code) else {
                 return .skip(consumed: consumed)
             }
             // Shift+Tab は従来 `CSI Z` として届き、Shift の付かない `.backTab` になる。
-            // 同じ打鍵がプロトコルの有無で別のキーになってはいけない。
+            // 同じ打鍵をプロトコルの有無で別のキーにしてはいけない。
             if key == .tab, modifiers.contains(.shift) {
                 var rest = modifiers
                 rest.remove(.shift)
@@ -322,7 +322,7 @@ public struct InputParser {
         consumed: Int
     ) -> ParseOutcome {
         switch (prefix, final) {
-        case (0x3C, 0x4D), (0x3C, 0x6D): // '<' と 'M' / 'm' — SGR 拡張形式のマウス
+        case (0x3C, 0x4D), (0x3C, 0x6D): // '<' と 'M' / 'm'
             guard let code = parameters[0], let column = parameters[1], let row = parameters[2] else {
                 return .skip(consumed: consumed)
             }
@@ -333,9 +333,9 @@ public struct InputParser {
                 isPress: final == 0x4D
             )
             return .event(.mouse(event), consumed: consumed)
-        case (0x3F, 0x75): // '?' と 'u' — kitty keyboard protocol の対応状況
+        case (0x3F, 0x75): // '?' と 'u'
             return .reply(.keyboardProtocol(flags: parameters[0] ?? 0), consumed: consumed)
-        case (0x3F, 0x63): // '?' と 'c' — 装置属性
+        case (0x3F, 0x63): // '?' と 'c'
             return .reply(.deviceAttributes, consumed: consumed)
         default:
             return .skip(consumed: consumed)
@@ -348,13 +348,15 @@ public struct InputParser {
     ///   - code: `CSI <code> ... u` の先頭パラメータ。
     /// - Returns: 対応するキー。当てはまるキーがなければ `nil`。
     private static func keyboardProtocolKey(_ code: Int) -> Key? {
+        // 番号は kitty keyboard protocol の機能キー表による。57344（U+E000）以降は私用領域で、
+        // キーコードとしての意味しかない。
         switch code {
         case 9: return .tab
-        case 13, 57414: return .enter // 57414 はテンキーの Enter。
+        case 13, 57414: return .enter
         case 27: return .escape
         case 127: return .backspace
-        case 57376...57398: return .function(code - 57376 + 13) // F13〜F35。
-        case 57399...57408: return .character(Character(Unicode.Scalar(UInt8(code - 57399 + 0x30)))) // テンキーの 0〜9。
+        case 57376...57398: return .function(code - 57376 + 13)
+        case 57399...57408: return .character(Character(Unicode.Scalar(UInt8(code - 57399 + 0x30))))
         case 57409: return .character(".")
         case 57410: return .character("/")
         case 57411: return .character("*")
@@ -373,8 +375,7 @@ public struct InputParser {
         case 57425: return .insert
         case 57426: return .delete
         default:
-            // 57344（U+E000）以降は私用領域で、キーコードとしての意味しかない。
-            // Caps Lock や修飾キー単独の通知がここへ来るので、文字にしてはいけない。
+            // Caps Lock や修飾キー単独の通知が私用領域の番号で来る。文字にしてはいけない。
             guard code > 0, code < 57344, let scalar = Unicode.Scalar(UInt32(code)) else { return nil }
             return .character(Character(scalar))
         }
