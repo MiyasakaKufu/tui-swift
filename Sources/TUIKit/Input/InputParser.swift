@@ -187,6 +187,11 @@ public struct InputParser {
         case 0x48: return .event(.key(KeyEvent(.home, modifiers: modifiers)), consumed: consumed)
         case 0x46: return .event(.key(KeyEvent(.end, modifiers: modifiers)), consumed: consumed)
         case 0x5A: return .event(.key(KeyEvent(.backTab, modifiers: modifiers)), consumed: consumed)
+        case 0x50, 0x51, 0x52, 0x53: // 'P'〜'S' — 修飾キー付きの F1〜F4
+            // `CSI 1;2R`（Shift+F3）はカーソル位置の問い合わせへの応答と同じ形だが、
+            // TUIKit は問い合わせを送らないので F3 として扱う。
+            let number = Int(final - 0x4F)
+            return .event(.key(KeyEvent(.function(number), modifiers: modifiers)), consumed: consumed)
         case 0x49: return .event(.focus(true), consumed: consumed)
         case 0x4F: return .event(.focus(false), consumed: consumed)
         case 0x75: // CSI u（Kitty キーボードプロトコル）

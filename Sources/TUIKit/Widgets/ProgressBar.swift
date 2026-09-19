@@ -44,13 +44,16 @@ public struct ProgressBar: View {
         }
 
         let filled = Int((Double(barWidth) * progress).rounded())
-        for offset in 0..<barWidth {
-            let isFilled = offset < filled
-            buffer[rect.minX + offset, rect.minY] = Cell(
-                character: isFilled ? filledCharacter : emptyCharacter,
-                style: isFilled ? filledStyle : emptyStyle
-            )
-        }
+        buffer.fill(
+            Rect(x: rect.minX, y: rect.minY, width: filled, height: 1),
+            repeating: filledCharacter,
+            style: filledStyle
+        )
+        buffer.fill(
+            Rect(x: rect.minX + filled, y: rect.minY, width: barWidth - filled, height: 1),
+            repeating: emptyCharacter,
+            style: emptyStyle
+        )
 
         if !suffix.isEmpty {
             buffer.write(

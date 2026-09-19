@@ -1,0 +1,123 @@
+import XCTest
+@testable import TUIKit
+
+/// 1 セルずつ書き込む描画に全角文字を渡しても、行の表示幅がバッファの幅を超えないことを確かめる。
+final class WideCharacterFillTests: XCTestCase {
+
+    private func render(_ view: any View, width: Int, height: Int) -> Buffer {
+        var buffer = Buffer(size: Size(width: width, height: height))
+        let bounds = buffer.bounds
+        view.render(into: &buffer, rect: bounds)
+        return buffer
+    }
+
+    /// 各行の表示幅がバッファの幅と一致することを確かめる。
+    private func assertRowsFit(_ buffer: Buffer, file: StaticString = #filePath, line: UInt = #line) {
+        for y in 0..<buffer.size.height {
+            XCTAssertEqual(
+                DisplayWidth.width(of: buffer.text(ofRow: y)),
+                buffer.size.width,
+                "行 \(y) の表示幅",
+                file: file,
+                line: line
+            )
+        }
+    }
+
+    // MARK: - 再現
+
+    func testWideCharacterInFillFitsBuffer() {
+        let buffer = render(Fill("あ"), width: 5, height: 2)
+        assertRowsFit(buffer)
+        XCTAssertEqual(buffer.text(ofRow: 0), "ああ ")
+    }
+
+    func testWideCharacterInDividerFitsBuffer() {
+        let buffer = render(Divider(character: "＝"), width: 5, height: 1)
+        assertRowsFit(buffer)
+        XCTAssertEqual(buffer.text(ofRow: 0), "＝＝ ")
+    }
+
+    func testWideCharacterInProgressBarFitsBuffer() {
+        let buffer = render(ProgressBar(value: 1, filledCharacter: "🟩"), width: 6, height: 1)
+        assertRowsFit(buffer)
+        XCTAssertEqual(buffer.text(ofRow: 0), "🟩🟩🟩")
+    }
+
+    func testWideCharacterInBorderStyleFitsBuffer() {
+        let wide = BorderStyle(
+            topLeft: "┌", top: "＝", topRight: "┐",
+            left: "｜", right: "｜",
+            bottomLeft: "└", bottom: "＝", bottomRight: "┘"
+        )
+        let buffer = render(EmptyView().border(wide), width: 8, height: 3)
+        assertRowsFit(buffer)
+    }
+
+    // MARK: - 奇数幅
+
+    func testFillWithWideCharacterPadsOddWidth() {
+        var buffer = Buffer(size: Size(width: 7, height: 1))
+        buffer.fill(buffer.bounds, repeating: "あ")
+        XCTAssertEqual(buffer.text(ofRow: 0), "あああ ")
+        XCTAssertEqual(buffer[6, 0].character, " ")
+        XCTAssertFalse(buffer[6, 0].isContinuation)
+        XCTAssertTrue(buffer[1, 0].isContinuation)
+    }
+
+    func testFillWithWideCharacterInOddOffsetRegion() {
+        var buffer = Buffer(size: Size(width: 6, height: 1))
+        buffer.fill(Rect(x: 1, y: 0, width: 4, height: 1), repeating: "あ")
+        XCTAssertEqual(buffer.text(ofRow: 0), " ああ ")
+        XCTAssertEqual(buffer[1, 0].character, "あ")
+        XCTAssertTrue(buffer[2, 0].isContinuation)
+    }
+
+    func testFillWithWideCharacterInSingleColumnBecomesSpace() {
+        var buffer = Buffer(size: Size(width: 1, height: 1))
+        buffer.fill(buffer.bounds, repeating: "あ")
+        XCTAssertEqual(buffer.text(ofRow: 0), " ")
+    }
+
+    func testProgressBarWithWideCharactersPadsOddSegments() {
+        // 幅 9 の 37.5% は 3 桁。全角文字は 1 個しか置けないので、残りの 1 桁は空白になる。
+        let buffer = render(
+            ProgressBar(value: 3, total: 8, filledCharacter: "＊", emptyCharacter: "・"),
+            width: 9,
+            height: 1
+        )
+        assertRowsFit(buffer)
+        XCTAssertEqual(buffer.text(ofRow: 0), "＊ ・・・")
+    }
+
+    func testDividerWithZeroWidthCharacterBecomesSpaces() {
+        let buffer = render(Divider(character: "\u{0301}"), width: 3, height: 1)
+        assertRowsFit(buffer)
+        XCTAssertEqual(buffer.text(ofRow: 0), "   ")
+    }
+
+    // MARK: - BorderStyle の検証
+
+    func testBorderStyleReplacesWideCharactersWithDefaults() {
+        let style = BorderStyle(
+            topLeft: "＋", top: "＝", topRight: "＋",
+            left: "｜", right: "｜",
+            bottomLeft: "＋", bottom: "＝", bottomRight: "＋"
+        )
+        XCTAssertEqual(style.topLeft, "┌")
+        XCTAssertEqual(style.top, "─")
+        XCTAssertEqual(style.topRight, "┐")
+        XCTAssertEqual(style.left, "│")
+        XCTAssertEqual(style.right, "│")
+        XCTAssertEqual(style.bottomLeft, "└")
+        XCTAssertEqual(style.bottom, "─")
+        XCTAssertEqual(style.bottomRight, "┘")
+    }
+
+    func testBorderStyleKeepsSingleWidthCharacters() {
+        XCTAssertEqual(BorderStyle.ascii.topLeft, "+")
+        XCTAssertEqual(BorderStyle.ascii.top, "-")
+        XCTAssertEqual(BorderStyle.ascii.left, "|")
+        XCTAssertEqual(BorderStyle.double.top, "═")
+    }
+}
