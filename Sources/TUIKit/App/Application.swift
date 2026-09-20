@@ -85,6 +85,19 @@ public final class Application<Root: Component> {
         resumeTerminal()
     }
 
+    /// 文字列をクリップボードへ渡す。
+    ///
+    /// - Parameters:
+    ///   - text: クリップボードへ渡す文字列。空文字列を渡すとクリップボードを空にする。
+    ///   - limit: Base64 に変換した後の長さの上限（バイト）。
+    /// - Returns: 端末へ送ったなら `true`。上限を超えて送らなかったなら `false`。
+    /// - Note: 端末が OSC 52 を拒否していれば、送ってもクリップボードは変わらない。
+    ///   応答がないため、戻り値では区別できない。
+    @discardableResult
+    public func copyToClipboard(_ text: String, limit: Int = ANSI.clipboardLimit) -> Bool {
+        terminal.copyToClipboard(text, limit: limit)
+    }
+
     /// 端末を初期化し、終了するまでイベントループを回す。
     ///
     /// - Throws: 入出力が端末でなければ `TerminalError.notATerminal`、

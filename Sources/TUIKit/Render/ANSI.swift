@@ -75,6 +75,11 @@ public enum ANSI {
     /// kitty keyboard protocol のすべてのフラグを落とし、従来の形式へ戻す。
     public static let disableKeyboardProtocol = "\u{1B}[=0u"
 
+    /// クリップボードへ渡せる Base64 の長さの上限（バイト）。
+    ///
+    /// - Note: 受け付ける長さは端末ごとに違い、OSC 52 の仕様にも定めがない。
+    public static let clipboardLimit = 100_000
+
     /// ウィンドウタイトルとアイコン名を設定するシーケンスを組み立てる。
     ///
     /// - Parameters:
@@ -103,5 +108,20 @@ public enum ANSI {
     /// - Returns: カーソルを移動するシーケンス。
     public static func moveCursor(row: Int, column: Int) -> String {
         "\u{1B}[\(max(1, row));\(max(1, column))H"
+    }
+
+    /// 文字列をクリップボードへ書き込むシーケンス（OSC 52）を組み立てる。
+    ///
+    /// - Parameters:
+    ///   - text: クリップボードへ渡す文字列。空文字列を渡すとクリップボードを空にする。
+    ///   - limit: Base64 に変換した後の長さの上限（バイト）。
+    /// - Returns: クリップボードへ書き込むシーケンス。上限を超えるなら `nil`。
+    /// - Note: OSC 52 を既定で拒否する端末がある（xterm の `allowWindowOps`、
+    ///   tmux の `set-clipboard`）。端末は応答を返さないため、書き込めたかは送った側から
+    ///   判別できない。
+    public static func setClipboard(_ text: String, limit: Int = ANSI.clipboardLimit) -> String? {
+        let encoded = Base64.encode(text)
+        guard encoded.utf8.count <= limit else { return nil }
+        return "\u{1B}]52;c;\(encoded)\u{07}"
     }
 }
