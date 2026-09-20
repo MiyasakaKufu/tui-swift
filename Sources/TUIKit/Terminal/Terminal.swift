@@ -34,9 +34,7 @@ public final class Terminal: TerminalOutput {
     private var isBracketedPasteEnabled = false
     private var isFocusReportingEnabled = false
     private var isKeyboardProtocolEnabled = false
-    /// 設定したウィンドウタイトル。まだ設定していなければ `nil`。
     private var windowTitle: String?
-    /// 設定したカーソル形状。まだ設定していなければ `nil`。
     private var cursorShape: CursorShape?
 
     /// 入出力のファイル記述子を指定して端末を作る。

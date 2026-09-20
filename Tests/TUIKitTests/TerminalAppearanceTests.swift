@@ -172,7 +172,7 @@ private func closeDescriptor(_ descriptor: Int32) {
 ///
 /// - Parameters:
 ///   - descriptor: 読み出すファイル記述子。
-///   - timeout: 何も届かないまま待つ秒数の上限。
+///   - timeout: 読み出しに費やす秒数の上限。
 /// - Returns: 読み出した内容。
 private func readOutput(from descriptor: Int32, timeout: Double = 0.5) -> String {
     var collected: [UInt8] = []
