@@ -14,7 +14,10 @@ enum CrashRestorer {
 
     /// 端末を戻すために書き出す制御コード。
     static let restoreSequence =
-        ANSI.disableKeyboardProtocol
+        // 同期出力が開いたまま落ちていると、後ろに続く復元が画面へ出ない。
+        // 先頭から動かさない。
+        ANSI.endSynchronizedUpdate
+        + ANSI.disableKeyboardProtocol
         + ANSI.disableMouseTracking
         + ANSI.disableBracketedPaste
         + ANSI.disableFocusReporting

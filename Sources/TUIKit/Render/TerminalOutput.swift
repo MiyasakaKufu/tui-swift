@@ -13,6 +13,8 @@ public protocol TerminalOutput: AnyObject {
 public final class StringOutput: TerminalOutput {
     /// これまでに書き込まれた文字列。
     public private(set) var contents: String = ""
+    /// `write(_:)` が呼ばれた回数。
+    public private(set) var writeCount: Int = 0
     /// `flush()` が呼ばれた回数。
     public private(set) var flushCount: Int = 0
 
@@ -25,6 +27,7 @@ public final class StringOutput: TerminalOutput {
     ///   - text: 足す文字列。
     public func write(_ text: String) {
         contents += text
+        writeCount += 1
     }
 
     /// `flushCount` を 1 つ増やす。
@@ -35,6 +38,7 @@ public final class StringOutput: TerminalOutput {
     /// 書き込まれた内容と呼び出し回数を捨てる。
     public func reset() {
         contents = ""
+        writeCount = 0
         flushCount = 0
     }
 }
