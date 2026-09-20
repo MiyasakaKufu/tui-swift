@@ -19,6 +19,15 @@ public struct ApplicationOptions {
     ///   対応していれば Ctrl+I と Tab、Ctrl+M と Enter が区別でき、Escape や Alt+[ を
     ///   時間切れで確定させる待ちがなくなる。対応していなければ、従来どおり時間切れで確定させる。
     public var usesKeyboardProtocol: Bool
+    /// 起動時に設定するウィンドウタイトル。`nil` なら端末のタイトルを変えない。
+    ///
+    /// - Note: 終了時と一時停止時に、設定する前のタイトルへ戻す。
+    ///   タイトルのスタックに対応しない端末では戻らない。
+    public var windowTitle: String?
+    /// 起動時に設定するカーソル形状。`nil` なら端末の設定どおりの形にする。
+    ///
+    /// - Note: 終了時と一時停止時に、端末の設定どおりの形へ戻す。
+    public var cursorShape: CursorShape?
     /// 入力がなくても一定間隔で再描画する（秒）。`nil` なら入力があるまで待つ。
     public var frameInterval: Double?
     /// `Component` が処理しなかった Ctrl+C でアプリを終了する。
@@ -42,6 +51,8 @@ public struct ApplicationOptions {
     ///   - usesBracketedPaste: ブラケットペーストを有効にするか。
     ///   - reportsFocus: 端末のフォーカス変化を受け取るか。
     ///   - usesKeyboardProtocol: 端末が対応していれば kitty keyboard protocol を使うか。
+    ///   - windowTitle: 起動時に設定するウィンドウタイトル。`nil` なら変えない。
+    ///   - cursorShape: 起動時に設定するカーソル形状。`nil` なら変えない。
     ///   - frameInterval: 入力がなくても再描画する間隔（秒）。`nil` なら入力があるまで待つ。
     ///   - quitsOnControlC: 処理されなかった Ctrl+C で終了するか。
     ///   - suspendsOnControlZ: 処理されなかった Ctrl+Z で一時停止するか。
@@ -51,6 +62,8 @@ public struct ApplicationOptions {
         usesBracketedPaste: Bool = true,
         reportsFocus: Bool = false,
         usesKeyboardProtocol: Bool = true,
+        windowTitle: String? = nil,
+        cursorShape: CursorShape? = nil,
         frameInterval: Double? = nil,
         quitsOnControlC: Bool = true,
         suspendsOnControlZ: Bool = true
@@ -60,6 +73,8 @@ public struct ApplicationOptions {
         self.usesBracketedPaste = usesBracketedPaste
         self.reportsFocus = reportsFocus
         self.usesKeyboardProtocol = usesKeyboardProtocol
+        self.windowTitle = windowTitle
+        self.cursorShape = cursorShape
         self.frameInterval = frameInterval
         self.quitsOnControlC = quitsOnControlC
         self.suspendsOnControlZ = suspendsOnControlZ

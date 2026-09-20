@@ -4,6 +4,10 @@ public enum ANSI {
     public static let escape = "\u{1B}"
     /// 制御シーケンス導入子 `CSI`（`ESC [`）。
     public static let csi = "\u{1B}["
+    /// オペレーティングシステムコマンド導入子 `OSC`（`ESC ]`）。
+    public static let osc = "\u{1B}]"
+    /// `OSC` の文字列を終える `BEL`。
+    public static let bell = "\u{07}"
 
     /// 文字色・背景色・装飾をすべて解除する。
     public static let reset = "\u{1B}[0m"
@@ -43,6 +47,16 @@ public enum ANSI {
     /// 同期出力を終了し、保留していた更新をまとめて表示させる。
     public static let endSynchronizedUpdate = "\u{1B}[?2026l"
 
+    /// 今のウィンドウタイトルとアイコン名を端末のスタックへ積む。
+    ///
+    /// - Note: タイトルのスタックに対応しない端末はこの制御コードを読み飛ばすため、
+    ///   積まれない。
+    public static let saveWindowTitle = "\u{1B}[22;0t"
+    /// 端末のスタックからウィンドウタイトルとアイコン名を戻す。
+    ///
+    /// - Note: スタックが空なら何も起きない。
+    public static let restoreWindowTitle = "\u{1B}[23;0t"
+
     /// 端末のフォーカス変化を受け取る。
     public static let enableFocusReporting = "\u{1B}[?1004h"
     /// フォーカス変化の通知を止める。
@@ -67,6 +81,26 @@ public enum ANSI {
     ///
     /// - Note: 受け付ける長さは端末ごとに違い、OSC 52 の仕様にも定めがない。
     public static let clipboardLimit = 100_000
+
+    /// ウィンドウタイトルとアイコン名を設定するシーケンスを組み立てる。
+    ///
+    /// - Parameters:
+    ///   - title: 設定するタイトル。
+    /// - Returns: タイトルを設定するシーケンス。
+    /// - Note: `title` の制御文字は取り除く。
+    public static func setWindowTitle(_ title: String) -> String {
+        let scalars = title.unicodeScalars.filter { $0.properties.generalCategory != .control }
+        return osc + "0;" + String(String.UnicodeScalarView(scalars)) + bell
+    }
+
+    /// カーソル形状を設定するシーケンスを組み立てる。
+    ///
+    /// - Parameters:
+    ///   - shape: 設定する形。
+    /// - Returns: カーソル形状を設定するシーケンス。
+    public static func setCursorShape(_ shape: CursorShape) -> String {
+        "\u{1B}[\(shape.parameter) q"
+    }
 
     /// カーソルを移動するシーケンスを組み立てる。
     ///
