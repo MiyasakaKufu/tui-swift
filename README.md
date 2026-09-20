@@ -28,6 +28,9 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
 - **IME への対応** — 入力欄は描画のたびに `TextFieldState.renderedCursorPoint` へ
   端末カーソルを置くべき位置を記録する。`Component.cursorPosition` でそれを返すと、
   変換中の文字と変換候補が入力欄の位置に出る。
+- **クリップボードへのコピー** — OSC 52 で文字列を端末のクリップボードへ渡す
+  （`Terminal.copyToClipboard(_:)`）。SSH 越しでも手元の端末へ届く。
+  OSC 52 を拒否する設定の端末では何も起こらない。
 - **端末の後始末** — raw モード・代替画面・マウストラッキング・フォーカス通知を
   終了時に必ず元へ戻す。
 - **外部依存なし** — SwiftPM だけでビルドできる。
