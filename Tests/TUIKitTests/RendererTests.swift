@@ -82,7 +82,11 @@ final class RendererTests: XCTestCase {
 
         renderer.render(buffer, cursor: Point(x: 1, y: 0))
 
-        XCTAssertTrue(output.contents.hasSuffix(ANSI.moveCursor(row: 1, column: 2) + ANSI.showCursor))
+        XCTAssertTrue(
+            output.contents.hasSuffix(
+                ANSI.moveCursor(row: 1, column: 2) + ANSI.showCursor + ANSI.endSynchronizedUpdate
+            )
+        )
     }
 
     func testCursorStaysHiddenWithoutPosition() {
@@ -92,8 +96,47 @@ final class RendererTests: XCTestCase {
 
         renderer.render(buffer)
 
-        XCTAssertTrue(output.contents.hasPrefix(ANSI.hideCursor))
+        XCTAssertTrue(output.contents.hasPrefix(ANSI.beginSynchronizedUpdate + ANSI.hideCursor))
         XCTAssertFalse(output.contents.contains(ANSI.showCursor))
+    }
+
+    func testFrameIsWrappedInSynchronizedUpdate() {
+        let output = StringOutput()
+        let renderer = Renderer(output: output)
+        var buffer = Buffer(size: Size(width: 3, height: 1))
+        buffer.write("abc", at: .zero)
+
+        renderer.render(buffer)
+
+        XCTAssertTrue(output.contents.hasPrefix(ANSI.beginSynchronizedUpdate))
+        XCTAssertTrue(output.contents.hasSuffix(ANSI.endSynchronizedUpdate))
+    }
+
+    func testDifferentialFrameIsWrappedInSynchronizedUpdate() {
+        let output = StringOutput()
+        let renderer = Renderer(output: output)
+        var buffer = Buffer(size: Size(width: 3, height: 1))
+        buffer.write("abc", at: .zero)
+        renderer.render(buffer)
+
+        output.reset()
+        buffer[1, 0] = Cell(character: "X")
+        renderer.render(buffer)
+
+        XCTAssertTrue(output.contents.hasPrefix(ANSI.beginSynchronizedUpdate))
+        XCTAssertTrue(output.contents.hasSuffix(ANSI.endSynchronizedUpdate))
+    }
+
+    func testSynchronizedUpdateIsWrittenAsOneFlush() {
+        let output = StringOutput()
+        let renderer = Renderer(output: output)
+        var buffer = Buffer(size: Size(width: 3, height: 1))
+        buffer.write("abc", at: .zero)
+
+        renderer.render(buffer)
+
+        XCTAssertEqual(output.writeCount, 1)
+        XCTAssertEqual(output.flushCount, 1)
     }
 
     func testStyleChangeEmitsSGR() {

@@ -24,7 +24,8 @@ public final class Renderer {
     public func render(_ buffer: Buffer, cursor: Point? = nil) {
         let isFullRedraw = (previous == nil || previous?.size != buffer.size)
 
-        var out = ANSI.hideCursor
+        var out = ANSI.beginSynchronizedUpdate
+        out += ANSI.hideCursor
         out += ANSI.reset
         if isFullRedraw {
             out += ANSI.clearScreen
@@ -97,7 +98,11 @@ public final class Renderer {
             out += ANSI.showCursor
         }
 
+        out += ANSI.endSynchronizedUpdate
+
         previous = buffer
+        // フレームを分けて書き出してはいけない。閉じる前に止まると、端末は更新を
+        // 保留したまま待ち続ける。
         output.write(out)
         output.flush()
     }

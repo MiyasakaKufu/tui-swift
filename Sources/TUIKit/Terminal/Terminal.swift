@@ -253,6 +253,9 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Postcondition: `reactivate()` で同じ設定へ戻せる。二重に呼んでも安全。
     public func deactivate() {
+        // 同期出力を開くのは `Renderer` で、この型は開いているかを知らない。開いたまま
+        // 抜けると、後ろに続く復元が画面へ出ない。
+        write(ANSI.endSynchronizedUpdate)
         if isKeyboardProtocolEnabled { write(ANSI.disableKeyboardProtocol) }
         if isMouseTrackingEnabled { write(ANSI.disableMouseTracking) }
         if isBracketedPasteEnabled { write(ANSI.disableBracketedPaste) }
