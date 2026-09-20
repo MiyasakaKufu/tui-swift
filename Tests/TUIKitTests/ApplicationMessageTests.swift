@@ -224,8 +224,8 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertEqual(describe(queue.drain(appending: [])), ["4"])
     }
 
-    /// 上限は `Application.send(_:)` にも効く。
-    func testApplicationSendReportsFullQueue() throws {
+    /// 上限は `Application.sender` から送るときにも効く。
+    func testSenderReportsFullQueue() throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
 
@@ -235,8 +235,8 @@ final class ApplicationMessageTests: XCTestCase {
             terminal: pty.terminal()
         )
 
-        XCTAssertTrue(application.send(.first))
-        XCTAssertFalse(application.send(.second), "上限を超えて積まれている")
+        XCTAssertTrue(application.sender.send(.first))
+        XCTAssertFalse(application.sender.send(.second), "上限を超えて積まれている")
     }
 
     // MARK: - 補助

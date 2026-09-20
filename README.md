@@ -195,8 +195,8 @@ var startupEffect: Effect<Message> {
 送信は捨てられ、古いイベントは捨てない。
 
 ランタイムの知らない入力源（自前のスレッド、C のコールバック）から届けたいときは、`Application` を
-自分で組み立てて `Application.sender` を渡すか、`Application.send(_:)` を呼ぶ。`MessageSender` は
-`Sendable` なので、どのスレッドからでも送れる。
+自分で組み立てて `Application.sender` を渡す。`MessageSender` は `Sendable` なので、どのスレッドから
+でも送れる。
 
 外から SIGINT / SIGQUIT / SIGTERM / SIGHUP を受けたときはイベントループを終えて端末を戻す。
 `fatalError` や範囲外アクセスで落ちたときも、シグナルハンドラが raw モード・代替画面・

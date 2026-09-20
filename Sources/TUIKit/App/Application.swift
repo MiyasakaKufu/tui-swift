@@ -54,17 +54,6 @@ public final class Application<Root: Component> {
         self.sender = MessageSender(queue: queue)
     }
 
-    /// イベントをイベントループへ送る。
-    ///
-    /// - Parameters:
-    ///   - message: 送るイベント。
-    /// - Returns: 送ったなら `true`。積んでおける数の上限に達していて捨てたなら `false`。
-    /// - Note: どのスレッドからでも呼べる。`sender` を渡した先から送るのと同じ。
-    @discardableResult
-    public func send(_ message: Root.Message) -> Bool {
-        sender.send(message)
-    }
-
     /// ループを終了させる。イベントハンドラの中からも呼べる。
     public func stop() {
         isRunning = false
