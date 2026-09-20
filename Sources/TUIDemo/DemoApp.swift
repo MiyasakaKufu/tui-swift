@@ -54,15 +54,16 @@ final class DemoApp: TerminalApp {
     }
 
     private func dialog() -> some View {
-        ZStack {
+        let textStyle = Style(foreground: .brightWhite, background: .blue)
+        return ZStack {
             if isShowingDialog {
                 VStack(spacing: 1, alignment: .center) {
-                    Text("画面の中央に重ねたダイアログです。", wrap: .word)
-                    Text("下に敷いた全角文字を覆っても、行の桁はずれません。", wrap: .word)
-                    Text("Enter か Esc で閉じる").dim()
+                    Text("画面の中央に重ねたダイアログです。", style: textStyle, wrap: .word)
+                    Text("下に敷いた全角文字を覆っても、行の桁はずれません。", style: textStyle, wrap: .word)
+                    Text("Enter か Esc で閉じる", style: textStyle).dim()
                 }
                 .padding(horizontal: 2, vertical: 1)
-                .border(.double, style: Style(foreground: .yellow), title: "ダイアログ")
+                .border(.double, style: Style(foreground: .yellow, background: .blue), title: "ダイアログ")
                 .background(style: Style(background: .blue))
                 .frame(width: 44, height: 9)
             }
