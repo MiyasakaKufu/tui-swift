@@ -290,6 +290,24 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
+    // MARK: - クリップボード
+
+    /// 文字列をクリップボードへ渡す。
+    ///
+    /// - Parameters:
+    ///   - text: クリップボードへ渡す文字列。空文字列を渡すとクリップボードを空にする。
+    ///   - limit: Base64 に変換した後の長さの上限（バイト）。
+    /// - Returns: 端末へ送ったなら `true`。上限を超えて送らなかったなら `false`。
+    /// - Note: 端末が OSC 52 を拒否していれば、送ってもクリップボードは変わらない。
+    ///   応答がないため、戻り値では区別できない。
+    @discardableResult
+    public func copyToClipboard(_ text: String, limit: Int = ANSI.clipboardLimit) -> Bool {
+        guard let sequence = ANSI.setClipboard(text, limit: limit) else { return false }
+        write(sequence)
+        flush()
+        return true
+    }
+
     // MARK: - 出力
 
     /// 文字列を出力バッファへ追加する。
