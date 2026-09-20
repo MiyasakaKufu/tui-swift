@@ -22,6 +22,11 @@ enum CrashRestorer {
         + ANSI.disableBracketedPaste
         + ANSI.disableFocusReporting
         + ANSI.exitAlternateScreen
+        // `Terminal.deactivate()` のように、設定したときだけ送る形にはできない。この列は
+        // 仕掛けるときに組み立てるので、後から設定されたかどうかを織り込めない。設定して
+        // いなければ、形は既定のままでタイトルのスタックは空なので、送っても何も起きない。
+        + ANSI.setCursorShape(.default)
+        + ANSI.restoreWindowTitle
         + ANSI.reset
         + ANSI.showCursor
 

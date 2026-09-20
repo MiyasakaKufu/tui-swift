@@ -6,7 +6,12 @@ import TUIKit
 @main
 final class DemoApp: TerminalApp {
     static var options: ApplicationOptions {
-        ApplicationOptions(tracksMouse: true, reportsFocus: true)
+        ApplicationOptions(
+            tracksMouse: true,
+            reportsFocus: true,
+            windowTitle: "TUIKit デモ",
+            cursorShape: .blinkingBar
+        )
     }
 
     private let items = [

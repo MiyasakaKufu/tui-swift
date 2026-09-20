@@ -48,6 +48,26 @@ public final class Application<Root: Component> {
         isRunning = false
     }
 
+    /// ウィンドウタイトルとアイコン名を設定する。
+    ///
+    /// - Parameters:
+    ///   - title: 設定するタイトル。
+    /// - Note: 起動時のタイトルは `ApplicationOptions.windowTitle` で指定する。
+    ///   終了時と一時停止時には、いずれも設定する前のタイトルへ戻る。
+    public func setWindowTitle(_ title: String) {
+        terminal.setWindowTitle(title)
+    }
+
+    /// カーソルの形と点滅の有無を切り替える。
+    ///
+    /// - Parameters:
+    ///   - shape: 設定する形。
+    /// - Note: 起動時の形は `ApplicationOptions.cursorShape` で指定する。
+    ///   終了時と一時停止時には、いずれも端末の設定どおりの形へ戻る。
+    public func setCursorShape(_ shape: CursorShape) {
+        terminal.setCursorShape(shape)
+    }
+
     /// 端末をシェルへ返してプロセスを止め、再開したら端末を設定し直す。
     ///
     /// raw モードでは `ISIG` を無効にしているため、Ctrl+Z はシグナルにならずキーとして届く。
@@ -90,6 +110,8 @@ public final class Application<Root: Component> {
         terminal.setMouseTrackingEnabled(options.tracksMouse)
         terminal.setBracketedPasteEnabled(options.usesBracketedPaste)
         terminal.setFocusReportingEnabled(options.reportsFocus)
+        if let title = options.windowTitle { terminal.setWindowTitle(title) }
+        if let shape = options.cursorShape { terminal.setCursorShape(shape) }
         terminal.setCursorVisible(false)
 
         buffer.resize(to: terminal.size())
