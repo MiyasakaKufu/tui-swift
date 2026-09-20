@@ -100,7 +100,8 @@ final class FocusTests: XCTestCase {
         XCTAssertTrue(manager.handle(.key(KeyEvent(.tab))))
         XCTAssertTrue(manager.isFocused(first), "同じ対象が 2 回巡っている")
         let press = MouseEvent(position: Point(x: 1, y: 2), button: .left, action: .press)
-        XCTAssertTrue(manager.handle(.mouse(press)), "当たり判定が後から登録した矩形になっていない")
+        _ = manager.handle(.mouse(press))
+        XCTAssertEqual(first.received.last, .mouse(press), "当たり判定が後から登録した矩形になっていない")
         XCTAssertTrue(manager.isFocused(first))
     }
 
