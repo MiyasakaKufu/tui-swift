@@ -67,9 +67,10 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(DisplayWidth.width(of: "🎉", ambiguous: .wide), 2)
     }
 
+    /// Ambiguous でもある結合文字は、曖昧幅の設定に関わらず 0 桁になる。
     func testZeroWidthCharactersStayZero() {
-        // U+0300〜U+036F は Ambiguous でもあるが、結合文字の 0 桁が優先される。
-        XCTAssertEqual(DisplayWidth.width(of: "e\u{0301}", ambiguous: .wide), 1)
+        let combiningAcuteAccent = "\u{0301}"
+        XCTAssertEqual(DisplayWidth.width(of: "e" + combiningAcuteAccent, ambiguous: .wide), 1)
         XCTAssertEqual(DisplayWidth.width(of: "\u{07}", ambiguous: .wide), 0)
     }
 
@@ -158,11 +159,12 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(render(view, width: 4, height: 3), "+--+\n|ab|\n+--+")
     }
 
+    /// 曖昧幅が 2 桁のとき、埋まる側（Ambiguous の `█`）だけが 2 桁になり、
+    /// 残りの側（Neutral の `░`）は 1 桁のまま行の幅が保たれる。
     func testProgressBarKeepsRowWidthWhenAmbiguousIsWide() {
         XCTAssertEqual(render(ProgressBar(value: 0.5), width: 10, height: 1), "█████░░░░░")
 
         DisplayWidth.ambiguousWidth = .wide
-        // `█` は Ambiguous、`░`（U+2591）は Neutral なので、埋まる側だけ 2 桁になる。
         XCTAssertEqual(render(ProgressBar(value: 0.5), width: 10, height: 1), "██ ░░░░░")
     }
 }

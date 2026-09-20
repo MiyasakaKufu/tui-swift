@@ -120,7 +120,8 @@ public final class Terminal: TerminalOutput {
         raw.c_lflag &= ~tcflag_t(ECHO | ICANON | ISIG | IEXTEN)
         raw.c_cflag |= tcflag_t(CS8)
 
-        // poll(2) で待つので、read(2) 自体は即座に返るようにしておく。
+        // `VMIN` を 1 に戻してはいけない。待つのは `poll(2)` の役目で、`read(2)` が入力を
+        // 待つと、シグナルの合図で起こしても読み終えるまで戻らない。
         withUnsafeMutablePointer(to: &raw.c_cc) { pointer in
             pointer.withMemoryRebound(to: cc_t.self, capacity: Int(NCCS)) { controlCharacters in
                 controlCharacters[Int(VMIN)] = 0

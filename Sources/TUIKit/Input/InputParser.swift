@@ -17,18 +17,50 @@ public struct InputParser {
     private static let sequenceWaitDuration = 1.0
 
     /// kitty keyboard protocol が機能キーに使う、私用領域の先頭のキーコード。
+    ///
+    /// - See: [kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/) の「Functional key definitions」。
     private static let firstFunctionalKeyCode = 0xE000
 
     /// kitty keyboard protocol で、キーを離したことを表すイベント種別。
+    ///
+    /// 種別は押下・キーリピート・解放の 3 つで、解放だけがこの値で届く。
+    ///
+    /// - See: [kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/) の「Event types」。
     private static let keyReleaseEventType = 3
 
-    /// SGR 形式のマウス報告で、動かしながらの操作であることを表すビット。
+    /// SGR 形式のマウス報告の符号。
     ///
-    /// ボタンを押していない間の移動は、このビットとボタンなし（下位 2 ビットが 3）の
-    /// 組み合わせで届く。押したままの移動は、このビットと押しているボタンの番号で届く。
+    /// 1 つの数値に、押されていた修飾キー、ボタンの種類、動かしながらの操作かがビットで詰まっている。
     ///
     /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「Mouse Tracking」。
-    private static let mouseMotionBit = 32
+    private enum MouseReport {
+        /// ボタンの番号が入る下位 2 ビット。
+        ///
+        /// 何を表す番号かは、`wheelBit` と `extendedButtonBit` のどちらが立っているかで決まる。
+        /// どちらも立っていなければ、左・中・右と「ボタンなし」を表す。
+        static let buttonMask = 3
+
+        /// Shift が押されていたことを表すビット。
+        static let shiftBit = 4
+
+        /// Alt が押されていたことを表すビット。
+        static let altBit = 8
+
+        /// Control が押されていたことを表すビット。
+        static let controlBit = 16
+
+        /// 動かしながらの操作であることを表すビット。
+        ///
+        /// ボタンを押していない間の移動は、このビットとボタンなし（`buttonMask` が 3）の
+        /// 組み合わせで届く。押したままの移動は、このビットと押しているボタンの番号で届く。
+        static let motionBit = 32
+
+        /// ホイールの回転を表すビット。回転の向きは `buttonMask` に入る。
+        static let wheelBit = 64
+
+        /// 拡張ボタン（戻る・進む・ボタン 10・11）を表すビット。ボタンの番号は `buttonMask` に入る。
+        static let extendedButtonBit = 128
+    }
 
     /// 何も読み取っていないパーサを作る。
     public init() {}
@@ -95,6 +127,7 @@ public struct InputParser {
     /// 入力が途切れたときに呼び、ESC で始まる未解釈のバイトを捨てるか確定させる。
     ///
     /// 単独の ESC は Escape キー、`ESC [` と `ESC O` は Alt+[ と Alt+O になる。
+    /// この 2 つは CSI と SS3 の始まりと同じ形なので、続きが届くまでは区別できない。
     /// それより長い、途中までの制御コードは捨てる。
     ///
     /// - Returns: 確定したイベント。確定するものがなければ空配列。
@@ -110,7 +143,6 @@ public struct InputParser {
         // 続きが届いてももう制御コードとして読めず、`ESC [ < 65 ; 10` が Escape と文字の列になる。
         var events: [InputEvent] = []
         if pending.count == 2, pending[1] == UInt8(ascii: "[") || pending[1] == UInt8(ascii: "O") {
-            // Alt+[ と Alt+O は `ESC [` / `ESC O` として届き、CSI / SS3 の始まりと同じ形になる。
             let character = Character(Unicode.Scalar(pending[1]))
             events.append(.key(KeyEvent(.character(character), modifiers: .alt)))
         }
@@ -151,12 +183,18 @@ public struct InputParser {
         return parseKey(at: 0, extraModifiers: [])
     }
 
+    /// ESC で始まるバイト列を解釈する。
+    ///
+    /// `ESC [` は CSI、`ESC O` は SS3 の始まり。SS3 で届くのは、修飾キーの付かない
+    /// F1〜F4 と Home / End。修飾キーが付くと、同じキーが CSI で届く。
+    ///
+    /// - Returns: 解釈の結果。続きが足りなければ `.incomplete`。
+    /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「PC-Style Function Keys」。
     private func parseEscape() -> ParseOutcome {
         guard pending.count >= 2 else { return .incomplete }
         switch pending[1] {
         case UInt8(ascii: "["):
             return parseControlSequence()
-        // `ESC O` は SS3。F1〜F4 は修飾キーが付かないときだけこの形で届く。
         case UInt8(ascii: "O"):
             guard pending.count >= 3 else { return .incomplete }
             switch pending[2] {
@@ -265,6 +303,18 @@ public struct InputParser {
         }
     }
 
+    /// `CSI` を解釈する。
+    ///
+    /// 最終バイトがキーの種類を、第 2 パラメータが修飾キーを表す。修飾キーが付くと、
+    /// SS3 で届く F1〜F4 も `CSI` で届く。
+    ///
+    /// - Parameters:
+    ///   - final: 制御コードの最終バイト。
+    ///   - parameters: 最終バイトの手前にあるパラメータ。
+    ///   - prefix: 前置きの記号。無ければ `nil`。
+    ///   - consumed: この制御コードが使ったバイト数。
+    /// - Returns: 解釈の結果。対応するキーが無ければ `.skip`。
+    /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「PC-Style Function Keys」。
     private func interpret(
         final: UInt8,
         parameters: Parameters,
@@ -290,10 +340,9 @@ public struct InputParser {
         case UInt8(ascii: "H"): return .event(.key(KeyEvent(.home, modifiers: modifiers)), consumed: consumed)
         case UInt8(ascii: "F"): return .event(.key(KeyEvent(.end, modifiers: modifiers)), consumed: consumed)
         case UInt8(ascii: "Z"): return .event(.key(KeyEvent(.backTab, modifiers: modifiers)), consumed: consumed)
-        // 修飾キーが付くと、F1〜F4 は SS3 ではなく `CSI` で届く。
         case UInt8(ascii: "P")...UInt8(ascii: "S"):
-            // `CSI 1;2R`（Shift+F3）はカーソル位置の問い合わせへの応答と同じ形だが、
-            // TUIKit はカーソル位置（`CSI 6 n`）を問い合わせないので F3 として扱う。
+            // `R` をカーソル位置の応答として先に処理してはいけない。TUIKit は `CSI 6 n` を
+            // 送らないので、届く `CSI 1;2R` は Shift+F3 であり、F3 が消える。
             let number = Int(final - UInt8(ascii: "P")) + 1
             return .event(.key(KeyEvent(.function(number), modifiers: modifiers)), consumed: consumed)
         case UInt8(ascii: "I"): return .event(.focus(true), consumed: consumed)
@@ -365,6 +414,7 @@ public struct InputParser {
     /// - Parameters:
     ///   - code: `CSI <code> ... u` の先頭パラメータ。
     /// - Returns: 対応するキー。当てはまるキーがなければ `nil`。
+    /// - See: [kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/) の「Functional key definitions」。
     private static func keyboardProtocolKey(_ code: Int) -> Key? {
         switch code {
         case 9: return .tab
@@ -415,25 +465,24 @@ public struct InputParser {
 
     private static func mouseEvent(code: Int, column: Int, row: Int, isPress: Bool) -> MouseEvent {
         var modifiers: KeyModifiers = []
-        if code & 4 != 0 { modifiers.insert(.shift) }
-        if code & 8 != 0 { modifiers.insert(.alt) }
-        if code & 16 != 0 { modifiers.insert(.control) }
+        if code & MouseReport.shiftBit != 0 { modifiers.insert(.shift) }
+        if code & MouseReport.altBit != 0 { modifiers.insert(.alt) }
+        if code & MouseReport.controlBit != 0 { modifiers.insert(.control) }
 
         let position = Point(x: max(0, column - 1), y: max(0, row - 1))
 
-        // ビット 128（拡張ボタン）→ ビット 64（ホイール）→ 下位 2 ビット（通常ボタン）の順に判定する。
-        // ビット 128 を先に見ないと、拡張ボタンを左・中・右ボタンと誤認する。
+        // 拡張ボタンのビットを先に見ないと、拡張ボタンを左・中・右ボタンと誤認する。
         let button: MouseButton
-        if code & 128 != 0 {
-            switch code & 3 {
+        if code & MouseReport.extendedButtonBit != 0 {
+            switch code & MouseReport.buttonMask {
             case 0: button = .backward
             case 1: button = .forward
             case 2: button = .button10
             default: button = .button11
             }
-        } else if code & 64 != 0 {
+        } else if code & MouseReport.wheelBit != 0 {
             let action: MouseAction
-            switch code & 3 {
+            switch code & MouseReport.buttonMask {
             case 0: action = .scrollUp
             case 1: action = .scrollDown
             case 2: action = .scrollLeft
@@ -441,7 +490,7 @@ public struct InputParser {
             }
             return MouseEvent(position: position, button: .none, action: action, modifiers: modifiers)
         } else {
-            switch code & 3 {
+            switch code & MouseReport.buttonMask {
             case 0: button = .left
             case 1: button = .middle
             case 2: button = .right
@@ -450,7 +499,7 @@ public struct InputParser {
         }
 
         let action: MouseAction
-        if code & InputParser.mouseMotionBit != 0 {
+        if code & MouseReport.motionBit != 0 {
             action = button == .none ? .move : .drag
         } else {
             action = isPress ? .press : .release
@@ -510,6 +559,12 @@ public struct InputParser {
 }
 
 /// 制御コードを組み立てるバイト。
+///
+/// `privatePrefixes` `parameterBytes` `intermediateBytes` `finalBytes` の区分は、
+/// 制御シーケンスの構文が定める。
+///
+/// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/)
+///   の「Control sequences」。
 private enum ControlByte {
     static let null: UInt8 = 0x00
     static let horizontalTab: UInt8 = 0x09
@@ -523,7 +578,6 @@ private enum ControlByte {
     /// Ctrl+\ 〜 Ctrl+_ が届くバイト。
     static let controlSymbols: ClosedRange<UInt8> = 0x1C...0x1F
 
-    // 以下の区分は ECMA-48 5.4 による。
     static let privatePrefixes: ClosedRange<UInt8> = 0x3C...0x3F
     static let parameterBytes: ClosedRange<UInt8> = 0x30...0x3F
     static let intermediateBytes: ClosedRange<UInt8> = 0x20...0x2F

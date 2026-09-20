@@ -80,21 +80,25 @@ public enum DisplayWidth {
 
     /// `LC_ALL` などのロケール名を解釈する。
     ///
+    /// ロケール名は `言語[_地域][.文字集合][@修飾子]` の形をとる。
+    ///
     /// - Parameters:
     ///   - value: ロケール名。未設定なら `nil`。
     /// - Returns: 文字集合が UTF-8 で、言語が ja / ko / zh なら `.wide`、
     ///   それ以外なら `.narrow`。`nil` か空文字列なら `nil`。
+    /// - See: [The Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9799919799/)
+    ///   の「Environment Variables」にある Internationalization Variables。
     static func parseAmbiguousWidth(localeValue value: String?) -> AmbiguousWidth? {
         guard let value, !value.isEmpty else { return nil }
 
-        // POSIX のロケール名は "言語[_地域][.文字集合][@修飾子]" の形をとる。
         let body = value.split(separator: "@", maxSplits: 1).first ?? ""
         let parts = body.split(separator: ".", maxSplits: 1)
         let territory = parts.first ?? ""
         let language = (territory.split(separator: "_").first ?? "").lowercased()
         let codeset = parts.count > 1 ? normalizedCodeset(parts[1]) : ""
 
-        // C や eucJP のロケールで端末がどちらの幅を選ぶかは決まっていない。推測で 2 桁にしない。
+        // 文字集合を見ずに言語だけで決めてはいけない。C や eucJP のロケールで端末がどちらの
+        // 幅を選ぶかは決まっておらず、推測が外れれば桁がずれたまま描き続けることになる。
         guard codeset == "utf8" else { return .narrow }
         return eastAsianLanguages.contains(language) ? .wide : .narrow
     }
@@ -120,6 +124,14 @@ public enum DisplayWidth {
 
     // MARK: - 幅の計算
 
+    /// 直前の文字を絵文字として表示するよう指定する異体字セレクタ。
+    ///
+    /// 既定でテキスト表示の文字でも、これが付けば絵文字表示になり、幅は 2 桁になる。
+    ///
+    /// - See: [UTS #51: Unicode Emoji](https://www.unicode.org/reports/tr51/) の
+    ///   emoji presentation sequence の定義。
+    private static let emojiPresentationSelector: UInt32 = 0xFE0F
+
     /// 1 文字（書記素クラスタ）の表示幅を返す。
     ///
     /// - Parameters:
@@ -132,13 +144,9 @@ public enum DisplayWidth {
     ) -> Int {
         guard let first = character.unicodeScalars.first else { return 0 }
 
-        // 制御文字は幅を持たない。
-        if first.value < 0x20 || (first.value >= 0x7F && first.value < 0xA0) {
-            return 0
-        }
+        if contains(controlRanges, first.value) { return 0 }
 
-        // 異体字セレクタ 16 が付いていれば絵文字表示（全角）。
-        if character.unicodeScalars.contains(where: { $0.value == 0xFE0F }) {
+        if character.unicodeScalars.contains(where: { $0.value == emojiPresentationSelector }) {
             return 2
         }
 
@@ -279,30 +287,43 @@ public enum DisplayWidth {
 
     // MARK: - 範囲表
 
-    /// East Asian Width が Wide / Fullwidth のコードポイント範囲。
+    /// 表示幅を持たない制御文字のコードポイント範囲。
+    ///
+    /// C0 制御文字（`0x00`〜`0x1F`）と、DELETE および C1 制御文字（`0x7F`〜`0x9F`）。
+    /// いずれも一般カテゴリは Cc。
     ///
     /// - Invariant: 昇順に並び、範囲どうしが重ならない。
+    /// - See: [UAX #44: Unicode Character Database](https://www.unicode.org/reports/tr44/)
+    ///   の「General_Category Values」。
+    private static let controlRanges: [ClosedRange<UInt32>] = [0x00...0x1F, 0x7F...0x9F]
+
+    /// East Asian Width が Wide / Fullwidth のコードポイント範囲。
+    ///
+    /// ハングル、かな、漢字とその互換形、イ文字、西夏文字、全角 ASCII、記号・絵文字が含まれる。
+    ///
+    /// - Invariant: 昇順に並び、範囲どうしが重ならない。
+    /// - See: [UAX #11: East Asian Width](https://www.unicode.org/reports/tr11/) の「Classifications」。
     static let wideRanges: [ClosedRange<UInt32>] = [
-        0x1100...0x115F,    // ハングル字母
-        0x2E80...0x303E,    // CJK 部首補助〜CJK 記号
-        0x3041...0x33FF,    // かな〜CJK 互換
-        0x3400...0x4DBF,    // CJK 統合漢字拡張 A
-        0x4E00...0x9FFF,    // CJK 統合漢字
-        0xA000...0xA4CF,    // イ文字
-        0xA960...0xA97F,    // ハングル字母拡張 A
-        0xAC00...0xD7A3,    // ハングル音節
-        0xF900...0xFAFF,    // CJK 互換漢字
-        0xFE10...0xFE19,    // 縦書き用記号
-        0xFE30...0xFE6F,    // CJK 互換形〜小字形
-        0xFF00...0xFF60,    // 全角 ASCII
-        0xFFE0...0xFFE6,    // 全角記号
+        0x1100...0x115F,
+        0x2E80...0x303E,
+        0x3041...0x33FF,
+        0x3400...0x4DBF,
+        0x4E00...0x9FFF,
+        0xA000...0xA4CF,
+        0xA960...0xA97F,
+        0xAC00...0xD7A3,
+        0xF900...0xFAFF,
+        0xFE10...0xFE19,
+        0xFE30...0xFE6F,
+        0xFF00...0xFF60,
+        0xFFE0...0xFFE6,
         0x16FE0...0x16FE4,
-        0x17000...0x18AFF,  // 西夏文字
-        0x1B000...0x1B2FF,  // 仮名補助
-        0x1F300...0x1F64F,  // 記号・絵文字
-        0x1F900...0x1F9FF,  // 補助記号・絵文字
+        0x17000...0x18AFF,
+        0x1B000...0x1B2FF,
+        0x1F300...0x1F64F,
+        0x1F900...0x1F9FF,
         0x1FA70...0x1FAFF,
-        0x20000...0x2FFFD,  // CJK 統合漢字拡張 B 以降
+        0x20000...0x2FFFD,
         0x30000...0x3FFFD,
     ]
 
@@ -311,6 +332,7 @@ public enum DisplayWidth {
     /// ラテン・ギリシャ・キリル文字の一部、記号、罫線素片、ブロック要素、私用領域が含まれる。
     ///
     /// - Invariant: 昇順に並び、範囲どうしが重ならない。
+    /// - See: [UAX #11: East Asian Width](https://www.unicode.org/reports/tr11/) の「Classifications」。
     static let ambiguousRanges: [ClosedRange<UInt32>] = [
         0x00A1...0x00A1, 0x00A4...0x00A4, 0x00A7...0x00A8,
         0x00AA...0x00AA, 0x00AD...0x00AE, 0x00B0...0x00B4,

@@ -18,8 +18,8 @@ final class DisplayWidthTests: XCTestCase {
     }
 
     func testCombiningMarksHaveNoWidth() {
-        // e + 結合アクセント
-        XCTAssertEqual(DisplayWidth.width(of: "e\u{0301}"), 1)
+        let combiningAcuteAccent = "\u{0301}"
+        XCTAssertEqual(DisplayWidth.width(of: "e" + combiningAcuteAccent), 1)
     }
 
     func testControlCharactersHaveNoWidth() {
