@@ -17,7 +17,7 @@ public final class Application<Root: Component> {
     /// 外部で起きたことをイベントループへ届ける送り口。
     ///
     /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
-    ///   ランタイムに作業を任せられるなら `Component.startupEffect` のほうが短く書ける。
+    ///   作業をランタイムに任せられるなら `Component.startupEffect` を使う。
     public let sender: MessageSender<Root.Message>
 
     private var buffer = Buffer(size: .zero)
