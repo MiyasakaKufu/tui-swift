@@ -31,6 +31,8 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
 - **クリップボードへのコピー** — OSC 52 で文字列を端末のクリップボードへ渡す
   （`Terminal.copyToClipboard(_:)`）。SSH 越しでも手元の端末へ届く。
   OSC 52 を拒否する設定の端末では何も起こらない。
+- **ウィンドウタイトルとカーソル形状** — 端末のタイトルと、カーソルの形
+  （ブロック・下線・縦棒と点滅の有無）を設定できる。終了時と一時停止時に元へ戻す。
 - **端末の後始末** — raw モード・代替画面・マウストラッキング・フォーカス通知を
   終了時に必ず元へ戻す。
 - **外部依存なし** — SwiftPM だけでビルドできる。
@@ -99,6 +101,19 @@ kitty keyboard protocol（`usesKeyboardProtocol`）は既定で有効になっ�
 対応状況を問い合わせ、対応していれば有効にする。対応していない端末では、従来どおり
 時間切れでキーを確定させる。問い合わせを送りたくないアプリだけ `false` にする。
 
+ウィンドウタイトル（`windowTitle`）とカーソル形状（`cursorShape`）は、どちらも既定で
+`nil`、つまり端末の設定のままにする。
+
+```swift
+static var options: ApplicationOptions {
+    ApplicationOptions(windowTitle: "MyApp", cursorShape: .blinkingBar)
+}
+```
+
+`Application.setWindowTitle(_:)` / `Application.setCursorShape(_:)` を呼べば、動作中にも
+変えられる。どちらも終了時と一時停止時に元へ戻す。タイトルは `CSI 22 t` で端末のスタックへ
+積んでおき、`CSI 23 t` で戻すため、タイトルのスタックに対応しない端末では戻らない。
+
 `handle(_:)` には既定実装（すべて `.ignored`）があるため、表示だけのアプリは `body` だけで書ける。
 raw モードでは Ctrl+C が SIGINT にならないので、`Component` が処理しなかった Ctrl+C は
 `ApplicationOptions.quitsOnControlC`（既定で有効）が終了させる。自前で扱うなら `false` にする。
@@ -109,7 +124,8 @@ Ctrl+Z も同じくシグナルにならないため、処理しなかった Ctr
 
 外から SIGINT / SIGQUIT / SIGTERM / SIGHUP を受けたときはイベントループを終えて端末を戻す。
 `fatalError` や範囲外アクセスで落ちたときも、シグナルハンドラが raw モード・代替画面・
-マウス受信・ブラケットペースト・キーの形式を元に戻してから、本来のクラッシュ処理へ進む。
+マウス受信・ブラケットペースト・キーの形式・カーソル形状・ウィンドウタイトルを元に戻してから、
+本来のクラッシュ処理へ進む。
 
 `Application` を直接組み立てることもできる。
 
@@ -152,7 +168,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 
 | 層 | 主な型 | 役割 |
 | --- | --- | --- |
-| 端末 | `Terminal`, `SignalWatcher` | raw モード、代替画面、サイズ取得、シグナル、クラッシュ時の復元 |
+| 端末 | `Terminal`, `SignalWatcher` | raw モード、代替画面、サイズ取得、タイトルとカーソル形状、シグナル、クラッシュ時の復元 |
 | 入力 | `InputParser`, `InputReader`, `KeyEvent`, `MouseEvent` | バイト列からイベントへの増分解析 |
 | 描画 | `Buffer`, `Cell`, `Renderer`, `Style` | セル単位の画面バッファと差分出力 |
 | 文字 | `DisplayWidth`, `TextWrapping`, `TabExpansion` | 表示幅の計算、折り返し、タブの展開 |

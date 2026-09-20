@@ -34,6 +34,8 @@ public final class Terminal: TerminalOutput {
     private var isBracketedPasteEnabled = false
     private var isFocusReportingEnabled = false
     private var isKeyboardProtocolEnabled = false
+    private var windowTitle: String?
+    private var cursorShape: CursorShape?
 
     /// 入出力のファイル記述子を指定して端末を作る。
     ///
@@ -183,6 +185,32 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
+    /// ウィンドウタイトルとアイコン名を設定する。
+    ///
+    /// - Parameters:
+    ///   - title: 設定するタイトル。
+    /// - Postcondition: `restore()` / `deactivate()` で設定する前のタイトルへ戻る。
+    /// - Note: タイトルのスタックに対応しない端末では、設定はできても戻らない。
+    public func setWindowTitle(_ title: String) {
+        if windowTitle == nil { write(ANSI.saveWindowTitle) }
+        windowTitle = title
+        write(ANSI.setWindowTitle(title))
+        flush()
+    }
+
+    /// カーソルの形と点滅の有無を切り替える。
+    ///
+    /// - Parameters:
+    ///   - shape: 設定する形。
+    /// - Postcondition: `restore()` / `deactivate()` で端末の設定どおりの形へ戻る。
+    /// - Note: `DECSCUSR` に対応しない端末では何も変わらない。
+    public func setCursorShape(_ shape: CursorShape) {
+        guard shape != cursorShape else { return }
+        cursorShape = shape
+        write(ANSI.setCursorShape(shape))
+        flush()
+    }
+
     /// マウスイベントの通知を切り替える。
     ///
     /// - Parameters:
@@ -244,6 +272,8 @@ public final class Terminal: TerminalOutput {
         isBracketedPasteEnabled = false
         isFocusReportingEnabled = false
         isKeyboardProtocolEnabled = false
+        windowTitle = nil
+        cursorShape = nil
         disableRawMode()
     }
 
@@ -261,6 +291,8 @@ public final class Terminal: TerminalOutput {
         if isBracketedPasteEnabled { write(ANSI.disableBracketedPaste) }
         if isFocusReportingEnabled { write(ANSI.disableFocusReporting) }
         if isInAlternateScreen { write(ANSI.exitAlternateScreen) }
+        if cursorShape != nil { write(ANSI.setCursorShape(.default)) }
+        if windowTitle != nil { write(ANSI.restoreWindowTitle) }
         write(ANSI.reset)
         write(ANSI.showCursor)
         flush()
@@ -287,6 +319,11 @@ public final class Terminal: TerminalOutput {
         if isBracketedPasteEnabled { write(ANSI.enableBracketedPaste) }
         if isFocusReportingEnabled { write(ANSI.enableFocusReporting) }
         if isKeyboardProtocolEnabled { write(ANSI.enableKeyboardProtocol) }
+        if let windowTitle {
+            write(ANSI.saveWindowTitle)
+            write(ANSI.setWindowTitle(windowTitle))
+        }
+        if let cursorShape { write(ANSI.setCursorShape(cursorShape)) }
         flush()
     }
 
