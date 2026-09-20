@@ -34,7 +34,7 @@ public enum ANSI {
     /// ブラケットペーストの通知を止める。
     public static let disableBracketedPaste = "\u{1B}[?2004l"
 
-    /// 同期出力（DECSET 2026）を開始し、1 フレーム分が揃うまで画面の更新を保留させる。
+    /// 同期出力（DECSET 2026）を開始し、終了するまで画面の更新を保留させる。
     ///
     /// - Note: 対応しない端末はこの制御コードを読み飛ばすため、送っても表示は変わらない。
     public static let beginSynchronizedUpdate = "\u{1B}[?2026h"

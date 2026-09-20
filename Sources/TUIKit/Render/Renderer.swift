@@ -21,8 +21,6 @@ public final class Renderer {
     /// - Parameters:
     ///   - buffer: 描画したい画面内容。
     ///   - cursor: カーソルを表示する位置。`nil` ならカーソルを隠す。
-    /// - Note: 1 フレーム分を同期出力（`ANSI.beginSynchronizedUpdate`）で囲むので、
-    ///   対応する端末では描画の途中が見えない。
     public func render(_ buffer: Buffer, cursor: Point? = nil) {
         let isFullRedraw = (previous == nil || previous?.size != buffer.size)
 
