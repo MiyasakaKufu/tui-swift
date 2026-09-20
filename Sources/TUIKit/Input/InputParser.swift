@@ -27,7 +27,7 @@ public struct InputParser {
     /// ボタンを押していない間の移動は、このビットとボタンなし（下位 2 ビットが 3）の
     /// 組み合わせで届く。押したままの移動は、このビットと押しているボタンの番号で届く。
     ///
-    /// - See: XTerm Control Sequences, Mouse Tracking
+    /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「Mouse Tracking」。
     private static let mouseMotionBit = 32
 
     /// 何も読み取っていないパーサを作る。

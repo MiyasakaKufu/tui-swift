@@ -36,7 +36,7 @@ public enum ANSI {
     ///
     /// - Note: それぞれ独立した DECSET モードなので、一部を送り直しても他は落ちない。
     ///   範囲を狭めるときは、この列を送ってから入れ直す。
-    /// - See: XTerm Control Sequences, Mouse Tracking
+    /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「Mouse Tracking」。
     public static let disableMouseTracking = "\u{1B}[?1006l\u{1B}[?1003l\u{1B}[?1002l\u{1B}[?1000l"
 
     /// 貼り付けを `ESC [ 200 ~` と `ESC [ 201 ~` で囲んで受け取る。
