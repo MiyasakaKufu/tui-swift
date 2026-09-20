@@ -218,8 +218,8 @@ public final class Terminal: TerminalOutput {
     /// - Note: `.motion` で届く移動を、`InputParser` は `.move` として解釈する。
     public func setMouseTracking(_ tracking: MouseTracking) {
         guard tracking != mouseTracking else { return }
-        // 1003 は 1000 や 1002 を送り直しても落ちない。この行を外して新しい範囲を送るだけに
-        // すると、`.motion` から狭めたときに移動の通知が残る。
+        // 1003 は 1000 や 1002 とは別の DECSET モードなので、送り直しても落ちない。この行を
+        // 外して新しい範囲を送るだけにすると、`.motion` から狭めたときに移動の通知が残る。
         if mouseTracking != .disabled { write(ANSI.disableMouseTracking) }
         mouseTracking = tracking
         if let sequence = Terminal.enableSequence(for: tracking) { write(sequence) }

@@ -444,6 +444,8 @@ public struct InputParser {
         let action: MouseAction
         if code & 32 != 0 {
             // 1003 の移動報告は、下位 2 ビットを「ボタンなし」（3）にして届く。
+            // ボタン番号と移動ビットの割り当ては xterm の Control Sequences
+            //「Mouse Tracking」による。
             action = button == .none ? .move : .drag
         } else {
             action = isPress ? .press : .release
