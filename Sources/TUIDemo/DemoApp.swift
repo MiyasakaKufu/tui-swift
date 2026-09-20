@@ -22,15 +22,19 @@ final class DemoApp: TerminalApp {
         "枠線とタイトル",
         "スクロールするリスト",
         "テキスト入力",
+        "フォーカスの移動と配送",
         "ウィンドウサイズ変更への追従",
     ]
 
     private let listState = ListState()
-    private let inputState = TextFieldState()
+    private let nameState = TextFieldState()
+    private let noteState = TextFieldState()
+    private let focusManager = FocusManager()
     private var progress = 0.35
     private var lastEventDescription = "（まだ入力はありません）"
-    private var isEditing = false
     private var terminalSize = Size(width: 0, height: 0)
+
+    var focus: FocusManager? { focusManager }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,7 +42,8 @@ final class DemoApp: TerminalApp {
             HStack(spacing: 1) {
                 ListView(items: items, state: listState)
                     .padding(horizontal: 1)
-                    .border(.rounded, title: "機能一覧")
+                    .border(.rounded, style: borderStyle(for: listState), title: "機能一覧")
+                    .focusable(listState, in: focusManager)
                     .flexible(horizontal: 2, vertical: 1)
 
                 detail()
@@ -65,66 +70,62 @@ final class DemoApp: TerminalApp {
         return VStack(spacing: 1) {
             Text("選択中: \(selected)", wrap: .word).bold()
             Text("端末サイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
-            Text("直前のイベント: \(lastEventDescription)", wrap: .word)
+            Text("ルートまで届いたイベント: \(lastEventDescription)", wrap: .word)
 
             VStack(spacing: 0) {
                 Text("進捗（+ / - で増減）").dim()
                 ProgressBar(value: progress, showsPercentage: true)
             }
 
-            VStack(spacing: 0) {
-                Text(isEditing ? "入力中（Tab で戻る）" : "Tab で入力に切り替え").dim()
-                TextField(
-                    state: inputState,
-                    placeholder: "ここに入力…",
-                    showsCursor: !isEditing
-                )
-                    .padding(horizontal: 1)
-                    .border(.single, style: Style(foreground: isEditing ? .yellow : .brightBlack))
-            }
+            field(state: nameState, title: "名前", placeholder: "名前を入力…")
+            field(state: noteState, title: "メモ", placeholder: "メモを入力…")
 
             Spacer()
         }
         .padding(horizontal: 1)
     }
 
+    private func field(state: TextFieldState, title: String, placeholder: String) -> some View {
+        TextField(
+            state: state,
+            placeholder: placeholder,
+            showsCursor: !focusManager.isFocused(state)
+        )
+            .padding(horizontal: 1)
+            .border(.single, style: borderStyle(for: state), title: title)
+            .focusable(state, in: focusManager)
+    }
+
+    /// フォーカスの有無で枠線の色を変える。
+    ///
+    /// - Parameters:
+    ///   - target: 枠線で囲むウィジェットの状態。
+    /// - Returns: フォーカス中なら黄色、そうでなければ暗い灰色のスタイル。
+    private func borderStyle(for target: FocusTarget) -> Style {
+        Style(foreground: focusManager.isFocused(target) ? .yellow : .brightBlack)
+    }
+
     private func footer() -> some View {
         HStack(spacing: 2) {
             Text(" ↑↓/jk 選択 ").styled(Style(foreground: .black, background: .white))
             Text(" ホイール スクロール ").styled(Style(foreground: .black, background: .white))
-            Text(" Tab 切り替え ").styled(Style(foreground: .black, background: .white))
+            Text(" Tab/クリック フォーカス ").styled(Style(foreground: .black, background: .white))
             Text(" Ctrl+Z 一時停止 ").styled(Style(foreground: .black, background: .white))
-            Text(" q 終了 ").styled(Style(foreground: .black, background: .white))
+            Text(" Esc 終了 ").styled(Style(foreground: .black, background: .white))
             Spacer()
         }
         .frame(height: 1)
         .flexible(horizontal: 1, vertical: 0)
     }
 
-    var cursorPosition: Point? {
-        isEditing ? inputState.renderedCursorPoint : nil
-    }
-
     func handle(_ event: InputEvent) -> EventResult {
         lastEventDescription = describe(event)
 
-        if case .resize(let size) = event {
+        switch event {
+        case .resize(let size):
             terminalSize = size
             return .handled
-        }
-
-        if case .key(let keyEvent) = event {
-            if keyEvent.key == .tab {
-                isEditing.toggle()
-                return .handled
-            }
-            if isEditing {
-                if keyEvent.key == .escape {
-                    isEditing = false
-                    return .handled
-                }
-                return inputState.handle(event) ? .handled : .ignored
-            }
+        case .key(let keyEvent):
             switch keyEvent.key {
             case .character("q"), .escape:
                 return .quit
@@ -135,15 +136,11 @@ final class DemoApp: TerminalApp {
                 progress = max(0.0, progress - 0.05)
                 return .handled
             default:
-                break
+                return .ignored
             }
+        default:
+            return .ignored
         }
-
-        if isEditing, case .paste = event {
-            return inputState.handle(event) ? .handled : .ignored
-        }
-
-        return listState.handle(event) ? .handled : .ignored
     }
 
     private func describe(_ event: InputEvent) -> String {

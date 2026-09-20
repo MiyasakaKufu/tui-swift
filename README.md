@@ -21,13 +21,17 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
 - **タブの展開** — タブは幅を計算する前に次のタブストップまでの空白へ展開する。
   既定のタブ幅は 4 桁で、`Text(_:tabSize:)` や `.tabStops(every:)` で変えられる。
 - **宣言的なレイアウト** — `VStack` / `HStack` / `Spacer` / `border` などを組み合わせて画面を記述する。
+- **フォーカスと配送** — `FocusManager` がフォーカス中のウィジェットを覚え、キーをそこへ、
+  マウスをクリックした位置のウィジェットへ配送する。Tab / Shift+Tab とクリックでフォーカスが移り、
+  処理されなかったイベントだけがルートの `Component` へ渡る。
 - **入力の解析** — 矢印キー、ファンクションキー、修飾キー、マウス（SGR 1006）、
   ブラケットペーストを解釈する。分割して届いたシーケンスも正しく扱う。
   端末が対応していれば kitty keyboard protocol を使い、Ctrl+I と Tab のように
   従来は同じバイト列だったキーを区別する。
 - **IME への対応** — 入力欄は描画のたびに `TextFieldState.renderedCursorPoint` へ
   端末カーソルを置くべき位置を記録する。`Component.cursorPosition` でそれを返すと、
-  変換中の文字と変換候補が入力欄の位置に出る。
+  変換中の文字と変換候補が入力欄の位置に出る。`FocusManager` を使うなら、
+  フォーカス中の入力欄の位置が既定で返る。
 - **クリップボードへのコピー** — OSC 52 で文字列を端末のクリップボードへ渡す
   （`Terminal.copyToClipboard(_:)`）。SSH 越しでも手元の端末へ届く。
   OSC 52 を拒否する設定の端末では何も起こらない。
@@ -142,6 +146,49 @@ try Application(root: Counter(), options: .default).run()
 swift run tui-demo
 ```
 
+## フォーカス
+
+ウィジェットが 2 つ以上あるとき、どれがキーを受け取るかは `FocusManager` が覚える。
+アプリはウィジェットの状態を `.focusable(_:in:)` で登録し、その `FocusManager` を
+`Component.focus` から返す。
+
+```swift
+@main
+final class Form: TerminalApp {
+    private let manager = FocusManager()
+    private let name = TextFieldState()
+    private let note = TextFieldState()
+
+    var focus: FocusManager? { manager }
+
+    var body: some View {
+        VStack(spacing: 1) {
+            TextField(state: name)
+                .border(style: borderStyle(for: name), title: "名前")
+                .focusable(name, in: manager)
+            TextField(state: note)
+                .border(style: borderStyle(for: note), title: "メモ")
+                .focusable(note, in: manager)
+        }
+    }
+
+    private func borderStyle(for target: FocusTarget) -> Style {
+        Style(foreground: manager.isFocused(target) ? .yellow : .brightBlack)
+    }
+}
+```
+
+- キーと貼り付けはフォーカス中のウィジェットへ届く。処理されなければルートの `handle(_:)` へ渡る。
+- Tab で次、Shift+Tab で前のウィジェットへ移る。巡る順序は描画順で、端では反対の端へ回り込む
+  （`wrapsAround` で止められる）。
+- マウスは位置にあるウィジェットへ届き、押下ならフォーカスもそこへ移る。重なっているときは、
+  後から描いた手前のものが受け取り、下へは抜けない。
+- 登録は描画のたびにやり直す。画面から消えたウィジェットはフォーカスを失い、
+  フォーカスがどこにもなければ先頭のウィジェットへ移る（`focusesFirstAutomatically` で止められる）。
+- フォーカスの有無は `isFocused(_:)` で分かる。枠線の色を変えるなど、描画へ反映するために使う。
+- フォーカスを受け取れるのは `FocusTarget` に適合したクラス。`ListState` と `TextFieldState` は
+  適合済みで、自前のウィジェットも `handle(_:)` を実装すれば同じように載る。
+
 ## 曖昧幅（East Asian Ambiguous）
 
 罫線素片（`─` `│` `╭`）、`…`、`█`、矢印などは East Asian Width が Ambiguous で、
@@ -177,6 +224,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | 文字 | `DisplayWidth`, `TextWrapping`, `TabExpansion` | 表示幅の計算、折り返し、タブの展開 |
 | ビュー | `View`, `VStack`, `HStack`, `Text`, 各種修飾子 | レイアウトと描画 |
 | 部品 | `ListView`, `TextField`, `ProgressBar` | 状態を持つウィジェット |
+| 配送 | `FocusManager`, `FocusTarget` | フォーカスの保持と、キー・マウスの配送 |
 | 実行 | `TerminalApp`, `Application`, `Component` | エントリポイントとイベントループ |
 
 ### 描画の流れ

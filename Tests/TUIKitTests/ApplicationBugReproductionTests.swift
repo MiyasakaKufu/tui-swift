@@ -334,6 +334,49 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
     }
 
+    /// フォーカス中のウィジェットがキーを先に受け取り、処理しなかったぶんがルートへ渡る。
+    func testFocusedWidgetReceivesKeysBeforeRoot() throws {
+        var masterDescriptor: Int32 = -1
+        var slaveDescriptor: Int32 = -1
+        let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
+        try XCTSkipIf(openResult != 0, "疑似端末を開けない環境のため飛ばす")
+        let master = masterDescriptor
+        let slave = slaveDescriptor
+        defer {
+            close(slave)
+            close(master)
+        }
+
+        XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
+
+        // 出力先が詰まるとループが止まるので、master 側は読み捨て続ける。
+        let drain = OutputDrain(descriptor: master)
+        drain.start()
+        defer { drain.stop() }
+
+        let component = FocusDeliveryComponent()
+        let application = Application(
+            root: component,
+            options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
+            terminal: Terminal(input: slave, output: slave)
+        )
+        component.onTimeout = { [weak application] in application?.stop() }
+
+        // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+        let sender = Thread {
+            guard component.hasStartedLoop.wait(timeout: 5) else { return }
+            writeByte(master, UInt8(ascii: "a"))
+            Thread.sleep(forTimeInterval: 0.2)
+            writeBytes(master, Array("\u{1B}[A".utf8))
+        }
+        sender.start()
+
+        try application.run()
+
+        XCTAssertEqual(component.field.text, "a", "入力欄までキーが届いていない")
+        XCTAssertEqual(component.unhandledKeys, [KeyEvent(.up)], "未処理のキーがルートへ渡っていない")
+    }
+
     /// クラッシュしたときの手順で端末が元に戻る。
     func testCrashRestoreReturnsTerminalToNormalMode() throws {
         var masterDescriptor: Int32 = -1
@@ -539,6 +582,41 @@ private final class SuspendRecordingComponent: Component {
         reportedSizes.append(size)
         guard reportedSizes.count >= 2 else { return .handled }
         onResume()
+        return .quit
+    }
+
+    func update(elapsed: Double) {
+        hasStartedLoop.set()
+        elapsedTotal += elapsed
+        if elapsedTotal > 5 { onTimeout() }
+    }
+}
+
+/// 入力欄をひとつ置き、フォーカスが処理しなかったキーを記録するコンポーネント。
+private final class FocusDeliveryComponent: Component {
+
+    /// フォーカスが処理しなかったキーを届いた順に並べたもの。
+    private(set) var unhandledKeys: [KeyEvent] = []
+    /// 入力欄の状態。
+    let field = TextFieldState()
+    /// イベントループが 1 周したら立つ。
+    let hasStartedLoop = Latch()
+
+    /// 入力が届かないまま時間切れになったときの脱出口。
+    var onTimeout: () -> Void = {}
+
+    private let manager = FocusManager()
+    private var elapsedTotal = 0.0
+
+    var focus: FocusManager? { manager }
+
+    var body: some View {
+        TextField(state: field).focusable(field, in: manager)
+    }
+
+    func handle(_ event: InputEvent) -> EventResult {
+        guard case .key(let keyEvent) = event else { return .ignored }
+        unhandledKeys.append(keyEvent)
         return .quit
     }
 

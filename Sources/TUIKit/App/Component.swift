@@ -26,6 +26,12 @@ public protocol Component: AnyObject {
     /// 端末カーソルを表示したい位置。`nil` ならカーソルを隠す。
     var cursorPosition: Point? { get }
 
+    /// キーとマウスの配送先。`nil` ならイベントはルートだけが受け取る。
+    ///
+    /// - Note: これを返すと、`Application` はイベントをまずフォーカス中のウィジェットへ渡し、
+    ///   処理されなかったぶんだけ `handle(_:)` へ渡す。
+    var focus: FocusManager? { get }
+
     /// 1 フレームごとに呼ばれる。
     ///
     /// - Parameters:
@@ -44,8 +50,11 @@ extension Component {
     ///   が既定で有効なため Ctrl+C で終了できる。
     public func handle(_ event: InputEvent) -> EventResult { .ignored }
 
-    /// カーソルを隠す。
-    public var cursorPosition: Point? { nil }
+    /// フォーカス中のウィジェットが置きたい位置。フォーカスを使わないなら `nil`。
+    public var cursorPosition: Point? { focus?.cursorPosition }
+
+    /// フォーカスを使わない。
+    public var focus: FocusManager? { nil }
 
     /// 何もしない。
     ///

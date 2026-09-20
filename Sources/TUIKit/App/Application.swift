@@ -197,12 +197,14 @@ public final class Application<Root: Component> {
         }
     }
 
-    /// イベントをルートへ渡す。
+    /// イベントをフォーカス中のウィジェットへ渡し、処理されなければルートへ渡す。
     ///
     /// - Parameters:
-    ///   - event: ルートへ渡すイベント。
+    ///   - event: 配送するイベント。
     /// - Returns: ループを続けるなら `true`。
     private func deliver(_ event: InputEvent) -> Bool {
+        if root.focus?.handle(event) == true { return true }
+
         switch root.handle(event) {
         case .quit:
             return false
@@ -258,12 +260,16 @@ public final class Application<Root: Component> {
     /// 1 フレーム分を描画する。
     ///
     /// - Precondition: `synchronizeSize()` によってバッファが端末サイズに追従している。
+    /// - Postcondition: `Component.focus` があれば、その登録がこのフレームの内容へ入れ替わる。
     private func draw() {
         buffer.clear()
 
         let view = root.body
         let bounds = buffer.bounds
+        let focus = root.focus
+        focus?.beginFrame()
         view.render(into: &buffer, rect: bounds)
+        focus?.endFrame()
         renderer.render(buffer, cursor: root.cursorPosition)
     }
 }

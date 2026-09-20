@@ -384,3 +384,9 @@ public struct TextField: View {
         buffer[point.x, point.y] = cell
     }
 }
+
+/// フォーカスの行き先になれる。
+extension TextFieldState: FocusTarget {
+    /// 端末カーソルを置きたい位置。直前の描画で入力欄のカーソルを置いた位置。
+    public var cursorPosition: Point? { renderedCursorPoint }
+}

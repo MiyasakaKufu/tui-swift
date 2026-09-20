@@ -290,3 +290,6 @@ public struct ListView: View {
         }
     }
 }
+
+/// フォーカスの行き先になれる。
+extension ListState: FocusTarget {}
