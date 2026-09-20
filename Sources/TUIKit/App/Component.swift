@@ -33,7 +33,7 @@ public protocol Component: AnyObject {
     /// - Parameters:
     ///   - message: `MessageSender.send(_:)` で送られたイベント。
     /// - Returns: 処理の結果。`.quit` を返すとアプリケーションが終了する。
-    /// - Note: 入力イベントと同じ列から順に渡されるので、`handle(_:)` と同じスレッドで呼ばれる。
+    /// - Note: 送られた順に、`handle(_:)` と同じスレッドから呼ばれる。端末の入力との前後も保たれる。
     func receive(_ message: Message) -> EventResult
 
     /// イベントループが回り始めるときに一度だけ呼ばれる。

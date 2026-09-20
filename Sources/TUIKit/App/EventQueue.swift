@@ -68,7 +68,7 @@ final class EventQueue<Message: Sendable>: @unchecked Sendable {
     /// - Parameters:
     ///   - inputEvents: 積む、端末から届いたイベント。
     /// - Returns: 積まれた順に並んだイベント。
-    /// - Note: 積むのと取り出すのを一度に行うため、端末から届いたイベントが上限を占めることはない。
+    /// - Note: 端末から届いたイベントが上限を占めることはない。
     func drain(appending inputEvents: [InputEvent]) -> [Element] {
         pthread_mutex_lock(mutex)
         defer { pthread_mutex_unlock(mutex) }
