@@ -16,12 +16,18 @@ private var wakeupReadDescriptor: Int32 = -1
 private var wakeupWriteDescriptor: Int32 = -1
 
 /// イベント待ちを起こす。
+///
+/// シグナルハンドラから呼ぶので、非同期シグナル安全な操作だけを使う。`write(2)` は
+/// 非同期シグナル安全な関数の一覧にあるが、`errno` を書き換える。
+///
+/// - See: [The Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9799919799/) の
+///   「Signal Concepts」にある Async-Signal-Safe Functions。
 private func wakeUpEventLoop() {
     let descriptor = wakeupWriteDescriptor
     guard descriptor >= 0 else { return }
 
-    // シグナルハンドラから呼べるのは非同期シグナル安全な操作だけ。
-    // `write(2)` は安全だが `errno` を書き換えるため、割り込まれた側から見える値を戻す。
+    // `errno` の退避を外してはいけない。割り込まれた側が、自分が呼んだ関数の `errno` を
+    // 読んだつもりで `write(2)` の結果を読む。
     let savedErrno = errno
     var byte: UInt8 = 0
     // 書けなくても書き直さない。起こす合図は 1 バイトあれば足りる。

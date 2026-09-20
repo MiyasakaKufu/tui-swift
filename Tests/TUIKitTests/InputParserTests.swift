@@ -340,8 +340,8 @@ final class InputParserTests: XCTestCase {
         XCTAssertEqual(events(bytes("\u{1B}[57399u")), [.key(KeyEvent(.character("0")))])
         XCTAssertEqual(events(bytes("\u{1B}[57414u")), [.key(KeyEvent(.enter))])
         XCTAssertEqual(events(bytes("\u{1B}[57417u")), [.key(KeyEvent(.left))])
-        // 57358 は Caps Lock。
-        XCTAssertEqual(events(bytes("\u{1B}[57358u")), [])
+        let capsLockKeyCode = 57358
+        XCTAssertEqual(events(bytes("\u{1B}[\(capsLockKeyCode)u")), [])
     }
 
     /// 下位パラメータ（`:`）は、上位のパラメータへ混ざらない。
@@ -369,8 +369,11 @@ final class InputParserTests: XCTestCase {
     func testKeyboardProtocolReleaseIsIgnored() {
         XCTAssertEqual(events(bytes("\u{1B}[97;1:3u")), [])
         XCTAssertEqual(events(bytes("\u{1B}[97;1:1u")), [.key(KeyEvent(.character("a")))])
-        // 種別 2 はキーリピート。
-        XCTAssertEqual(events(bytes("\u{1B}[97;1:2u")), [.key(KeyEvent(.character("a")))])
+        let keyRepeatEventType = 2
+        XCTAssertEqual(
+            events(bytes("\u{1B}[97;1:\(keyRepeatEventType)u")),
+            [.key(KeyEvent(.character("a")))]
+        )
     }
 
     /// 対応状況の応答はキーではなく、応答として取り出せる。
