@@ -23,6 +23,7 @@ final class DemoApp: TerminalApp {
         "スクロールするリスト",
         "テキスト入力",
         "ウィンドウサイズ変更への追従",
+        "ビューの重ね描きとダイアログ",
     ]
 
     private let listState = ListState()
@@ -30,6 +31,7 @@ final class DemoApp: TerminalApp {
     private var progress = 0.35
     private var lastEventDescription = "（まだ入力はありません）"
     private var isEditing = false
+    private var isShowingDialog = false
     private var terminalSize = Size(width: 0, height: 0)
 
     var body: some View {
@@ -47,6 +49,24 @@ final class DemoApp: TerminalApp {
             }
             .flexible(horizontal: 1, vertical: 1)
             footer()
+        }
+        .screenOverlay(dialog())
+    }
+
+    private func dialog() -> some View {
+        let textStyle = Style(foreground: .brightWhite, background: .blue)
+        return ZStack {
+            if isShowingDialog {
+                VStack(spacing: 1, alignment: .center) {
+                    Text("画面の中央に重ねたダイアログです。", style: textStyle, wrap: .word)
+                    Text("下に敷いた全角文字を覆っても、行の桁はずれません。", style: textStyle, wrap: .word)
+                    Text("Enter か Esc で閉じる", style: textStyle).dim()
+                }
+                .padding(horizontal: 2, vertical: 1)
+                .border(.double, style: Style(foreground: .yellow, background: .blue), title: "ダイアログ")
+                .background(style: Style(background: .blue))
+                .frame(width: 44, height: 9)
+            }
         }
     }
 
@@ -93,6 +113,7 @@ final class DemoApp: TerminalApp {
             Text(" ↑↓/jk 選択 ").styled(Style(foreground: .black, background: .white))
             Text(" ホイール スクロール ").styled(Style(foreground: .black, background: .white))
             Text(" Tab 切り替え ").styled(Style(foreground: .black, background: .white))
+            Text(" d ダイアログ ").styled(Style(foreground: .black, background: .white))
             Text(" Ctrl+Z 一時停止 ").styled(Style(foreground: .black, background: .white))
             Text(" q 終了 ").styled(Style(foreground: .black, background: .white))
             Spacer()
@@ -113,6 +134,14 @@ final class DemoApp: TerminalApp {
             return .handled
         }
 
+        if isShowingDialog {
+            if case .key = event {
+                isShowingDialog = false
+                return .handled
+            }
+            return .ignored
+        }
+
         if case .key(let keyEvent) = event {
             if keyEvent.key == .tab {
                 isEditing.toggle()
@@ -128,6 +157,9 @@ final class DemoApp: TerminalApp {
             switch keyEvent.key {
             case .character("q"), .escape:
                 return .quit
+            case .character("d"):
+                isShowingDialog = true
+                return .handled
             case .character("+"):
                 progress = min(1.0, progress + 0.05)
                 return .handled

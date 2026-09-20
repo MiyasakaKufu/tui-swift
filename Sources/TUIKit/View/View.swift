@@ -50,7 +50,8 @@ public protocol View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    /// - Postcondition: `rect` の外のセルは書き換えない。
+    /// - Postcondition: `rect` の外のセルは書き換えない。画面全体を基準に重ねる
+    ///   `ScreenOverlayView` だけが、この約束から外れる。
     func render(into buffer: inout Buffer, rect: Rect)
 
     /// 余白の分配に関する性質。

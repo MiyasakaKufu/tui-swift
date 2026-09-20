@@ -96,6 +96,65 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), "   ")
     }
 
+    // MARK: - 重ね書き
+
+    func testOverwritingWideCharacterHeadBlanksContinuation() {
+        var buffer = Buffer(size: Size(width: 4, height: 1))
+        buffer.write("あい", at: Point(x: 0, y: 0))
+        buffer[0, 0] = Cell(character: "X")
+
+        assertRowsFit(buffer)
+        XCTAssertFalse(buffer[1, 0].isContinuation)
+        XCTAssertEqual(buffer.text(ofRow: 0), "X い")
+    }
+
+    /// `TextField` は全角文字のセルへカーソルを重ねるとき、同じ文字を書き直す。
+    func testOverwritingWideCharacterHeadWithWideCharacterKeepsContinuation() {
+        var buffer = Buffer(size: Size(width: 4, height: 1))
+        buffer.write("あい", at: Point(x: 0, y: 0))
+        buffer[0, 0] = Cell(character: "あ", style: Style(attributes: .reverse))
+
+        assertRowsFit(buffer)
+        XCTAssertTrue(buffer[1, 0].isContinuation)
+        XCTAssertEqual(buffer.text(ofRow: 0), "あい")
+    }
+
+    func testOverwritingWideCharacterContinuationBlanksHead() {
+        var buffer = Buffer(size: Size(width: 4, height: 1))
+        buffer.write("あい", at: Point(x: 0, y: 0))
+        buffer[1, 0] = Cell(character: "X")
+
+        assertRowsFit(buffer)
+        XCTAssertEqual(buffer.text(ofRow: 0), " Xい")
+    }
+
+    func testFillOverlappingWideCharactersKeepsColumns() {
+        var buffer = Buffer(size: Size(width: 6, height: 1))
+        buffer.write("あいう", at: Point(x: 0, y: 0))
+        buffer.fill(Rect(x: 1, y: 0, width: 3, height: 1), with: Cell(character: "#"))
+
+        assertRowsFit(buffer)
+        XCTAssertEqual(buffer.text(ofRow: 0), " ###う")
+    }
+
+    func testBlankedHalfKeepsStyle() {
+        var buffer = Buffer(size: Size(width: 4, height: 1))
+        let style = Style(background: .blue)
+        buffer.write("あ", at: Point(x: 0, y: 0), style: style)
+        buffer[0, 0] = Cell(character: "X")
+
+        XCTAssertEqual(buffer[1, 0].style, style)
+    }
+
+    func testWritingWideCharacterOverWideCharacterKeepsColumns() {
+        var buffer = Buffer(size: Size(width: 6, height: 1))
+        buffer.write("あいう", at: Point(x: 0, y: 0))
+        buffer.write("か", at: Point(x: 1, y: 0))
+
+        assertRowsFit(buffer)
+        XCTAssertEqual(buffer.text(ofRow: 0), " か う")
+    }
+
     // MARK: - BorderStyle の検証
 
     func testBorderStyleReplacesWideCharactersWithDefaults() {
