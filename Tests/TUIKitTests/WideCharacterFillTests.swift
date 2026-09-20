@@ -108,6 +108,17 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), "X い")
     }
 
+    /// `TextField` は全角文字のセルへカーソルを重ねるとき、同じ文字を書き直す。
+    func testOverwritingWideCharacterHeadWithWideCharacterKeepsContinuation() {
+        var buffer = Buffer(size: Size(width: 4, height: 1))
+        buffer.write("あい", at: Point(x: 0, y: 0))
+        buffer[0, 0] = Cell(character: "あ", style: Style(attributes: .reverse))
+
+        assertRowsFit(buffer)
+        XCTAssertTrue(buffer[1, 0].isContinuation)
+        XCTAssertEqual(buffer.text(ofRow: 0), "あい")
+    }
+
     func testOverwritingWideCharacterContinuationBlanksHead() {
         var buffer = Buffer(size: Size(width: 4, height: 1))
         buffer.write("あい", at: Point(x: 0, y: 0))

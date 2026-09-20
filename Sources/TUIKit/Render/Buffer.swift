@@ -24,8 +24,8 @@ public struct Buffer: Hashable, Sendable {
     /// - Parameters:
     ///   - x: 桁。左端が 0。
     ///   - y: 行。上端が 0。
-    /// - Postcondition: 全角文字が占める 2 桁のうち片側だけを書き換えたとき、
-    ///   残った側は空白になる。
+    /// - Postcondition: 全角文字が占める 2 桁のうち片側だけを書き換えたとき、対にならなくなった
+    ///   残りの側は空白になる。
     /// - Note: 範囲外の読み取りは `.empty` を返し、範囲外への書き込みは無視される。
     public subscript(x: Int, y: Int) -> Cell {
         get {
@@ -39,11 +39,22 @@ public struct Buffer: Hashable, Sendable {
             if !newValue.isContinuation, x > 0, cells[y * size.width + x].isContinuation {
                 blankCell(atColumn: x - 1, row: y)
             }
-            if x + 1 < size.width, cells[y * size.width + x + 1].isContinuation {
+            if x + 1 < size.width,
+               cells[y * size.width + x + 1].isContinuation,
+               !Buffer.coversNextColumn(newValue) {
                 blankCell(atColumn: x + 1, row: y)
             }
             cells[y * size.width + x] = newValue
         }
+    }
+
+    /// 右隣の桁まで占めるセルか。
+    ///
+    /// - Parameters:
+    ///   - cell: 調べるセル。
+    /// - Returns: 表示幅が 2 桁以上なら `true`。
+    private static func coversNextColumn(_ cell: Cell) -> Bool {
+        DisplayWidth.width(of: cell.character) > 1
     }
 
     /// 1 桁を、スタイルを保ったまま空白へ戻す。
