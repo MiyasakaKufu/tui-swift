@@ -79,13 +79,15 @@ public final class ListState {
         clampScroll()
     }
 
-    /// 上下キー・PageUp/PageDown・Home/End と縦方向のホイールを処理する。
+    /// 上下キー・PageUp/PageDown・Home/End と縦方向のホイール、左ボタンの押下を処理する。
     ///
     /// - Parameters:
     ///   - event: 端末から届いたイベント。
     /// - Returns: 選択または表示位置を動かしたら `true`。
     /// - Note: ホイールは選択ではなく表示位置を `wheelScrollRows` 行動かす。
-    ///   `renderedRect` の外で起きたホイールは処理しない。
+    ///   左ボタンの押下は、その位置にある項目を選択する。表示位置は動かさない。
+    ///   `renderedRect` の外で起きたホイールと押下は処理しない。押下した行に項目が
+    ///   なければ選択は変わらない。
     @discardableResult
     public func handle(_ event: InputEvent) -> Bool {
         guard case .key(let keyEvent) = event else {
@@ -104,7 +106,12 @@ public final class ListState {
                     return scrollByWheel(at: mouseEvent.position, rows: wheelScrollRows)
                 case .scrollLeft, .scrollRight:
                     return false
-                case .press, .release, .drag, .move:
+                case .press:
+                    // ボタンを問わず選択したくなるが、右ボタンや拡張ボタンに別の操作を
+                    // 割り当てたアプリで、その操作のたびに選択が動いてしまう。
+                    guard mouseEvent.button == .left else { return false }
+                    return selectItem(at: mouseEvent.position)
+                case .release, .drag, .move:
                     return false
                 }
             }
@@ -143,6 +150,21 @@ public final class ListState {
     private func scrollByWheel(at position: Point, rows: Int) -> Bool {
         guard renderedRect.contains(position) else { return false }
         scroll(by: rows)
+        return true
+    }
+
+    // 座標から項目を求める式を公開したくなるが、`render(into:rect:)` が行の並べ方を
+    // 変えたときに、式を写したアプリの側が黙って壊れる。
+    /// 矩形の中で起きた押下として、その位置の項目を選択する。
+    ///
+    /// - Parameters:
+    ///   - position: 押下が起きた位置。
+    /// - Returns: その位置に項目があれば `true`。
+    private func selectItem(at position: Point) -> Bool {
+        guard renderedRect.contains(position) else { return false }
+        let index = scrollOffset + (position.y - renderedRect.minY)
+        guard index < itemCount else { return false }
+        select(index)
         return true
     }
 

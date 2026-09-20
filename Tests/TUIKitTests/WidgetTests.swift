@@ -160,6 +160,82 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.selectedIndex, 0)
     }
 
+    func testListStateSelectsClickedItem() {
+        let state = listState(itemCount: 10, visibleRows: 4)
+        let press = MouseEvent(position: Point(x: 3, y: 2), button: .left, action: .press)
+        XCTAssertTrue(state.handle(.mouse(press)))
+        XCTAssertEqual(state.selectedIndex, 2)
+        XCTAssertEqual(state.scrollOffset, 0, "クリックで表示位置が動かないこと")
+    }
+
+    /// 矩形が原点から離れていても、その中での行の位置で項目が決まる。
+    func testListStateSelectsClickedItemInOffsetRect() {
+        let state = ListState(itemCount: 10)
+        state.renderedRect = Rect(x: 2, y: 1, width: 5, height: 4)
+        let press = MouseEvent(position: Point(x: 2, y: 3), button: .left, action: .press)
+        XCTAssertTrue(state.handle(.mouse(press)))
+        XCTAssertEqual(state.selectedIndex, 2)
+    }
+
+    func testListStateSelectsClickedItemAfterWheelScroll() {
+        let state = listState(itemCount: 20, visibleRows: 5)
+        let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
+        for _ in 0..<3 { XCTAssertTrue(state.handle(.mouse(down))) }
+        XCTAssertEqual(state.scrollOffset, 6)
+
+        let press = MouseEvent(position: Point(x: 1, y: 1), button: .left, action: .press)
+        XCTAssertTrue(state.handle(.mouse(press)))
+        XCTAssertEqual(state.selectedIndex, 7)
+        XCTAssertEqual(state.scrollOffset, 6, "クリックで表示位置が動かないこと")
+    }
+
+    func testListStateIgnoresClickOnRowWithoutItem() {
+        let state = listState(itemCount: 2, visibleRows: 5)
+        state.select(1)
+        for y in 2..<5 {
+            let press = MouseEvent(position: Point(x: 0, y: y), button: .left, action: .press)
+            XCTAssertFalse(state.handle(.mouse(press)), "\(y) 行目に項目はない")
+            XCTAssertEqual(state.selectedIndex, 1)
+        }
+    }
+
+    func testListStateIgnoresClickOutsideRenderedRect() {
+        let state = ListState(itemCount: 20)
+        state.renderedRect = Rect(x: 2, y: 1, width: 5, height: 4)
+
+        for position in [Point(x: 1, y: 2), Point(x: 7, y: 2), Point(x: 4, y: 0), Point(x: 4, y: 5)] {
+            let press = MouseEvent(position: position, button: .left, action: .press)
+            XCTAssertFalse(state.handle(.mouse(press)), "\(position) は範囲外")
+            XCTAssertEqual(state.selectedIndex, 0)
+        }
+    }
+
+    func testListStateSelectsOnlyWithLeftButton() {
+        let state = listState(itemCount: 10, visibleRows: 4)
+        for button in [MouseButton.middle, .right, .backward, .forward, .none] {
+            let press = MouseEvent(position: Point(x: 0, y: 2), button: button, action: .press)
+            XCTAssertFalse(state.handle(.mouse(press)), "\(button) で選択しないこと")
+            XCTAssertEqual(state.selectedIndex, 0)
+        }
+    }
+
+    func testListStateIgnoresReleaseAndDragAndMove() {
+        let state = listState(itemCount: 10, visibleRows: 4)
+        for action in [MouseAction.release, .drag, .move] {
+            let event = MouseEvent(position: Point(x: 0, y: 2), button: .left, action: action)
+            XCTAssertFalse(state.handle(.mouse(event)), "\(action) は扱わないこと")
+            XCTAssertEqual(state.selectedIndex, 0)
+        }
+    }
+
+    /// 一度も描画していない状態では、どこで起きた押下も処理しない。
+    func testListStateIgnoresClickBeforeFirstRender() {
+        let state = ListState(itemCount: 20)
+        let press = MouseEvent(position: .zero, button: .left, action: .press)
+        XCTAssertFalse(state.handle(.mouse(press)))
+        XCTAssertEqual(state.selectedIndex, 0)
+    }
+
     func testListViewRendersSelectionMarker() {
         let state = ListState()
         let list = ListView(items: ["a", "b", "c"], state: state)
@@ -203,6 +279,21 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.scrollOffset, 0)
 
         XCTAssertEqual(render(list, width: 5, height: 3), "  b  \n  c  \n> d  ")
+    }
+
+    /// クリックで選ばれる項目は、その行に描かれている項目と一致する。
+    func testListViewMarksClickedRowAfterWheelScroll() {
+        let items = ["a", "b", "c", "d"]
+        let state = ListState()
+        _ = render(ListView(items: items, state: state), width: 5, height: 2)
+
+        let down = MouseEvent(position: .zero, button: .none, action: .scrollDown)
+        XCTAssertTrue(state.handle(.mouse(down)))
+
+        let press = MouseEvent(position: Point(x: 1, y: 1), button: .left, action: .press)
+        XCTAssertTrue(state.handle(.mouse(press)))
+        XCTAssertEqual(state.selectedIndex, 3)
+        XCTAssertEqual(render(ListView(items: items, state: state), width: 5, height: 2), "  c  \n> d  ")
     }
 
     // MARK: - TextFieldState
