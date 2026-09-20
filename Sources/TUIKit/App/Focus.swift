@@ -85,7 +85,6 @@ public final class FocusManager {
     /// - Parameters:
     ///   - target: 調べる対象。
     /// - Returns: フォーカスされていれば `true`。
-    /// - Note: 枠線の色を変えるなど、フォーカスの有無を描画へ反映するために使う。
     public func isFocused(_ target: FocusTarget) -> Bool {
         focusedTarget === target
     }
@@ -94,7 +93,8 @@ public final class FocusManager {
     ///
     /// - Parameters:
     ///   - target: フォーカスを移す先。`nil` ならフォーカスを外す。
-    /// - Note: まだ描画していない対象も指定できる。
+    /// - Note: まだ描画していない対象も指定できる。ただし次の描画で登録されなければ、
+    ///   フォーカスはそこから外れる。
     public func focus(_ target: FocusTarget?) {
         focusedTarget = target
     }
@@ -121,7 +121,7 @@ public final class FocusManager {
     ///   - event: 端末から届いたイベント。
     /// - Returns: フォーカスを動かしたか、配送先が処理したら `true`。
     /// - Note: Tab と Shift+Tab（`.backTab`）はフォーカス中のウィジェットへ渡さず、常に移動に使う。
-    ///   `.resize` と `.focus` はウィジェットではなくアプリ全体に関わるため配送しない。
+    ///   `.resize` と `.focus` は配送しない。
     public func handle(_ event: InputEvent) -> Bool {
         switch event {
         case .key(let keyEvent):
