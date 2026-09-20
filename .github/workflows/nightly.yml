@@ -1,14 +1,13 @@
-name: CI
+name: Nightly
 
 on:
-  push:
-    branches: ["**"]
-  pull_request:
+  schedule:
+    - cron: "37 18 * * *"
+  workflow_dispatch:
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-    container: swift:5.9
+  macos:
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - name: Build
