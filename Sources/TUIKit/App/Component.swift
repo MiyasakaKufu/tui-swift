@@ -36,12 +36,13 @@ public protocol Component: AnyObject {
     /// - Note: 送られた順に、`handle(_:)` と同じスレッドから呼ばれる。端末の入力との前後も保たれる。
     func receive(_ message: Message) -> EventResult
 
-    /// イベントループが回り始めるときに一度だけ呼ばれる。
+    /// 起動時にイベントループが走らせる作業。
     ///
-    /// - Parameters:
-    ///   - sender: 外部イベントの送り口。別スレッドや `Task` へ渡して使う。
-    /// - Note: 呼ばれた時点で端末は raw モードになっていて、最初の `.resize` は通知済み。
-    func didStart(sender: MessageSender<Message>)
+    /// 通信やファイル読み込みのように、待つあいだ画面を止めたくない処理をここで組み立てる。
+    /// 実行するのはイベントループで、結果は `receive(_:)` へ渡る。
+    ///
+    /// - Note: ループが終わるときに打ち切られる。
+    var startupEffect: Effect<Message> { get }
 
     /// 端末カーソルを表示したい位置。`nil` ならカーソルを隠す。
     var cursorPosition: Point? { get }
@@ -71,11 +72,8 @@ extension Component {
     /// - Returns: 常に `.ignored`。
     public func receive(_ message: Message) -> EventResult { .ignored }
 
-    /// 送り口を使わない。
-    ///
-    /// - Parameters:
-    ///   - sender: 外部イベントの送り口。
-    public func didStart(sender: MessageSender<Message>) {}
+    /// 起動時に何も走らせない。
+    public var startupEffect: Effect<Message> { .none }
 
     /// カーソルを隠す。
     public var cursorPosition: Point? { nil }

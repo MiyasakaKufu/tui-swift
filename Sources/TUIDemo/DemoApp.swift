@@ -113,10 +113,10 @@ final class DemoApp: TerminalApp {
         isEditing ? inputState.renderedCursorPoint : nil
     }
 
-    func didStart(sender: MessageSender<DemoMessage>) {
-        Task.detached {
+    var startupEffect: Effect<DemoMessage> {
+        .run {
             try? await Task.sleep(nanoseconds: loadingDelayNanoseconds)
-            sender.send(.loaded(itemsLoadedLater))
+            return .loaded(itemsLoadedLater)
         }
     }
 

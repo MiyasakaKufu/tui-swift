@@ -3,7 +3,9 @@
 /// どのスレッド・どの `Task` からでも送れる。送られたイベントは `Component.receive(_:)` へ渡され、
 /// 続けて画面が描き直される。`ApplicationOptions.frameInterval` を設定していなくても届く。
 ///
-/// - Note: `Component.didStart(sender:)` か `Application.sender` で受け取る。
+/// - Note: アプリが自分で作業を起こすなら `Component.startupEffect` と `Effect` を使う。これを
+///   直接使うのは、`Application` を自分で組み立てていて、ランタイムの知らない入力源
+///   （自前のスレッド、C のコールバック）から届けるときだけ。`Application.sender` で受け取る。
 public struct MessageSender<Message: Sendable>: Sendable {
 
     private let queue: EventQueue<Message>

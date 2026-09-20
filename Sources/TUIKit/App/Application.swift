@@ -17,6 +17,7 @@ public final class Application<Root: Component> {
     /// 外部で起きたことをイベントループへ届ける送り口。
     ///
     /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
+    ///   ランタイムに作業を任せられるなら `Component.startupEffect` のほうが短く書ける。
     public let sender: MessageSender<Root.Message>
 
     private var buffer = Buffer(size: .zero)
@@ -157,7 +158,9 @@ public final class Application<Root: Component> {
         isRunning = true
         lastFrameTime = monotonicSeconds()
 
-        root.didStart(sender: sender)
+        let effectTasks = root.startupEffect.start(sending: sender)
+        defer { for task in effectTasks { task.cancel() } }
+
         // この起こしを外してはいけない。合図を書けるようになる前に送られたイベントが、
         // 次の入力かタイムアウトまで届かなくなる。
         if !queue.isEmpty { SignalWatcher.wakeUp() }

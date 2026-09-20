@@ -10,11 +10,11 @@ import XCTest
 import CTUITestSupport
 @testable import TUIKit
 
-/// 外部から送られたイベントがイベントループへ届くかを、疑似端末（pty）の上で確かめる。
+/// 外部から届いたイベントがイベントループへ渡るかを、疑似端末（pty）の上で確かめる。
 final class ApplicationMessageTests: XCTestCase {
 
-    /// 別スレッドから送ったイベントで、`frameInterval` なしでも画面が更新される。
-    func testMessageFromAnotherThreadUpdatesScreenWithoutFrameInterval() throws {
+    /// 起動時の作業が返した値で、`frameInterval` なしでも画面が更新される。
+    func testStartupEffectResultUpdatesScreenWithoutFrameInterval() throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
         XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
@@ -23,7 +23,7 @@ final class ApplicationMessageTests: XCTestCase {
         drain.start()
         defer { drain.stop() }
 
-        let component = MessageRecordingComponent()
+        let component = MessageRecordingComponent(startupEffect: .run { .arrived })
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
 
         let finished = expectation(description: "イベントループが終わる")
@@ -37,14 +37,11 @@ final class ApplicationMessageTests: XCTestCase {
             finished.fulfill()
         }
 
-        let sender = try XCTUnwrap(component.awaitSender(timeout: 5), "送り口が渡されない")
-        // 入力を送ってはいけない。送ったイベントだけで画面が変わることを確かめているので、
+        // 画面が変わるまで入力を送ってはいけない。作業の結果だけで変わることを確かめているので、
         // 入力で起きたのかどうかが分からなくなる。
-        XCTAssertTrue(sender.send(.arrived))
-
         XCTAssertTrue(
             drain.waitForOutput(containing: arrivedText, timeout: 5),
-            "送ったイベントの後に画面が描き直されていない"
+            "作業の結果が届いた後に画面が描き直されていない"
         )
 
         writeByte(pty.master, UInt8(ascii: "q"))
@@ -52,6 +49,82 @@ final class ApplicationMessageTests: XCTestCase {
 
         XCTAssertNil(error.value)
         XCTAssertEqual(component.messages, [.arrived])
+    }
+
+    /// 終わりの決まっていない作業は、値を何度でも届けられる。
+    func testStreamEffectDeliversManyMessages() throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let drain = OutputDrain(descriptor: pty.master)
+        drain.start()
+        defer { drain.stop() }
+
+        let expectedCount = 3
+        let component = MessageRecordingComponent(
+            quitsAfter: expectedCount,
+            startupEffect: .stream { send in
+                for _ in 0..<expectedCount { send(.arrived) }
+            }
+        )
+        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+
+        let finished = expectation(description: "イベントループが終わる")
+        let error = ErrorBox()
+        Thread.detachNewThread {
+            do {
+                try application.run()
+            } catch let thrown {
+                error.value = thrown
+            }
+            finished.fulfill()
+        }
+
+        wait(for: [finished], timeout: 10)
+
+        XCTAssertNil(error.value)
+        XCTAssertEqual(component.messages, Array(repeating: TestMessage.arrived, count: expectedCount))
+    }
+
+    /// ループが終わると、走っている作業が打ち切られる。
+    func testStartupEffectIsCancelledWhenLoopEnds() throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let drain = OutputDrain(descriptor: pty.master)
+        drain.start()
+        defer { drain.stop() }
+
+        let noticedCancellation = Latch()
+        let component = MessageRecordingComponent(
+            quitsAfter: 1,
+            startupEffect: .stream { send in
+                send(.arrived)
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 5_000_000)
+                }
+                noticedCancellation.set()
+            }
+        )
+        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+
+        let finished = expectation(description: "イベントループが終わる")
+        let error = ErrorBox()
+        Thread.detachNewThread {
+            do {
+                try application.run()
+            } catch let thrown {
+                error.value = thrown
+            }
+            finished.fulfill()
+        }
+
+        wait(for: [finished], timeout: 10)
+
+        XCTAssertNil(error.value)
+        XCTAssertTrue(noticedCancellation.wait(timeout: 5), "ループが終わっても作業が打ち切られない")
     }
 
     /// 複数のスレッドから同時に送っても、すべてのイベントが届く。
@@ -68,6 +141,7 @@ final class ApplicationMessageTests: XCTestCase {
         let countPerThread = 50
         let component = MessageRecordingComponent(quitsAfter: threadCount * countPerThread)
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        let sender = application.sender
 
         let finished = expectation(description: "イベントループが終わる")
         let error = ErrorBox()
@@ -80,7 +154,6 @@ final class ApplicationMessageTests: XCTestCase {
             finished.fulfill()
         }
 
-        let sender = try XCTUnwrap(component.awaitSender(timeout: 5), "送り口が渡されない")
         for _ in 0..<threadCount {
             Thread.detachNewThread {
                 for _ in 0..<countPerThread { sender.send(.arrived) }
@@ -105,6 +178,7 @@ final class ApplicationMessageTests: XCTestCase {
 
         let component = MessageRecordingComponent(quitsAfter: 4)
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        let sender = application.sender
 
         let finished = expectation(description: "イベントループが終わる")
         let error = ErrorBox()
@@ -117,7 +191,8 @@ final class ApplicationMessageTests: XCTestCase {
             finished.fulfill()
         }
 
-        let sender = try XCTUnwrap(component.awaitSender(timeout: 5), "送り口が渡されない")
+        // raw モードへの切り替えは入力待ちのバイト列を捨てるため、最初の描画を待ってから送る。
+        XCTAssertTrue(component.hasDrawnOnce.wait(timeout: 5), "最初の描画が終わらない")
 
         // 順序を入れ替えてはいけない。キーを先に書くと、ループがそれを読んだのと送ったのと
         // どちらが先か決まらず、確かめたい順序そのものが揺れる。
@@ -197,6 +272,38 @@ private final class ErrorBox: @unchecked Sendable {
     var value: Error?
 }
 
+/// 一度立つと戻らないフラグ。
+private final class Latch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isRaised = false
+
+    var isSet: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isRaised
+    }
+
+    func set() {
+        lock.lock()
+        isRaised = true
+        lock.unlock()
+    }
+
+    /// フラグが立つまで待つ。
+    ///
+    /// - Parameters:
+    ///   - timeout: 待つ秒数の上限。
+    /// - Returns: 時間内に立てば `true`。
+    func wait(timeout: Double) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !isSet {
+            if Date() > deadline { return false }
+            Thread.sleep(forTimeInterval: 0.005)
+        }
+        return true
+    }
+}
+
 /// テストから送るイベント。
 private enum TestMessage: Hashable, Sendable {
     case arrived
@@ -215,35 +322,36 @@ private final class MessageRecordingComponent: Component, @unchecked Sendable {
 
     /// 受け取ったイベントを届いた順に並べたもの。
     private(set) var messages: [TestMessage] = []
+    /// 最初の描画が終わったら立つ。
+    let hasDrawnOnce = Latch()
 
     private let quitsAfter: Int
+    private let effect: Effect<TestMessage>
     private let lock = NSLock()
     private var entries: [String] = []
-    private var sender: MessageSender<TestMessage>?
 
-    /// 終了するまでに受け取る件数を決めて作る。
+    /// 受け取る件数と起動時の作業を決めて作る。
     ///
     /// - Parameters:
     ///   - quitsAfter: 記録がこの数に達したら終了する。`0` なら自分からは終了しない。
-    init(quitsAfter: Int = 0) {
+    ///   - startupEffect: 起動時にイベントループへ走らせる作業。
+    init(quitsAfter: Int = 0, startupEffect: Effect<TestMessage> = .none) {
         self.quitsAfter = quitsAfter
+        self.effect = startupEffect
     }
 
     var body: some View {
-        Text(messages.isEmpty ? waitingText : arrivedText)
+        hasDrawnOnce.set()
+        return Text(messages.isEmpty ? waitingText : arrivedText)
     }
+
+    var startupEffect: Effect<TestMessage> { effect }
 
     /// 受け取ったイベントとキーを、届いた順に文字列で並べたもの。
     var records: [String] {
         lock.lock()
         defer { lock.unlock() }
         return entries
-    }
-
-    func didStart(sender: MessageSender<TestMessage>) {
-        lock.lock()
-        self.sender = sender
-        lock.unlock()
     }
 
     func receive(_ message: TestMessage) -> EventResult {
@@ -259,23 +367,6 @@ private final class MessageRecordingComponent: Component, @unchecked Sendable {
         }
         if character == "q" { return .quit }
         return record("key:\(character)")
-    }
-
-    /// 送り口が渡されるまで待つ。
-    ///
-    /// - Parameters:
-    ///   - timeout: 待つ秒数の上限。
-    /// - Returns: 時間内に渡された送り口。渡されなければ `nil`。
-    func awaitSender(timeout: Double) -> MessageSender<TestMessage>? {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            lock.lock()
-            let sender = self.sender
-            lock.unlock()
-            if let sender { return sender }
-            Thread.sleep(forTimeInterval: 0.005)
-        }
-        return nil
     }
 
     /// 記録が決めた数に達するまで待つ。

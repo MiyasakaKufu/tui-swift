@@ -33,9 +33,9 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
   OSC 52 を拒否する設定の端末では何も起こらない。
 - **ウィンドウタイトルとカーソル形状** — 端末のタイトルと、カーソルの形
   （ブロック・下線・縦棒と点滅の有無）を設定できる。終了時と一時停止時に元へ戻す。
-- **外部イベント** — 別スレッドや `Task` で終わった処理の結果を、`MessageSender` でイベントループへ
-  送れる。送るとループが起きるので、`frameInterval` を設定していなくても画面が更新される。
-  端末の入力と同じ列に積まれるため、順序が保たれる。
+- **外部イベント** — 通信やファイル読み込みの結果を画面へ反映できる。走らせる作業は `Effect` という
+  値で宣言し、実行と打ち切りはイベントループが持つ。届くとループが起きるので、`frameInterval` を
+  設定していなくても画面が更新される。端末の入力と同じ列に積まれるため、順序が保たれる。
 - **端末の後始末** — raw モード・代替画面・マウストラッキング・フォーカス通知を
   終了時に必ず元へ戻す。
 - **外部依存なし** — SwiftPM だけでビルドできる。
@@ -130,7 +130,8 @@ Ctrl+Z も同じくシグナルにならないため、処理しなかった Ctr
 
 ### 外部で起きたことを画面へ反映する
 
-別スレッドや `Task` で終わった処理の結果は、`MessageSender` でイベントループへ送る。
+通信やファイル読み込みのように、待つあいだ画面を止めたくない処理は `Effect` として宣言する。実行する
+のはイベントループで、結果は `receive(_:)` へ渡る。
 
 ```swift
 @main
@@ -146,11 +147,8 @@ final class Loader: TerminalApp {
         Text(items.isEmpty ? "読み込み中…" : items.joined(separator: " / "))
     }
 
-    func didStart(sender: MessageSender<Message>) {
-        Task.detached {
-            let loaded = await fetchItems()
-            sender.send(.loaded(loaded))
-        }
+    var startupEffect: Effect<Message> {
+        .run { .loaded(await fetchItems()) }
     }
 
     func receive(_ message: Message) -> EventResult {
@@ -163,10 +161,29 @@ final class Loader: TerminalApp {
 }
 ```
 
-`didStart(sender:)` はイベントループが回り始めるときに一度だけ呼ばれる。ここで受け取った
-`MessageSender` は `Sendable` なので、どのスレッド・どの `Task` へ渡しても送れる（`fetchItems()` は
-アプリ側の処理）。送ると待ちが起きるため、`frameInterval` を設定していなくても、届いた時点で
-`receive(_:)` が呼ばれて画面が描き直される。
+`startupEffect` は起動時に一度だけ読まれる（`fetchItems()` はアプリ側の処理）。`Effect` は値なので、
+アプリはスレッドも `Task` も持たない。実行と打ち切りを持つのはイベントループで、ループが終わるときに
+打ち切る。
+
+| 作り方 | 何をするか |
+| --- | --- |
+| `.none` | 何もしない |
+| `.run { ... }` | 非同期の処理を走らせ、返った値を 1 つ届ける |
+| `.stream { send in ... }` | `send` を呼ぶたびに値を届ける。時計やファイル監視のような終わりの決まっていない入力源に使う |
+| `.merge([...])` | 複数を同時に走らせる |
+
+`.stream` の打ち切りは `Task.isCancelled` と、`Task.sleep(nanoseconds:)` が投げるエラーで伝わる。
+
+```swift
+var startupEffect: Effect<Message> {
+    .stream { send in
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            send(.tick)
+        }
+    }
+}
+```
 
 イベントの型は `Component.Message` で、`receive(_:)` を書けば推論される。既定は `Never` なので、
 外部イベントを使わないアプリは何も書かなくてよい。
@@ -175,10 +192,11 @@ final class Loader: TerminalApp {
 `handle(_:)` と同じスレッドから呼ばれるため、`Component` の状態にロックは要らない。
 
 積んでおける数は `ApplicationOptions.messageQueueLimit`（既定 1024）で決める。上限に達している間の
-`send(_:)` は、積まずに `false` を返す。古いイベントは捨てない。
+送信は捨てられ、古いイベントは捨てない。
 
-`Application` を直接組み立てたときは、`Application.sender` で送り口を取り出すか、
-`Application.send(_:)` で直接送る。
+ランタイムの知らない入力源（自前のスレッド、C のコールバック）から届けたいときは、`Application` を
+自分で組み立てて `Application.sender` を渡すか、`Application.send(_:)` を呼ぶ。`MessageSender` は
+`Sendable` なので、どのスレッドからでも送れる。
 
 外から SIGINT / SIGQUIT / SIGTERM / SIGHUP を受けたときはイベントループを終えて端末を戻す。
 `fatalError` や範囲外アクセスで落ちたときも、シグナルハンドラが raw モード・代替画面・
@@ -232,7 +250,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | 文字 | `DisplayWidth`, `TextWrapping`, `TabExpansion` | 表示幅の計算、折り返し、タブの展開 |
 | ビュー | `View`, `VStack`, `HStack`, `Text`, 各種修飾子 | レイアウトと描画 |
 | 部品 | `ListView`, `TextField`, `ProgressBar` | 状態を持つウィジェット |
-| 実行 | `TerminalApp`, `Application`, `Component`, `MessageSender` | エントリポイント、イベントループ、外部イベントの受け取り |
+| 実行 | `TerminalApp`, `Application`, `Component`, `Effect` | エントリポイント、イベントループ、外部イベントの受け取り |
 
 ### 描画の流れ
 
