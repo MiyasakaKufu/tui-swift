@@ -2,8 +2,10 @@
 public struct ApplicationOptions {
     /// 代替画面バッファへ切り替える（終了時に元の画面が戻る）。
     public var usesAlternateScreen: Bool
-    /// マウスイベントを受け取る。
-    public var tracksMouse: Bool
+    /// マウスイベントを受け取る範囲。
+    ///
+    /// - Note: 既定では受け取らない。有効にしない限り `.mouse` は届かない。
+    public var mouseTracking: MouseTracking
     /// ブラケットペーストを有効にする。
     public var usesBracketedPaste: Bool
     /// 端末のフォーカス変化を `.focus` として受け取る。
@@ -45,7 +47,7 @@ public struct ApplicationOptions {
     ///
     /// - Parameters:
     ///   - usesAlternateScreen: 代替画面バッファへ切り替えるか。
-    ///   - tracksMouse: マウスイベントを受け取るか。
+    ///   - mouseTracking: マウスイベントを受け取る範囲。
     ///   - usesBracketedPaste: ブラケットペーストを有効にするか。
     ///   - reportsFocus: 端末のフォーカス変化を受け取るか。
     ///   - usesKeyboardProtocol: 端末が対応していれば kitty keyboard protocol を使うか。
@@ -56,7 +58,7 @@ public struct ApplicationOptions {
     ///   - suspendsOnControlZ: 処理されなかった Ctrl+Z で一時停止するか。
     public init(
         usesAlternateScreen: Bool = true,
-        tracksMouse: Bool = false,
+        mouseTracking: MouseTracking = .disabled,
         usesBracketedPaste: Bool = true,
         reportsFocus: Bool = false,
         usesKeyboardProtocol: Bool = true,
@@ -67,7 +69,7 @@ public struct ApplicationOptions {
         suspendsOnControlZ: Bool = true
     ) {
         self.usesAlternateScreen = usesAlternateScreen
-        self.tracksMouse = tracksMouse
+        self.mouseTracking = mouseTracking
         self.usesBracketedPaste = usesBracketedPaste
         self.reportsFocus = reportsFocus
         self.usesKeyboardProtocol = usesKeyboardProtocol

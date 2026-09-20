@@ -30,8 +30,14 @@ public enum ANSI {
 
     /// クリック・ドラッグ・ホイールを SGR 拡張形式（1006）で受け取る。
     public static let enableMouseTracking = "\u{1B}[?1000h\u{1B}[?1002h\u{1B}[?1006h"
-    /// マウスの通知を止める。
-    public static let disableMouseTracking = "\u{1B}[?1006l\u{1B}[?1002l\u{1B}[?1000l"
+    /// ボタンを押していない間の移動（1003）も SGR 拡張形式で受け取る。
+    public static let enableMouseMotionTracking = "\u{1B}[?1000h\u{1B}[?1002h\u{1B}[?1003h\u{1B}[?1006h"
+    /// マウスの通知（1000 / 1002 / 1003 / 1006）をすべて止める。
+    ///
+    /// - Note: それぞれ独立した DECSET モードなので、一部を送り直しても他は落ちない。
+    ///   範囲を狭めるときは、この列を送ってから入れ直す。
+    /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「Mouse Tracking」。
+    public static let disableMouseTracking = "\u{1B}[?1006l\u{1B}[?1003l\u{1B}[?1002l\u{1B}[?1000l"
 
     /// 貼り付けを `ESC [ 200 ~` と `ESC [ 201 ~` で囲んで受け取る。
     public static let enableBracketedPaste = "\u{1B}[?2004h"

@@ -90,12 +90,15 @@ final class Counter: TerminalApp {
 
 ```swift
 static var options: ApplicationOptions {
-    ApplicationOptions(tracksMouse: true, frameInterval: 1.0 / 30)
+    ApplicationOptions(mouseTracking: .buttons, frameInterval: 1.0 / 30)
 }
 ```
 
-マウス（`tracksMouse`）とフォーカス通知（`reportsFocus`）は既定で無効になっている。
+マウス（`mouseTracking`）とフォーカス通知（`reportsFocus`）は既定で無効になっている。
 有効にした端末だけが `.mouse` / `.focus` を送ってくるため、使うアプリが明示的に有効にする。
+`mouseTracking` は `.buttons` で押下・解放・ドラッグ・ホイールを、`.motion` でボタンを押していない
+間の移動（`.move`）も受け取る。`.motion` はカーソルが動くたびにイベントが届くので、ホバーの強調や
+ツールチップのように移動そのものを使うアプリだけが選ぶ。
 
 kitty keyboard protocol（`usesKeyboardProtocol`）は既定で有効になっている。起動時に端末へ
 対応状況を問い合わせ、対応していれば有効にする。対応していない端末では、従来どおり
@@ -206,7 +209,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | 移動 | ↑↓←→, Home, End, PageUp, PageDown |
 | ファンクション | F1〜F12（SS3 形式・CSI `~` 形式の両方） |
 | 修飾 | Ctrl, Alt, Shift（CSI の修飾パラメータを解釈） |
-| マウス | 押下・解放・ドラッグ・ホイール 4 方向・拡張ボタン（SGR 1006） |
+| マウス | 押下・解放・ドラッグ・ホイール 4 方向・拡張ボタン・移動（SGR 1006、移動は `.motion` のとき） |
 | その他 | ブラケットペースト、フォーカス通知（`reportsFocus` で有効にしたとき） |
 | kitty | CSI u 形式のキー（F13〜F35、テンキー、Ctrl+I と Tab の区別） |
 

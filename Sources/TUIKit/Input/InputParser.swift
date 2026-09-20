@@ -22,6 +22,14 @@ public struct InputParser {
     /// kitty keyboard protocol で、キーを離したことを表すイベント種別。
     private static let keyReleaseEventType = 3
 
+    /// SGR 形式のマウス報告で、動かしながらの操作であることを表すビット。
+    ///
+    /// ボタンを押していない間の移動は、このビットとボタンなし（下位 2 ビットが 3）の
+    /// 組み合わせで届く。押したままの移動は、このビットと押しているボタンの番号で届く。
+    ///
+    /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「Mouse Tracking」。
+    private static let mouseMotionBit = 32
+
     /// 何も読み取っていないパーサを作る。
     public init() {}
 
@@ -442,8 +450,8 @@ public struct InputParser {
         }
 
         let action: MouseAction
-        if code & 32 != 0 {
-            action = .drag
+        if code & InputParser.mouseMotionBit != 0 {
+            action = button == .none ? .move : .drag
         } else {
             action = isPress ? .press : .release
         }

@@ -1,3 +1,16 @@
+/// マウスイベントを受け取る範囲。
+public enum MouseTracking: Hashable, Sendable {
+    /// 受け取らない。
+    case disabled
+    /// ボタンの押下・解放・ドラッグとホイールを受け取る。
+    case buttons
+    /// ボタンを押していない間の移動（`.move`）も受け取る。
+    ///
+    /// - Note: カーソルが 1 桁動くたびにイベントが届く。ホバーの強調やツールチップのように、
+    ///   移動そのものを使うアプリだけが選ぶ。
+    case motion
+}
+
 /// マウスボタン。
 public enum MouseButton: Hashable, Sendable {
     /// 左ボタン。
@@ -26,6 +39,8 @@ public enum MouseAction: Hashable, Sendable {
     case release
     /// ボタンを押したまま動かした。
     case drag
+    /// ボタンを押さずに動かした。
+    case move
     /// ホイールを上へ回した。
     case scrollUp
     /// ホイールを下へ回した。

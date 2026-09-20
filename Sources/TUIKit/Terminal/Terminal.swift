@@ -30,7 +30,7 @@ public final class Terminal: TerminalOutput {
     private var pendingOutput: [UInt8] = []
 
     private var isInAlternateScreen = false
-    private var isMouseTrackingEnabled = false
+    private var mouseTracking: MouseTracking = .disabled
     private var isBracketedPasteEnabled = false
     private var isFocusReportingEnabled = false
     private var isKeyboardProtocolEnabled = false
@@ -211,15 +211,32 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
-    /// マウスイベントの通知を切り替える。
+    /// マウスイベントを受け取る範囲を切り替える。
     ///
     /// - Parameters:
-    ///   - enabled: 受け取るなら `true`。
-    public func setMouseTrackingEnabled(_ enabled: Bool) {
-        guard enabled != isMouseTrackingEnabled else { return }
-        isMouseTrackingEnabled = enabled
-        write(enabled ? ANSI.enableMouseTracking : ANSI.disableMouseTracking)
+    ///   - tracking: 受け取る範囲。
+    /// - Note: `.motion` で届く移動を、`InputParser` は `.move` として解釈する。
+    public func setMouseTracking(_ tracking: MouseTracking) {
+        guard tracking != mouseTracking else { return }
+        // この行を外して新しい範囲を送るだけにすると、`.motion` から狭めたときに
+        // 移動の通知が残る。
+        if mouseTracking != .disabled { write(ANSI.disableMouseTracking) }
+        mouseTracking = tracking
+        if let sequence = Terminal.enableSequence(for: tracking) { write(sequence) }
         flush()
+    }
+
+    /// マウスイベントを受け取る範囲を端末へ伝えるシーケンスを返す。
+    ///
+    /// - Parameters:
+    ///   - tracking: 受け取る範囲。
+    /// - Returns: 端末へ送るシーケンス。`.disabled` なら `nil`。
+    private static func enableSequence(for tracking: MouseTracking) -> String? {
+        switch tracking {
+        case .disabled: return nil
+        case .buttons: return ANSI.enableMouseTracking
+        case .motion: return ANSI.enableMouseMotionTracking
+        }
     }
 
     /// ブラケットペーストを切り替える。
@@ -268,7 +285,7 @@ public final class Terminal: TerminalOutput {
     public func restore() {
         deactivate()
         isInAlternateScreen = false
-        isMouseTrackingEnabled = false
+        mouseTracking = .disabled
         isBracketedPasteEnabled = false
         isFocusReportingEnabled = false
         isKeyboardProtocolEnabled = false
@@ -287,7 +304,7 @@ public final class Terminal: TerminalOutput {
         // 抜けると、後ろに続く復元が画面へ出ない。
         write(ANSI.endSynchronizedUpdate)
         if isKeyboardProtocolEnabled { write(ANSI.disableKeyboardProtocol) }
-        if isMouseTrackingEnabled { write(ANSI.disableMouseTracking) }
+        if mouseTracking != .disabled { write(ANSI.disableMouseTracking) }
         if isBracketedPasteEnabled { write(ANSI.disableBracketedPaste) }
         if isFocusReportingEnabled { write(ANSI.disableFocusReporting) }
         if isInAlternateScreen { write(ANSI.exitAlternateScreen) }
@@ -315,7 +332,7 @@ public final class Terminal: TerminalOutput {
             write(ANSI.enterAlternateScreen)
             write(ANSI.clearScreen)
         }
-        if isMouseTrackingEnabled { write(ANSI.enableMouseTracking) }
+        if let sequence = Terminal.enableSequence(for: mouseTracking) { write(sequence) }
         if isBracketedPasteEnabled { write(ANSI.enableBracketedPaste) }
         if isFocusReportingEnabled { write(ANSI.enableFocusReporting) }
         if isKeyboardProtocolEnabled { write(ANSI.enableKeyboardProtocol) }

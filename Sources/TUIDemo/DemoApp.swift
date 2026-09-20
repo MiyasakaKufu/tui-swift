@@ -7,7 +7,7 @@ import TUIKit
 final class DemoApp: TerminalApp {
     static var options: ApplicationOptions {
         ApplicationOptions(
-            tracksMouse: true,
+            mouseTracking: .motion,
             reportsFocus: true,
             windowTitle: "TUIKit デモ",
             cursorShape: .blinkingBar

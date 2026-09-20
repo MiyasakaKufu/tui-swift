@@ -120,7 +120,7 @@ public final class Application<Root: Component> {
         }
 
         if options.usesAlternateScreen { terminal.enterAlternateScreen() }
-        terminal.setMouseTrackingEnabled(options.tracksMouse)
+        terminal.setMouseTracking(options.mouseTracking)
         terminal.setBracketedPasteEnabled(options.usesBracketedPaste)
         terminal.setFocusReportingEnabled(options.reportsFocus)
         if let title = options.windowTitle { terminal.setWindowTitle(title) }

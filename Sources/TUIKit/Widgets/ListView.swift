@@ -104,7 +104,7 @@ public final class ListState {
                     return scrollByWheel(at: mouseEvent.position, rows: wheelScrollRows)
                 case .scrollLeft, .scrollRight:
                     return false
-                case .press, .release, .drag:
+                case .press, .release, .drag, .move:
                     return false
                 }
             }

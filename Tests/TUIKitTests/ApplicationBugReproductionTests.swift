@@ -114,6 +114,61 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
     }
 
+    /// `mouseTracking` が `.motion` なら、ボタンを押していない移動が `.move` として届く。
+    func testApplicationEnablesMouseMotionTracking() throws {
+        var masterDescriptor: Int32 = -1
+        var slaveDescriptor: Int32 = -1
+        let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
+        try XCTSkipIf(openResult != 0, "疑似端末を開けない環境のため飛ばす")
+        let master = masterDescriptor
+        let slave = slaveDescriptor
+        defer {
+            close(slave)
+            close(master)
+        }
+
+        XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
+
+        // 出力先が詰まるとループが止まるので、master 側は読み続ける。
+        let drain = OutputDrain(descriptor: master, recordsOutput: true)
+        drain.start()
+        defer { drain.stop() }
+
+        let component = MouseRecordingComponent()
+        let application = Application(
+            root: component,
+            options: ApplicationOptions(
+                usesAlternateScreen: false,
+                mouseTracking: .motion,
+                frameInterval: 1.0 / 60
+            ),
+            terminal: Terminal(input: slave, output: slave)
+        )
+        component.onTimeout = { [weak application] in application?.stop() }
+
+        // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+        let sender = Thread {
+            guard component.hasStartedLoop.wait(timeout: 5) else { return }
+            writeBytes(master, Array("\u{1B}[<35;4;2M".utf8))
+        }
+        sender.start()
+
+        try application.run()
+
+        XCTAssertEqual(
+            component.mouseEvents,
+            [MouseEvent(position: Point(x: 3, y: 1), button: .none, action: .move)]
+        )
+        XCTAssertTrue(
+            drain.waitForOutput(containing: ANSI.enableMouseMotionTracking, timeout: 2),
+            "移動追跡を有効にするシーケンスが送られていない"
+        )
+        XCTAssertTrue(
+            drain.waitForOutput(containing: ANSI.disableMouseTracking, timeout: 2),
+            "終了時にマウスの通知が止められていない"
+        )
+    }
+
     /// 対応する端末では kitty keyboard protocol を有効にし、Ctrl+I と Tab を区別する。
     func testApplicationEnablesKeyboardProtocolWhenSupported() throws {
         var masterDescriptor: Int32 = -1
@@ -380,6 +435,36 @@ private final class FocusRecordingComponent: Component {
         guard case .focus(let gained) = event else { return .ignored }
         focusChanges.append(gained)
         return gained ? .handled : .quit
+    }
+
+    func update(elapsed: Double) {
+        hasStartedLoop.set()
+        elapsedTotal += elapsed
+        if elapsedTotal > 5 { onTimeout() }
+    }
+}
+
+/// 受け取ったマウスイベントを記録し、移動が届いたら終了するコンポーネント。
+private final class MouseRecordingComponent: Component {
+
+    /// 受け取ったマウスイベントを届いた順に並べたもの。
+    private(set) var mouseEvents: [MouseEvent] = []
+    /// イベントループが 1 周したら立つ。
+    let hasStartedLoop = Latch()
+
+    /// 移動が届かないまま時間切れになったときの脱出口。
+    var onTimeout: () -> Void = {}
+
+    private var elapsedTotal = 0.0
+
+    var body: some View {
+        Text("マウスの確認")
+    }
+
+    func handle(_ event: InputEvent) -> EventResult {
+        guard case .mouse(let mouseEvent) = event else { return .ignored }
+        mouseEvents.append(mouseEvent)
+        return mouseEvent.action == .move ? .quit : .handled
     }
 
     func update(elapsed: Double) {
