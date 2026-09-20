@@ -7,8 +7,8 @@ public struct InputParser {
     private var isInPaste = false
     private var replies: [TerminalReply] = []
 
-    /// ブラケットペーストの終端 `ESC [ 201 ~`。
-    private static let pasteTerminator: [UInt8] = [0x1B, 0x5B, 0x32, 0x30, 0x31, 0x7E]
+    /// ブラケットペーストの終端。
+    private static let pasteTerminator = Array((ANSI.csi + "201~").utf8)
 
     /// 単独の ESC の続きを待つ時間（秒）。
     private static let escapeWaitDuration = 0.05
@@ -33,7 +33,7 @@ public struct InputParser {
     /// この時間が過ぎても続きが届かなければ `flush()` を呼んでよい。
     /// 待っても確定できるものがないときは `nil`。
     public var pendingWaitDuration: Double? {
-        guard !isInPaste, let first = pending.first, first == 0x1B else { return nil }
+        guard !isInPaste, let first = pending.first, first == ControlByte.escape else { return nil }
         return pending.count == 1 ? InputParser.escapeWaitDuration : InputParser.sequenceWaitDuration
     }
 
@@ -92,7 +92,7 @@ public struct InputParser {
     /// - Returns: 確定したイベント。確定するものがなければ空配列。
     /// - Postcondition: ESC で始まる未解釈のバイトは残らない。
     public mutating func flush() -> [InputEvent] {
-        guard !isInPaste, let first = pending.first, first == 0x1B else { return [] }
+        guard !isInPaste, let first = pending.first, first == ControlByte.escape else { return [] }
         if pending.count == 1 {
             pending.removeFirst()
             return [.key(KeyEvent(.escape))]
@@ -101,7 +101,7 @@ public struct InputParser {
         // 途中までの制御コードを 1 バイトずつキーにしてはいけない。
         // 続きが届いてももう制御コードとして読めず、`ESC [ < 65 ; 10` が Escape と文字の列になる。
         var events: [InputEvent] = []
-        if pending.count == 2, pending[1] == 0x5B || pending[1] == 0x4F {
+        if pending.count == 2, pending[1] == UInt8(ascii: "[") || pending[1] == UInt8(ascii: "O") {
             // Alt+[ と Alt+O は `ESC [` / `ESC O` として届き、CSI / SS3 の始まりと同じ形になる。
             let character = Character(Unicode.Scalar(pending[1]))
             events.append(.key(KeyEvent(.character(character), modifiers: .alt)))
@@ -139,27 +139,28 @@ public struct InputParser {
 
     private func parseOne() -> ParseOutcome {
         guard let first = pending.first else { return .incomplete }
-        if first == 0x1B { return parseEscape() }
+        if first == ControlByte.escape { return parseEscape() }
         return parseKey(at: 0, extraModifiers: [])
     }
 
     private func parseEscape() -> ParseOutcome {
         guard pending.count >= 2 else { return .incomplete }
         switch pending[1] {
-        case 0x5B: // '['
+        case UInt8(ascii: "["):
             return parseControlSequence()
-        case 0x4F: // 'O' — SS3（F1〜F4 など）
+        // `ESC O` は SS3。F1〜F4 は修飾キーが付かないときだけこの形で届く。
+        case UInt8(ascii: "O"):
             guard pending.count >= 3 else { return .incomplete }
             switch pending[2] {
-            case 0x50: return .event(.key(KeyEvent(.function(1))), consumed: 3)
-            case 0x51: return .event(.key(KeyEvent(.function(2))), consumed: 3)
-            case 0x52: return .event(.key(KeyEvent(.function(3))), consumed: 3)
-            case 0x53: return .event(.key(KeyEvent(.function(4))), consumed: 3)
-            case 0x48: return .event(.key(KeyEvent(.home)), consumed: 3)
-            case 0x46: return .event(.key(KeyEvent(.end)), consumed: 3)
+            case UInt8(ascii: "P"): return .event(.key(KeyEvent(.function(1))), consumed: 3)
+            case UInt8(ascii: "Q"): return .event(.key(KeyEvent(.function(2))), consumed: 3)
+            case UInt8(ascii: "R"): return .event(.key(KeyEvent(.function(3))), consumed: 3)
+            case UInt8(ascii: "S"): return .event(.key(KeyEvent(.function(4))), consumed: 3)
+            case UInt8(ascii: "H"): return .event(.key(KeyEvent(.home)), consumed: 3)
+            case UInt8(ascii: "F"): return .event(.key(KeyEvent(.end)), consumed: 3)
             default: return .skip(consumed: 3)
             }
-        case 0x1B:
+        case ControlByte.escape:
             // ESC が連続した場合、最初の 1 つを Escape キーとして確定する。
             return .event(.key(KeyEvent(.escape)), consumed: 1)
         default:
@@ -171,7 +172,7 @@ public struct InputParser {
         var index = 2
         var prefix: UInt8?
 
-        if index < pending.count, pending[index] >= 0x3C, pending[index] <= 0x3F { // '<' '=' '>' '?'
+        if index < pending.count, ControlByte.privatePrefixes.contains(pending[index]) {
             prefix = pending[index]
             index += 1
         }
@@ -179,19 +180,20 @@ public struct InputParser {
         var parameterBytes: [UInt8] = []
         while index < pending.count {
             let byte = pending[index]
-            if byte >= 0x30 && byte <= 0x3F {
+            switch byte {
+            case ControlByte.parameterBytes:
                 parameterBytes.append(byte)
                 index += 1
-            } else if byte >= 0x20 && byte <= 0x2F {
+            case ControlByte.intermediateBytes:
                 index += 1
-            } else if byte >= 0x40 && byte <= 0x7E {
+            case ControlByte.finalBytes:
                 return interpret(
                     final: byte,
                     parameters: Parameters(parameterBytes),
                     prefix: prefix,
                     consumed: index + 1
                 )
-            } else {
+            default:
                 return .skip(consumed: index + 1)
             }
         }
@@ -216,14 +218,14 @@ public struct InputParser {
             var hasDigits = false
             for byte in bytes {
                 switch byte {
-                case 0x30...0x39:
-                    current = current * 10 + Int(byte - 0x30)
+                case UInt8(ascii: "0")...UInt8(ascii: "9"):
+                    current = current * 10 + Int(byte - UInt8(ascii: "0"))
                     hasDigits = true
-                case 0x3A: // ':'
+                case UInt8(ascii: ":"):
                     group.append(hasDigits ? current : 0)
                     current = 0
                     hasDigits = false
-                case 0x3B: // ';'
+                case UInt8(ascii: ";"):
                     group.append(hasDigits ? current : 0)
                     groups.append(group)
                     group = []
@@ -273,21 +275,22 @@ public struct InputParser {
         let modifiers = KeyModifiers(csiParameter: parameters[1] ?? 1)
 
         switch final {
-        case 0x41: return .event(.key(KeyEvent(.up, modifiers: modifiers)), consumed: consumed)
-        case 0x42: return .event(.key(KeyEvent(.down, modifiers: modifiers)), consumed: consumed)
-        case 0x43: return .event(.key(KeyEvent(.right, modifiers: modifiers)), consumed: consumed)
-        case 0x44: return .event(.key(KeyEvent(.left, modifiers: modifiers)), consumed: consumed)
-        case 0x48: return .event(.key(KeyEvent(.home, modifiers: modifiers)), consumed: consumed)
-        case 0x46: return .event(.key(KeyEvent(.end, modifiers: modifiers)), consumed: consumed)
-        case 0x5A: return .event(.key(KeyEvent(.backTab, modifiers: modifiers)), consumed: consumed)
-        case 0x50, 0x51, 0x52, 0x53: // 'P'〜'S' — 修飾キー付きの F1〜F4
+        case UInt8(ascii: "A"): return .event(.key(KeyEvent(.up, modifiers: modifiers)), consumed: consumed)
+        case UInt8(ascii: "B"): return .event(.key(KeyEvent(.down, modifiers: modifiers)), consumed: consumed)
+        case UInt8(ascii: "C"): return .event(.key(KeyEvent(.right, modifiers: modifiers)), consumed: consumed)
+        case UInt8(ascii: "D"): return .event(.key(KeyEvent(.left, modifiers: modifiers)), consumed: consumed)
+        case UInt8(ascii: "H"): return .event(.key(KeyEvent(.home, modifiers: modifiers)), consumed: consumed)
+        case UInt8(ascii: "F"): return .event(.key(KeyEvent(.end, modifiers: modifiers)), consumed: consumed)
+        case UInt8(ascii: "Z"): return .event(.key(KeyEvent(.backTab, modifiers: modifiers)), consumed: consumed)
+        // 修飾キーが付くと、F1〜F4 は SS3 ではなく `CSI` で届く。
+        case UInt8(ascii: "P")...UInt8(ascii: "S"):
             // `CSI 1;2R`（Shift+F3）はカーソル位置の問い合わせへの応答と同じ形だが、
             // TUIKit はカーソル位置（`CSI 6 n`）を問い合わせないので F3 として扱う。
-            let number = Int(final - 0x4F)
+            let number = Int(final - UInt8(ascii: "P")) + 1
             return .event(.key(KeyEvent(.function(number), modifiers: modifiers)), consumed: consumed)
-        case 0x49: return .event(.focus(true), consumed: consumed)
-        case 0x4F: return .event(.focus(false), consumed: consumed)
-        case 0x75: // 'u'
+        case UInt8(ascii: "I"): return .event(.focus(true), consumed: consumed)
+        case UInt8(ascii: "O"): return .event(.focus(false), consumed: consumed)
+        case UInt8(ascii: "u"):
             // 捨てないと、1 回の打鍵が押下と解放の 2 つのキーになる。
             if parameters[1, 1] == InputParser.keyReleaseEventType {
                 return .skip(consumed: consumed)
@@ -303,7 +306,7 @@ public struct InputParser {
                 return .event(.key(KeyEvent(.backTab, modifiers: rest)), consumed: consumed)
             }
             return .event(.key(KeyEvent(key, modifiers: modifiers)), consumed: consumed)
-        case 0x7E: // '~'
+        case UInt8(ascii: "~"):
             guard let code = parameters[0] else { return .skip(consumed: consumed) }
             if code == 200 { return .pasteStart(consumed: consumed) }
             if code == 201 { return .skip(consumed: consumed) }
@@ -329,7 +332,7 @@ public struct InputParser {
         consumed: Int
     ) -> ParseOutcome {
         switch (prefix, final) {
-        case (0x3C, 0x4D), (0x3C, 0x6D): // '<' と 'M' / 'm'
+        case (UInt8(ascii: "<"), UInt8(ascii: "M")), (UInt8(ascii: "<"), UInt8(ascii: "m")):
             guard let code = parameters[0], let column = parameters[1], let row = parameters[2] else {
                 return .skip(consumed: consumed)
             }
@@ -337,12 +340,12 @@ public struct InputParser {
                 code: code,
                 column: column,
                 row: row,
-                isPress: final == 0x4D
+                isPress: final == UInt8(ascii: "M")
             )
             return .event(.mouse(event), consumed: consumed)
-        case (0x3F, 0x75): // '?' と 'u'
+        case (UInt8(ascii: "?"), UInt8(ascii: "u")):
             return .reply(.keyboardProtocol(flags: parameters[0] ?? 0), consumed: consumed)
-        case (0x3F, 0x63): // '?' と 'c'
+        case (UInt8(ascii: "?"), UInt8(ascii: "c")):
             return .reply(.deviceAttributes, consumed: consumed)
         default:
             return .skip(consumed: consumed)
@@ -361,7 +364,7 @@ public struct InputParser {
         case 27: return .escape
         case 127: return .backspace
         case 57376...57398: return .function(code - 57376 + 13)
-        case 57399...57408: return .character(Character(Unicode.Scalar(UInt8(code - 57399 + 0x30))))
+        case 57399...57408: return .character(Character(Unicode.Scalar(UInt8(code - 57399) + UInt8(ascii: "0"))))
         case 57409: return .character(".")
         case 57410: return .character("/")
         case 57411: return .character("*")
@@ -453,24 +456,26 @@ public struct InputParser {
         var modifiers = extraModifiers
 
         switch byte {
-        case 0x0D, 0x0A:
+        case ControlByte.carriageReturn, ControlByte.lineFeed:
             return .event(.key(KeyEvent(.enter, modifiers: modifiers)), consumed: start + 1)
-        case 0x09:
+        case ControlByte.horizontalTab:
             return .event(.key(KeyEvent(.tab, modifiers: modifiers)), consumed: start + 1)
-        case 0x7F:
+        case ControlByte.delete:
             return .event(.key(KeyEvent(.backspace, modifiers: modifiers)), consumed: start + 1)
-        case 0x00:
+        case ControlByte.null:
             modifiers.insert(.control)
             return .event(.key(KeyEvent(.character(" "), modifiers: modifiers)), consumed: start + 1)
-        case 0x01...0x1A:
+        case ControlByte.controlLetters:
             modifiers.insert(.control)
-            let letter = Character(Unicode.Scalar(byte + 0x60))
+            let offset = byte - ControlByte.controlLetters.lowerBound
+            let letter = Character(Unicode.Scalar(UInt8(ascii: "a") + offset))
             return .event(.key(KeyEvent(.character(letter), modifiers: modifiers)), consumed: start + 1)
-        case 0x1C...0x1F:
+        case ControlByte.controlSymbols:
             modifiers.insert(.control)
-            let letter = Character(Unicode.Scalar(byte + 0x40))
+            let offset = byte - ControlByte.controlSymbols.lowerBound
+            let letter = Character(Unicode.Scalar(UInt8(ascii: "\\") + offset))
             return .event(.key(KeyEvent(.character(letter), modifiers: modifiers)), consumed: start + 1)
-        case 0x20...0x7E:
+        case UInt8(ascii: " ")...UInt8(ascii: "~"):
             let character = Character(Unicode.Scalar(byte))
             return .event(.key(KeyEvent(.character(character), modifiers: modifiers)), consumed: start + 1)
         default:
@@ -494,4 +499,25 @@ public struct InputParser {
         default: return 0
         }
     }
+}
+
+/// 制御コードを組み立てるバイト。
+private enum ControlByte {
+    static let null: UInt8 = 0x00
+    static let horizontalTab: UInt8 = 0x09
+    static let lineFeed: UInt8 = 0x0A
+    static let carriageReturn: UInt8 = 0x0D
+    static let escape: UInt8 = 0x1B
+    static let delete: UInt8 = 0x7F
+
+    /// Ctrl+A〜Ctrl+Z が届くバイト。
+    static let controlLetters: ClosedRange<UInt8> = 0x01...0x1A
+    /// Ctrl+\ 〜 Ctrl+_ が届くバイト。
+    static let controlSymbols: ClosedRange<UInt8> = 0x1C...0x1F
+
+    // 以下の区分は ECMA-48 5.4 による。
+    static let privatePrefixes: ClosedRange<UInt8> = 0x3C...0x3F
+    static let parameterBytes: ClosedRange<UInt8> = 0x30...0x3F
+    static let intermediateBytes: ClosedRange<UInt8> = 0x20...0x2F
+    static let finalBytes: ClosedRange<UInt8> = 0x40...0x7E
 }
