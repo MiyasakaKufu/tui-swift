@@ -10,7 +10,7 @@ private final class DisplayOnlyComponent: Component {
 
 /// `@main` を付けずに起動できる形だけ確かめるためのアプリ。
 private final class MinimalApp: TerminalApp {
-    static var options: ApplicationOptions { ApplicationOptions(tracksMouse: true) }
+    static var options: ApplicationOptions { ApplicationOptions(mouseTracking: .buttons) }
 
     var body: some View {
         VStack(spacing: 1) {
@@ -41,7 +41,7 @@ final class ComponentTests: XCTestCase {
     func testDefaultOptions() {
         let options = ApplicationOptions.default
         XCTAssertTrue(options.usesAlternateScreen)
-        XCTAssertFalse(options.tracksMouse)
+        XCTAssertEqual(options.mouseTracking, .disabled)
         XCTAssertTrue(options.usesBracketedPaste)
         XCTAssertNil(options.frameInterval)
         XCTAssertTrue(options.quitsOnControlC)
@@ -75,9 +75,9 @@ final class ComponentTests: XCTestCase {
     }
 
     func testTerminalAppProvidesDefaultOptions() {
-        XCTAssertTrue(MinimalApp.options.tracksMouse)
+        XCTAssertEqual(MinimalApp.options.mouseTracking, .buttons)
         XCTAssertTrue(DefaultOptionApp.options.quitsOnControlC)
-        XCTAssertFalse(DefaultOptionApp.options.tracksMouse)
+        XCTAssertEqual(DefaultOptionApp.options.mouseTracking, .disabled)
     }
 }
 

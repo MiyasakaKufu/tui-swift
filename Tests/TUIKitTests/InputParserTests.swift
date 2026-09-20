@@ -224,6 +224,30 @@ final class InputParserTests: XCTestCase {
         ])
     }
 
+    func testMouseMove() {
+        XCTAssertEqual(events(bytes("\u{1B}[<35;10;5M")), [
+            .mouse(MouseEvent(position: Point(x: 9, y: 4), button: .none, action: .move))
+        ])
+    }
+
+    func testMouseMoveWithModifiers() {
+        XCTAssertEqual(events(bytes("\u{1B}[<39;3;4M")), [
+            .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .move, modifiers: [.shift]))
+        ])
+    }
+
+    func testMoveWithButtonHeldIsReportedAsDrag() {
+        XCTAssertEqual(events(bytes("\u{1B}[<32;3;4M")), [
+            .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .left, action: .drag))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<34;3;4M")), [
+            .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .right, action: .drag))
+        ])
+        XCTAssertEqual(events(bytes("\u{1B}[<160;3;4M")), [
+            .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .backward, action: .drag))
+        ])
+    }
+
     func testExtraMouseButtons() {
         XCTAssertEqual(events(bytes("\u{1B}[<128;1;1M")), [
             .mouse(MouseEvent(position: .zero, button: .backward, action: .press))

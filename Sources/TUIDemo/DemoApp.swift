@@ -6,7 +6,7 @@ import TUIKit
 @main
 final class DemoApp: TerminalApp {
     static var options: ApplicationOptions {
-        ApplicationOptions(tracksMouse: true, reportsFocus: true)
+        ApplicationOptions(mouseTracking: .motion, reportsFocus: true)
     }
 
     private let items = [

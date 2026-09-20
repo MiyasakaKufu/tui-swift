@@ -443,7 +443,8 @@ public struct InputParser {
 
         let action: MouseAction
         if code & 32 != 0 {
-            action = .drag
+            // 1003 の移動報告は、下位 2 ビットを「ボタンなし」（3）にして届く。
+            action = button == .none ? .move : .drag
         } else {
             action = isPress ? .press : .release
         }
