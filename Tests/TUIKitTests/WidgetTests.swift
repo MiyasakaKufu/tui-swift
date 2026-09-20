@@ -160,7 +160,6 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.selectedIndex, 0)
     }
 
-    /// 押した行の項目が選択される。
     func testListStateSelectsClickedItem() {
         let state = listState(itemCount: 10, visibleRows: 4)
         let press = MouseEvent(position: Point(x: 3, y: 2), button: .left, action: .press)
@@ -178,7 +177,6 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.selectedIndex, 2)
     }
 
-    /// ホイールで送ったあとも、見えている項目をクリックで選択できる。
     func testListStateSelectsClickedItemAfterWheelScroll() {
         let state = listState(itemCount: 20, visibleRows: 5)
         let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
@@ -191,7 +189,6 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.scrollOffset, 6, "クリックで表示位置が動かないこと")
     }
 
-    /// 項目のない行を押しても選択は変わらない。
     func testListStateIgnoresClickOnRowWithoutItem() {
         let state = listState(itemCount: 2, visibleRows: 5)
         state.select(1)
@@ -202,7 +199,6 @@ final class WidgetTests: XCTestCase {
         }
     }
 
-    /// 描画領域の外で起きた押下は処理しない。
     func testListStateIgnoresClickOutsideRenderedRect() {
         let state = ListState(itemCount: 20)
         state.renderedRect = Rect(x: 2, y: 1, width: 5, height: 4)
@@ -214,7 +210,6 @@ final class WidgetTests: XCTestCase {
         }
     }
 
-    /// 選択を動かすのは左ボタンだけ。
     func testListStateSelectsOnlyWithLeftButton() {
         let state = listState(itemCount: 10, visibleRows: 4)
         for button in [MouseButton.middle, .right, .backward, .forward, .none] {
@@ -224,7 +219,6 @@ final class WidgetTests: XCTestCase {
         }
     }
 
-    /// 解放・ドラッグ・移動では選択が動かない。
     func testListStateIgnoresReleaseAndDragAndMove() {
         let state = listState(itemCount: 10, visibleRows: 4)
         for action in [MouseAction.release, .drag, .move] {
