@@ -35,9 +35,13 @@ final class FocusTests: XCTestCase {
     ///
     /// - Parameters:
     ///   - manager: 登録先。
+    ///   - handlesEvents: 各対象の `handle(_:)` が返す値。
     /// - Returns: 描画順に並べた対象。
-    private func registerThreeTargets(into manager: FocusManager) -> [RecordingTarget] {
-        let targets = [RecordingTarget(), RecordingTarget(), RecordingTarget()]
+    private func registerThreeTargets(
+        into manager: FocusManager,
+        handlesEvents: Bool = true
+    ) -> [RecordingTarget] {
+        let targets = (0..<3).map { _ in RecordingTarget(handlesEvents: handlesEvents) }
         var entries: [(FocusTarget, Rect)] = []
         for (offset, target) in targets.enumerated() {
             entries.append((target, Rect(x: 0, y: offset, width: 10, height: 1)))
@@ -80,8 +84,8 @@ final class FocusTests: XCTestCase {
 
     func testRegisteringSameTargetTwiceLeavesOneStop() {
         let manager = FocusManager()
-        let first = RecordingTarget()
-        let second = RecordingTarget()
+        let first = RecordingTarget(handlesEvents: false)
+        let second = RecordingTarget(handlesEvents: false)
         registerFrame(
             [
                 (first, Rect(x: 0, y: 0, width: 4, height: 1)),
@@ -104,7 +108,7 @@ final class FocusTests: XCTestCase {
 
     func testTabMovesFocusInRenderOrder() {
         let manager = FocusManager()
-        let targets = registerThreeTargets(into: manager)
+        let targets = registerThreeTargets(into: manager, handlesEvents: false)
 
         XCTAssertTrue(manager.handle(.key(KeyEvent(.tab))))
         XCTAssertTrue(manager.isFocused(targets[1]))
@@ -114,7 +118,7 @@ final class FocusTests: XCTestCase {
 
     func testShiftTabMovesFocusBackward() {
         let manager = FocusManager()
-        let targets = registerThreeTargets(into: manager)
+        let targets = registerThreeTargets(into: manager, handlesEvents: false)
         manager.focus(targets[2])
 
         XCTAssertTrue(manager.handle(.key(KeyEvent(.backTab))))
@@ -125,7 +129,7 @@ final class FocusTests: XCTestCase {
 
     func testFocusWrapsAroundAtBothEnds() {
         let manager = FocusManager()
-        let targets = registerThreeTargets(into: manager)
+        let targets = registerThreeTargets(into: manager, handlesEvents: false)
 
         XCTAssertTrue(manager.handle(.key(KeyEvent(.backTab))))
         XCTAssertTrue(manager.isFocused(targets[2]))
@@ -136,7 +140,7 @@ final class FocusTests: XCTestCase {
     func testFocusStopsAtEndsWhenWrappingIsDisabled() {
         let manager = FocusManager()
         manager.wrapsAround = false
-        let targets = registerThreeTargets(into: manager)
+        let targets = registerThreeTargets(into: manager, handlesEvents: false)
 
         XCTAssertFalse(manager.handle(.key(KeyEvent(.backTab))))
         XCTAssertTrue(manager.isFocused(targets[0]))
@@ -144,6 +148,15 @@ final class FocusTests: XCTestCase {
         manager.focus(targets[2])
         XCTAssertFalse(manager.handle(.key(KeyEvent(.tab))))
         XCTAssertTrue(manager.isFocused(targets[2]))
+    }
+
+    func testFocusedTargetCanTakeTabForItself() {
+        let manager = FocusManager()
+        let targets = registerThreeTargets(into: manager)
+
+        XCTAssertTrue(manager.handle(.key(KeyEvent(.tab))))
+        XCTAssertTrue(manager.isFocused(targets[0]), "ウィジェットが処理した Tab で移動している")
+        XCTAssertEqual(targets[0].received, [.key(KeyEvent(.tab))])
     }
 
     func testTabIsNotConsumedWithoutTargets() {

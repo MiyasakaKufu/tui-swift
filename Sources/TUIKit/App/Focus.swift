@@ -120,13 +120,14 @@ public final class FocusManager {
     /// - Parameters:
     ///   - event: 端末から届いたイベント。
     /// - Returns: フォーカスを動かしたか、配送先が処理したら `true`。
-    /// - Note: Tab と Shift+Tab（`.backTab`）はフォーカス中のウィジェットへ渡さず、常に移動に使う。
-    ///   `.resize` と `.focus` は配送しない。
+    /// - Note: Tab と Shift+Tab（`.backTab`）もまずフォーカス中のウィジェットへ渡し、
+    ///   処理されなかったときだけ移動に使う。タブ文字を入れる入力欄のように、
+    ///   ウィジェットが Tab を自分で使える。`.resize` と `.focus` は配送しない。
     public func handle(_ event: InputEvent) -> Bool {
         switch event {
         case .key(let keyEvent):
-            if let moved = moveFocus(for: keyEvent) { return moved }
-            return focusedTarget?.handle(event) ?? false
+            if focusedTarget?.handle(event) == true { return true }
+            return moveFocus(for: keyEvent)
         case .paste:
             return focusedTarget?.handle(event) ?? false
         case .mouse(let mouseEvent):
@@ -175,19 +176,19 @@ public final class FocusManager {
         }
     }
 
-    /// キーがフォーカスの移動なら、移動した結果を返す。
+    /// キーがフォーカスの移動なら、フォーカスを動かす。
     ///
     /// - Parameters:
     ///   - event: 押されたキー。
-    /// - Returns: 移動なら移した結果、そうでなければ `nil`。
-    private func moveFocus(for event: KeyEvent) -> Bool? {
+    /// - Returns: 動かしたら `true`。移動のキーでないか、移せる対象がなければ `false`。
+    private func moveFocus(for event: KeyEvent) -> Bool {
         switch event.key {
         case .tab:
             return focusNext()
         case .backTab:
             return focusPrevious()
         default:
-            return nil
+            return false
         }
     }
 
