@@ -27,8 +27,13 @@ final class ApplicationMessageTests: XCTestCase {
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
 
         let finished = expectation(description: "イベントループが終わる")
+        let error = ErrorBox()
         Thread.detachNewThread {
-            try? application.run()
+            do {
+                try application.run()
+            } catch let thrown {
+                error.value = thrown
+            }
             finished.fulfill()
         }
 
@@ -45,6 +50,7 @@ final class ApplicationMessageTests: XCTestCase {
         writeByte(pty.master, UInt8(ascii: "q"))
         wait(for: [finished], timeout: 5)
 
+        XCTAssertNil(error.value)
         XCTAssertEqual(component.messages, [.arrived])
     }
 
@@ -64,8 +70,13 @@ final class ApplicationMessageTests: XCTestCase {
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
 
         let finished = expectation(description: "イベントループが終わる")
+        let error = ErrorBox()
         Thread.detachNewThread {
-            try? application.run()
+            do {
+                try application.run()
+            } catch let thrown {
+                error.value = thrown
+            }
             finished.fulfill()
         }
 
@@ -78,6 +89,7 @@ final class ApplicationMessageTests: XCTestCase {
 
         wait(for: [finished], timeout: 10)
 
+        XCTAssertNil(error.value)
         XCTAssertEqual(component.records.count, threadCount * countPerThread)
     }
 
@@ -95,8 +107,13 @@ final class ApplicationMessageTests: XCTestCase {
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
 
         let finished = expectation(description: "イベントループが終わる")
+        let error = ErrorBox()
         Thread.detachNewThread {
-            try? application.run()
+            do {
+                try application.run()
+            } catch let thrown {
+                error.value = thrown
+            }
             finished.fulfill()
         }
 
@@ -115,6 +132,7 @@ final class ApplicationMessageTests: XCTestCase {
 
         wait(for: [finished], timeout: 5)
 
+        XCTAssertNil(error.value)
         XCTAssertEqual(component.records, ["message:first", "key:a", "key:b", "message:second"])
     }
 
@@ -170,6 +188,13 @@ final class ApplicationMessageTests: XCTestCase {
             }
         }
     }
+}
+
+/// スレッドをまたいでエラーを受け渡すための入れ物。
+///
+/// - Warning: 読み書きの順序は `XCTestExpectation` で揃える。
+private final class ErrorBox: @unchecked Sendable {
+    var value: Error?
 }
 
 /// テストから送るイベント。
