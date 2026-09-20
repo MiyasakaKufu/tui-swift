@@ -21,6 +21,8 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
 - **タブの展開** — タブは幅を計算する前に次のタブストップまでの空白へ展開する。
   既定のタブ幅は 4 桁で、`Text(_:tabSize:)` や `.tabStops(every:)` で変えられる。
 - **宣言的なレイアウト** — `VStack` / `HStack` / `Spacer` / `border` などを組み合わせて画面を記述する。
+- **ビューの重ね描き** — `ZStack` で同じ領域へビューを重ね、`.overlay` でレイアウトを変えずに上へ足す。
+  `.screenOverlay` は画面全体を基準に置くので、深い階層からでも中央にダイアログを出せる。
 - **入力の解析** — 矢印キー、ファンクションキー、修飾キー、マウス（SGR 1006）、
   ブラケットペーストを解釈する。分割して届いたシーケンスも正しく扱う。
   端末が対応していれば kitty keyboard protocol を使い、Ctrl+I と Tab のように
@@ -175,7 +177,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | 入力 | `InputParser`, `InputReader`, `KeyEvent`, `MouseEvent` | バイト列からイベントへの増分解析 |
 | 描画 | `Buffer`, `Cell`, `Renderer`, `Style` | セル単位の画面バッファと差分出力 |
 | 文字 | `DisplayWidth`, `TextWrapping`, `TabExpansion` | 表示幅の計算、折り返し、タブの展開 |
-| ビュー | `View`, `VStack`, `HStack`, `Text`, 各種修飾子 | レイアウトと描画 |
+| ビュー | `View`, `VStack`, `HStack`, `ZStack`, `Text`, 各種修飾子 | レイアウトと描画 |
 | 部品 | `ListView`, `TextField`, `ProgressBar` | 状態を持つウィジェット |
 | 実行 | `TerminalApp`, `Application`, `Component` | エントリポイントとイベントループ |
 
