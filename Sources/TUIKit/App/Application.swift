@@ -12,6 +12,12 @@ public final class Application<Root: Component> {
     private let terminal: Terminal
     private let reader: InputReader
     private let renderer: Renderer
+    private let queue: EventQueue<Root.Message>
+
+    /// 外部で起きたことをイベントループへ届ける送り口。
+    ///
+    /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
+    public let sender: MessageSender<Root.Message>
 
     private var buffer = Buffer(size: .zero)
     /// 最後に `.resize` として通知したサイズ。
@@ -41,6 +47,21 @@ public final class Application<Root: Component> {
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
+
+        let queue = EventQueue<Root.Message>(limit: options.messageQueueLimit)
+        self.queue = queue
+        self.sender = MessageSender(queue: queue)
+    }
+
+    /// イベントをイベントループへ送る。
+    ///
+    /// - Parameters:
+    ///   - message: 送るイベント。
+    /// - Returns: 送ったなら `true`。積んでおける数の上限に達していて捨てたなら `false`。
+    /// - Note: どのスレッドからでも呼べる。`sender` を渡した先から送るのと同じ。
+    @discardableResult
+    public func send(_ message: Root.Message) -> Bool {
+        sender.send(message)
     }
 
     /// ループを終了させる。イベントハンドラの中からも呼べる。
@@ -136,6 +157,11 @@ public final class Application<Root: Component> {
         isRunning = true
         lastFrameTime = monotonicSeconds()
 
+        root.didStart(sender: sender)
+        // この起こしを外してはいけない。合図を書けるようになる前に送られたイベントが、
+        // 次の入力かタイムアウトまで届かなくなる。
+        if !queue.isEmpty { SignalWatcher.wakeUp() }
+
         while isRunning {
             // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
             if !synchronizeSize() {
@@ -167,8 +193,8 @@ public final class Application<Root: Component> {
                 break
             }
 
-            for event in events {
-                if deliver(event) { continue }
+            for element in queue.drain(appending: events) {
+                if deliver(element) { continue }
                 isRunning = false
                 break
             }
@@ -197,7 +223,21 @@ public final class Application<Root: Component> {
         }
     }
 
-    /// イベントをルートへ渡す。
+    /// 積まれたイベントをルートへ渡す。
+    ///
+    /// - Parameters:
+    ///   - element: ルートへ渡すイベント。
+    /// - Returns: ループを続けるなら `true`。
+    private func deliver(_ element: EventQueue<Root.Message>.Element) -> Bool {
+        switch element {
+        case .input(let event):
+            return deliver(event)
+        case .message(let message):
+            return root.receive(message) != .quit
+        }
+    }
+
+    /// 入力イベントをルートへ渡す。
     ///
     /// - Parameters:
     ///   - event: ルートへ渡すイベント。

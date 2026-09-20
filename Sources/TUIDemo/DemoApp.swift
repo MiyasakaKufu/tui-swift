@@ -1,5 +1,11 @@
 import TUIKit
 
+/// デモへ外部から届くイベント。
+enum DemoMessage: Sendable {
+    /// 読み込みが終わり、追加の項目が届いた。
+    case loaded([String])
+}
+
 /// TUIKit の主な機能を一通り触れるデモ。
 ///
 ///   swift run tui-demo
@@ -14,7 +20,7 @@ final class DemoApp: TerminalApp {
         )
     }
 
-    private let items = [
+    private var items = [
         "差分レンダリング",
         "全角文字・絵文字の幅計算",
         "キー入力とマウスの解析",
@@ -31,6 +37,7 @@ final class DemoApp: TerminalApp {
     private var lastEventDescription = "（まだ入力はありません）"
     private var isEditing = false
     private var terminalSize = Size(width: 0, height: 0)
+    private var loadingLabel = "項目を読み込み中…"
 
     var body: some View {
         VStack(spacing: 0) {
@@ -66,6 +73,7 @@ final class DemoApp: TerminalApp {
             Text("選択中: \(selected)", wrap: .word).bold()
             Text("端末サイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
             Text("直前のイベント: \(lastEventDescription)", wrap: .word)
+            Text(loadingLabel).dim()
 
             VStack(spacing: 0) {
                 Text("進捗（+ / - で増減）").dim()
@@ -103,6 +111,22 @@ final class DemoApp: TerminalApp {
 
     var cursorPosition: Point? {
         isEditing ? inputState.renderedCursorPoint : nil
+    }
+
+    func didStart(sender: MessageSender<DemoMessage>) {
+        Task.detached {
+            try? await Task.sleep(nanoseconds: loadingDelayNanoseconds)
+            sender.send(.loaded(itemsLoadedLater))
+        }
+    }
+
+    func receive(_ message: DemoMessage) -> EventResult {
+        switch message {
+        case .loaded(let loaded):
+            items.append(contentsOf: loaded)
+            loadingLabel = "読み込み完了（\(loaded.count) 件を追加）"
+            return .handled
+        }
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -179,3 +203,12 @@ final class DemoApp: TerminalApp {
         }
     }
 }
+
+/// 通信の完了を模した待ち時間。
+private let loadingDelayNanoseconds: UInt64 = 1_500_000_000
+
+/// 読み込みが終わった後に届く項目。
+private let itemsLoadedLater = [
+    "別スレッドからのイベント",
+    "Task の完了で届くイベント",
+]

@@ -13,6 +13,11 @@ public protocol Component: AnyObject {
     /// `body` が返すビューの型。適合側が `some View` で書けば推論される。
     associatedtype Body: View
 
+    /// 外部から送るイベントの型。`receive(_:)` を書けば推論される。
+    ///
+    /// 既定は `Never`。外部からイベントを送らないなら決めなくてよい。
+    associatedtype Message: Sendable = Never
+
     /// 現在の状態から画面を組み立てる。
     var body: Body { get }
 
@@ -22,6 +27,21 @@ public protocol Component: AnyObject {
     ///   - event: 端末から届いたイベント。
     /// - Returns: 処理の結果。`.quit` を返すとアプリケーションが終了する。
     func handle(_ event: InputEvent) -> EventResult
+
+    /// 外部から送られたイベントを処理する。
+    ///
+    /// - Parameters:
+    ///   - message: `MessageSender.send(_:)` で送られたイベント。
+    /// - Returns: 処理の結果。`.quit` を返すとアプリケーションが終了する。
+    /// - Note: 入力イベントと同じ列から順に渡されるので、`handle(_:)` と同じスレッドで呼ばれる。
+    func receive(_ message: Message) -> EventResult
+
+    /// イベントループが回り始めるときに一度だけ呼ばれる。
+    ///
+    /// - Parameters:
+    ///   - sender: 外部イベントの送り口。別スレッドや `Task` へ渡して使う。
+    /// - Note: 呼ばれた時点で端末は raw モードになっていて、最初の `.resize` は通知済み。
+    func didStart(sender: MessageSender<Message>)
 
     /// 端末カーソルを表示したい位置。`nil` ならカーソルを隠す。
     var cursorPosition: Point? { get }
@@ -43,6 +63,19 @@ extension Component {
     /// - Note: すべてのイベントが未処理になるが、`ApplicationOptions.quitsOnControlC`
     ///   が既定で有効なため Ctrl+C で終了できる。
     public func handle(_ event: InputEvent) -> EventResult { .ignored }
+
+    /// 外部からイベントを送らないアプリは受け取らなくてよい。
+    ///
+    /// - Parameters:
+    ///   - message: 送られたイベント。
+    /// - Returns: 常に `.ignored`。
+    public func receive(_ message: Message) -> EventResult { .ignored }
+
+    /// 送り口を使わない。
+    ///
+    /// - Parameters:
+    ///   - sender: 外部イベントの送り口。
+    public func didStart(sender: MessageSender<Message>) {}
 
     /// カーソルを隠す。
     public var cursorPosition: Point? { nil }

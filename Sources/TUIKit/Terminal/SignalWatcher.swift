@@ -92,6 +92,15 @@ public enum SignalWatcher {
         #endif
     }
 
+    /// イベント待ちを起こす。
+    ///
+    /// シグナル以外の理由でイベントループを進めたいときに呼ぶ。
+    ///
+    /// - Note: `install()` を呼ぶ前は何も起こらない。
+    static func wakeUp() {
+        wakeUpEventLoop()
+    }
+
     /// シグナルが届いたことを知らせるパイプの読み取り側。
     ///
     /// `install()` を呼ぶ前や、パイプを作れなかったときは `nil`。
