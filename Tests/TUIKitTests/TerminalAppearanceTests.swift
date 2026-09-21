@@ -10,7 +10,6 @@ import Glibc
 #endif
 
 /// ウィンドウタイトルとカーソル形状の設定と、その戻し方を確かめる。
-@TUIActor
 final class TerminalAppearanceTests: XCTestCase {
 
     /// タイトルは `OSC 0` とベルで囲んで送る。

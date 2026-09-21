@@ -5,7 +5,6 @@ import XCTest
 ///
 /// 見るのは機械的に判定できる書式だけ。要約の書き出しや、コードを言い換えただけの
 /// コメントは判定できないので、レビューで見る。
-@TUIActor
 final class DocumentationStyleTests: XCTestCase {
 
     /// `Sources` の DocC が書式どおりであることを確かめる。

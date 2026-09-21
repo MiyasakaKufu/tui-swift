@@ -1,7 +1,6 @@
 import XCTest
 @testable import TUIKit
 
-@TUIActor
 final class StyleTests: XCTestCase {
 
     func testIdenticalStylesProduceNoSequence() {

@@ -11,7 +11,6 @@ import Glibc
 #endif
 
 /// シグナルがイベントループへ届くかを、疑似端末（pty）の上で確かめる。
-@TUIActor
 final class ApplicationSignalTests: XCTestCase {
 
     /// イベント待ちに入る直前の SIGWINCH でも、入力なしで再描画される。

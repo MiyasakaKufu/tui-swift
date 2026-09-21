@@ -7,7 +7,6 @@ import Glibc
 import XCTest
 @testable import TUIKit
 
-@TUIActor
 final class AmbiguousWidthTests: XCTestCase {
 
     private var savedAmbiguousWidth: DisplayWidth.AmbiguousWidth = .narrow

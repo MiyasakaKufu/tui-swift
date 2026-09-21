@@ -2,7 +2,6 @@ import XCTest
 @testable import TUIKit
 
 /// 型注釈と戻り値が食い違えばビルドが通らないので、検査の本体はコンパイル時に行われる。
-@TUIActor
 final class ModifierGenericsTests: XCTestCase {
 
     func testModifiersReturnConcreteTypes() {

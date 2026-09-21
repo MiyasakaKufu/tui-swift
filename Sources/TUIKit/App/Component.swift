@@ -9,7 +9,6 @@ public enum EventResult: Hashable, Sendable {
 }
 
 /// アプリケーションのルートになるもの。
-@TUIActor
 public protocol Component: AnyObject {
     /// `body` が返すビューの型。適合側が `some View` で書けば推論される。
     associatedtype Body: View
