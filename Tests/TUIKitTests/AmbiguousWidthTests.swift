@@ -7,19 +7,20 @@ import Glibc
 import XCTest
 @testable import TUIKit
 
+/// 退避した曖昧幅の設定。
+private var savedAmbiguousWidth: DisplayWidth.AmbiguousWidth = .narrow
+
 @TUIActor
 final class AmbiguousWidthTests: XCTestCase {
 
-    private var savedAmbiguousWidth: DisplayWidth.AmbiguousWidth = .narrow
-
-    @TUIActor
+    // setUp / tearDown は非隔離の宣言を override するので、隔離を付けられない。
+    // 退避先をクラスの外へ出す。`DisplayWidth.ambiguousWidth` 自体は隔離されていない。
     override func setUp() {
         super.setUp()
         savedAmbiguousWidth = DisplayWidth.ambiguousWidth
         DisplayWidth.ambiguousWidth = .narrow
     }
 
-    @TUIActor
     override func tearDown() {
         DisplayWidth.ambiguousWidth = savedAmbiguousWidth
         super.tearDown()

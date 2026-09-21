@@ -14,7 +14,7 @@ import CTUITestSupport
 final class ApplicationBugReproductionTests: XCTestCase {
 
     /// イベントを処理している最中に端末サイズが変わっても `.resize` が届く。
-    func testResizeDuringEventHandlingIsReported() throws {
+    func testResizeDuringEventHandlingIsReported() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
         let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
@@ -56,13 +56,13 @@ final class ApplicationBugReproductionTests: XCTestCase {
         }
         sender.start()
 
-        try application.run()
+        try await application.run()
 
         XCTAssertEqual(component.reportedSizes, [initialSize, resizedSize])
     }
 
     /// `reportsFocus` を有効にすると `.focus` が届き、終了時に通知が止まる。
-    func testApplicationEnablesFocusReporting() throws {
+    func testApplicationEnablesFocusReporting() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
         let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
@@ -102,7 +102,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         }
         sender.start()
 
-        try application.run()
+        try await application.run()
 
         XCTAssertEqual(component.focusChanges, [true, false])
         XCTAssertTrue(
@@ -116,7 +116,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
     }
 
     /// `mouseTracking` が `.motion` なら、ボタンを押していない移動が `.move` として届く。
-    func testApplicationEnablesMouseMotionTracking() throws {
+    func testApplicationEnablesMouseMotionTracking() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
         let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
@@ -154,7 +154,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         }
         sender.start()
 
-        try application.run()
+        try await application.run()
 
         XCTAssertEqual(
             component.mouseEvents,
@@ -171,7 +171,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
     }
 
     /// 対応する端末では kitty keyboard protocol を有効にし、Ctrl+I と Tab を区別する。
-    func testApplicationEnablesKeyboardProtocolWhenSupported() throws {
+    func testApplicationEnablesKeyboardProtocolWhenSupported() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
         let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
@@ -210,7 +210,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         }
         responder.start()
 
-        try application.run()
+        try await application.run()
 
         XCTAssertEqual(
             component.keys,
@@ -228,7 +228,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
     }
 
     /// 応答しない端末では kitty keyboard protocol を有効にしない。
-    func testApplicationLeavesKeyboardProtocolOffWhenUnsupported() throws {
+    func testApplicationLeavesKeyboardProtocolOffWhenUnsupported() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
         let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
@@ -262,7 +262,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         }
         sender.start()
 
-        try application.run()
+        try await application.run()
 
         XCTAssertEqual(component.keys, [KeyEvent(.tab)], "従来どおりの形式で届いていない")
         XCTAssertFalse(
@@ -272,7 +272,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
     }
 
     /// Ctrl+Z を受けると端末をシェルへ返し、再開したら設定と画面を取り戻す。
-    func testControlZSuspendsAndResumesTerminal() throws {
+    func testControlZSuspendsAndResumesTerminal() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
         let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
@@ -322,7 +322,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         }
         sender.start()
 
-        try application.run()
+        try await application.run()
 
         XCTAssertFalse(isRawModeWhileStopped, "止まる前に raw モードを解いていない")
         XCTAssertTrue(isCanonicalWhileStopped, "止まる前に端末属性を戻していない")
@@ -336,7 +336,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
     }
 
     /// クラッシュしたときの手順で端末が元に戻る。
-    func testCrashRestoreReturnsTerminalToNormalMode() throws {
+    func testCrashRestoreReturnsTerminalToNormalMode() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
         let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)

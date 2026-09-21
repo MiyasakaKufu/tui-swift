@@ -406,7 +406,7 @@ private func closeDescriptor(_ descriptor: Int32) {
 ///   - size: 設定するサイズ。
 /// - Returns: 成功なら `0`。
 private func setTerminalSize(_ descriptor: Int32, _ size: Size) -> Int32 {
-    ctui_test_set_window_size(descriptor, UInt16(size.height), UInt16(size.width))
+    ctui_test_set_terminal_size(descriptor, Int32(size.width), Int32(size.height))
 }
 
 /// 端末へ 1 バイト書く。
