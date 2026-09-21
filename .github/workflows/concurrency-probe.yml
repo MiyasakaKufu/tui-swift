@@ -13,14 +13,16 @@ jobs:
       - name: Build and count diagnostics
         run: |
           swift build --build-tests 2>&1 | tee build.log || true
+          sed 's#.*/tui-swift/##' build.log > tidy.log
+          echo "===== エラーの箇所（重複除去）をターゲット別に数える ====="
+          grep -o "^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: error" tidy.log | sort -u \
+            | cut -d/ -f1-2 | sort | uniq -c | sort -rn
+          echo "===== エラーのファイル別（重複除去） ====="
+          grep -o "^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: error" tidy.log | sort -u \
+            | cut -d: -f1 | sort | uniq -c | sort -rn | head -30
           echo "===== エラーの内訳 ====="
-          grep -o "error: .*" build.log | sed 's/[0-9]\{1,\}/N/g' | sort | uniq -c | sort -rn | head -40
-          echo "===== エラーのファイル別 ====="
-          grep -o "^/__w/[^:]*:[0-9]*:[0-9]*: error" build.log | cut -d: -f1 | sed 's#.*/tui-swift/##' | sort | uniq -c | sort -rn
-          echo "===== エラーの箇所（重複除去） ====="
-          grep -o "^/__w/[^:]*:[0-9]*:[0-9]*: error" build.log | sed 's#.*/tui-swift/##' | sort -u
-          echo "===== 警告のファイル別 ====="
-          grep -o "^/__w/[^:]*:[0-9]*:[0-9]*: warning" build.log | cut -d: -f1 | sed 's#.*/tui-swift/##' | sort | uniq -c | sort -rn
+          grep -o "error: .*" tidy.log | sed 's/[0-9]\{1,\}/N/g' | sort | uniq -c | sort -rn | head -25
           echo "===== 合計 ====="
-          echo "error: $(grep -c 'error:' build.log || true)"
-          echo "warning: $(grep -c 'warning:' build.log || true)"
+          echo "重複除去した箇所: $(grep -o "^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: error" tidy.log | sort -u | wc -l)"
+          echo "error 行: $(grep -c 'error:' tidy.log || true)"
+          echo "warning 行: $(grep -c 'warning:' tidy.log || true)"
