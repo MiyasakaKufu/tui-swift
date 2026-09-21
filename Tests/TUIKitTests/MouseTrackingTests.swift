@@ -9,6 +9,7 @@ import Glibc
 #endif
 
 /// マウスイベントを受け取る範囲の切り替えを確かめる。
+@TUIActor
 final class MouseTrackingTests: XCTestCase {
 
     /// `.buttons` では移動の報告（1003）を求めない。

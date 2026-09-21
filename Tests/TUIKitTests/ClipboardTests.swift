@@ -7,6 +7,7 @@ import Darwin
 import Glibc
 #endif
 
+@TUIActor
 final class ClipboardTests: XCTestCase {
 
     func testSequenceCarriesTheTextAsBase64() {

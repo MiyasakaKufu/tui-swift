@@ -1,6 +1,7 @@
 import XCTest
 @testable import TUIKit
 
+@TUIActor
 final class WidgetTests: XCTestCase {
 
     private func render(_ view: any View, width: Int, height: Int) -> String {

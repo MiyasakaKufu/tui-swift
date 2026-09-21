@@ -11,6 +11,7 @@ import Glibc
 #endif
 
 /// シグナルがイベントループへ届くかを、疑似端末（pty）の上で確かめる。
+@TUIActor
 final class ApplicationSignalTests: XCTestCase {
 
     /// イベント待ちに入る直前の SIGWINCH でも、入力なしで再描画される。
@@ -262,6 +263,7 @@ private final class PseudoTerminal {
     }
 
     /// スレーブ側を入出力に使う端末を作る。
+    @TUIActor
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
     }

@@ -1,0 +1,30 @@
+name: Concurrency Probe
+
+on:
+  push:
+    branches: ["claude/issue-106-**"]
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    container: swift:5.9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          swift build --build-tests 2>&1 | tee build.log || true
+          sed 's#.*/tui-swift/##' build.log > tidy.log
+          sites() { grep -o "^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: error" tidy.log | sort -u; }
+          echo "===== エラーの箇所 ====="
+          sites | head -40
+          echo "===== 合計 ====="
+          echo "重複除去した箇所: $(sites | wc -l)"
+          echo "error 行: $(grep -c 'error:' tidy.log || true)"
+          echo "warning 行: $(grep -c 'warning:' tidy.log || true)"
+      - name: Test
+        run: |
+          swift test 2>&1 | tee test.log || true
+          echo "===== 失敗したテスト ====="
+          grep -E "error:|failed" test.log | head -30 || true
+          echo "===== 結果 ====="
+          tail -5 test.log

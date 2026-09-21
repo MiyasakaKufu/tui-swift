@@ -1,3 +1,5 @@
+import Foundation
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -5,6 +7,7 @@ import Glibc
 #endif
 
 /// 端末を初期化し、入力・描画のループを回すアプリケーション。
+@TUIActor
 public final class Application<Root: Component> {
 
     private let root: Root
@@ -12,6 +15,14 @@ public final class Application<Root: Component> {
     private let terminal: Terminal
     private let reader: InputReader
     private let renderer: Renderer
+    private let stream: AsyncStream<LoopEvent<Root.Message>>
+    private let continuation: AsyncStream<LoopEvent<Root.Message>>.Continuation
+
+    /// 外部で起きたことをイベントループへ届ける送り口。
+    ///
+    /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
+    ///   作業をランタイムに任せられるなら `Component.startupEffect` を使う。
+    nonisolated public let sender: MessageSender<Root.Message>
 
     private var buffer = Buffer(size: .zero)
     /// 最後に `.resize` として通知したサイズ。
@@ -34,10 +45,11 @@ public final class Application<Root: Component> {
     public init(
         root: Root,
         options: ApplicationOptions = .default,
-        terminal: Terminal = Terminal()
+        terminal: Terminal? = nil
     ) {
         self.root = root
         self.options = options
+        let terminal = terminal ?? Terminal()
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
@@ -106,7 +118,7 @@ public final class Application<Root: Component> {
     ///   戻るときは端末を起動前の状態へ戻し、カーソルを表示に戻す。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
-    public func run() throws {
+    public func run() async throws {
         guard terminal.isTerminal else { throw TerminalError.notATerminal }
 
         try terminal.enableRawMode()
@@ -136,49 +148,87 @@ public final class Application<Root: Component> {
         isRunning = true
         lastFrameTime = monotonicSeconds()
 
-        while isRunning {
-            // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
-            if !synchronizeSize() {
-                isRunning = false
+        let effectTasks = root.startupEffect.start(sending: sender)
+        // 列を閉じてから起こす順序を変えてはいけない。逆にすると読み取りスレッドが
+        // 閉じる前の列へ yield し、`poll(2)` へ戻って次の入力まで終わらない。
+        defer {
+            for task in effectTasks { task.cancel() }
+            continuation.finish()
+            SignalWatcher.wakeUp()
+        }
+
+        startReadingInput()
+        draw()
+
+        loop: for await event in stream {
+            switch event {
+            case .input(let input):
+                if !deliver(input) { break loop }
+            case .message(let message):
+                if root.receive(message) == .quit { break loop }
+            case .wake:
                 break
             }
-            draw()
 
-            let events = reader.wait(timeout: options.frameInterval)
-
-            if SignalWatcher.consumeTermination() {
-                isRunning = false
-                break
-            }
+            if SignalWatcher.consumeTermination() { break loop }
 
             if SignalWatcher.consumeSuspend() {
                 suspend()
-                if !isRunning { break }
+                if !isRunning { break loop }
             }
 
             // 捕まえられない SIGSTOP で止められた後は、端末の設定だけが失われている。
             if SignalWatcher.consumeContinue() {
                 resumeTerminal()
-                if !isRunning { break }
+                if !isRunning { break loop }
             }
 
-            if SignalWatcher.consumeWindowResize(), !synchronizeSize() {
-                isRunning = false
-                break
-            }
-
-            for event in events {
-                if deliver(event) { continue }
-                isRunning = false
-                break
-            }
+            // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
+            if !synchronizeSize() { break loop }
 
             let now = monotonicSeconds()
             root.update(elapsed: now - lastFrameTime)
             lastFrameTime = now
+
+            if !isRunning { break loop }
+            draw()
         }
 
+        isRunning = false
         terminal.setCursorVisible(true)
+    }
+
+    /// 端末の入力を読む専用スレッドを起こし、読んだものを列へ流す。
+    ///
+    /// - Note: `poll(2)` はアクタの上に置けない。アクタを止めると、外部から送られたイベントが
+    ///   実行の機会を得られないため。
+    private func startReadingInput() {
+        let descriptor = terminal.inputDescriptor
+        let wakeupDescriptor = SignalWatcher.wakeupDescriptor
+        let timeout = options.frameInterval
+        let continuation = self.continuation
+
+        // 読み取り器をこのスレッドの中で作る。外で作って渡すと、非 Sendable の参照が
+        // スレッドを跨ぐ。
+        Thread.detachNewThread {
+            let reader = InputReader(descriptor: descriptor)
+            reader.wakeupDescriptor = wakeupDescriptor
+
+            while true {
+                let events = reader.wait(timeout: timeout)
+
+                var terminated = false
+                for event in events {
+                    if case .terminated = continuation.yield(.input(event)) {
+                        terminated = true
+                        break
+                    }
+                }
+                if terminated { break }
+
+                if case .terminated = continuation.yield(.wake) { break }
+            }
+        }
     }
 
     /// 端末が kitty keyboard protocol に対応しているかを問い合わせる。
@@ -270,3 +320,12 @@ public final class Application<Root: Component> {
 
 /// 起動時の問い合わせに応答を待つ時間（秒）。
 private let queryTimeout = 0.25
+
+extension Application where Root: TerminalApp {
+    /// ルートを作り、アプリケーションを起動する。
+    ///
+    /// - Throws: `run()` が投げるもの。
+    static func start() async throws {
+        try await Application(root: Root(), options: Root.options).run()
+    }
+}

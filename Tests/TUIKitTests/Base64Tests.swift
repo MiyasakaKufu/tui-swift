@@ -1,6 +1,7 @@
 import XCTest
 @testable import TUIKit
 
+@TUIActor
 final class Base64Tests: XCTestCase {
 
     func testEmptyInputEncodesToEmptyString() {

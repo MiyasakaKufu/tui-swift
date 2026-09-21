@@ -7,16 +7,19 @@ import Glibc
 import XCTest
 @testable import TUIKit
 
+@TUIActor
 final class AmbiguousWidthTests: XCTestCase {
 
     private var savedAmbiguousWidth: DisplayWidth.AmbiguousWidth = .narrow
 
+    @TUIActor
     override func setUp() {
         super.setUp()
         savedAmbiguousWidth = DisplayWidth.ambiguousWidth
         DisplayWidth.ambiguousWidth = .narrow
     }
 
+    @TUIActor
     override func tearDown() {
         DisplayWidth.ambiguousWidth = savedAmbiguousWidth
         super.tearDown()
