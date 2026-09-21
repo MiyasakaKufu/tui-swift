@@ -16,6 +16,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "CTUIShim"),
+        .target(name: "ConcurrencyProbe", swiftSettings: strictConcurrency),
         .target(name: "TUIKit", dependencies: ["CTUIShim"], swiftSettings: strictConcurrency),
         .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"], swiftSettings: strictConcurrency),
         // 製品コードから参照できてしまうため、ライブラリ本体のターゲットには混ぜない。

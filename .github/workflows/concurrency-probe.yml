@@ -13,11 +13,11 @@ jobs:
       - name: Build and count warnings
         run: |
           swift build 2>&1 | tee build.log || true
-          echo "===== 警告の内訳 ====="
+          echo "===== 隔離と Sendable ====="
+          grep -n "requireSendable(" Sources/ConcurrencyProbe/Probe.swift | sed 's/^/  /'
+          echo "----- 警告が出た行（= Sendable でない） -----"
+          grep "Probe.swift:[0-9]*:[0-9]*: warning: type" build.log | sort -u
+          echo "===== 警告の内訳（Sources 全体）====="
           grep -o "warning: .*" build.log | sed 's/[0-9]\{1,\}/N/g' | sort | uniq -c | sort -rn
           echo "===== ファイル別 ====="
           grep -o "^/__w/[^:]*:[0-9]*:[0-9]*: warning" build.log | cut -d: -f1 | sort | uniq -c | sort -rn
-          echo "===== 合計 ====="
-          grep -c "warning:" build.log || true
-      - name: Run isolation probe
-        run: swift test --filter ConcurrencyIsolationProbe 2>&1 | tail -40
