@@ -31,10 +31,8 @@ final class ApplicationMessageTests: XCTestCase {
 
         // 画面が変わるまで入力を送ってはいけない。作業の結果だけで変わることを確かめているので、
         // 入力で起きたのかどうかが分からなくなる。
-        XCTAssertTrue(
-            await waitUntil(timeout: 5) { self.captured.contains(arrivedText) },
-            "作業の結果が届いた後に画面が描き直されていない"
-        )
+        let drew = await waitUntil(timeout: 5) { self.captured.contains(arrivedText) }
+        XCTAssertTrue(drew, "作業の結果が届いた後に画面が描き直されていない")
 
         writeByte(pty.master, UInt8(ascii: "q"))
         try await loop.value
@@ -126,7 +124,8 @@ final class ApplicationMessageTests: XCTestCase {
         let sender = application.sender
         let loop = Task { try await application.run() }
 
-        XCTAssertTrue(await waitUntil(timeout: 5) { component.hasDrawnOnce }, "最初の描画が終わらない")
+        let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
 
         for _ in 0..<4 {
             Thread.detachNewThread {
@@ -155,23 +154,20 @@ final class ApplicationMessageTests: XCTestCase {
         let loop = Task { try await application.run() }
 
         // raw モードへの切り替えは入力待ちのバイト列を捨てるため、最初の描画を待ってから送る。
-        XCTAssertTrue(await waitUntil(timeout: 5) { component.hasDrawnOnce }, "最初の描画が終わらない")
+        let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
 
         // 順序を入れ替えてはいけない。キーを先に書くと、ループがそれを読んだのと送ったのと
         // どちらが先か決まらず、確かめたい順序そのものが揺れる。
         sender.send(.first)
         writeByte(pty.master, UInt8(ascii: "a"))
-        XCTAssertTrue(
-            await waitUntil(timeout: 5) { component.records.count >= 2 },
-            "イベントとキーが届かない"
-        )
+        let gotBoth = await waitUntil(timeout: 5) { component.records.count >= 2 }
+        XCTAssertTrue(gotBoth, "イベントとキーが届かない")
 
         // キーが届くのを待たずに送ってはいけない。キーより先に積まれて、逆向きを確かめられなくなる。
         writeByte(pty.master, UInt8(ascii: "b"))
-        XCTAssertTrue(
-            await waitUntil(timeout: 5) { component.records.count >= 3 },
-            "キーが届かない"
-        )
+        let gotSecondKey = await waitUntil(timeout: 5) { component.records.count >= 3 }
+        XCTAssertTrue(gotSecondKey, "キーが届かない")
         sender.send(.second)
 
         try await loop.value
