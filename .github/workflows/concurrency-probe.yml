@@ -26,10 +26,7 @@ jobs:
           SWIFT_BACKTRACE: enable=no
         run: |
           swift test 2>&1 | tee test.log || true
-          echo "===== 失敗・クラッシュ ====="
-          grep -E "^Test Case .* (failed|passed \\(.*\\))|: error:|Fatal error|Crash|signal" test.log \
-            | grep -v "passed" | head -25 || true
+          echo "===== 落ちたテスト ====="
+          grep -o "Test Case '[^']*' failed" test.log | sort -u
           echo "===== 集計 ====="
-          grep -E "^Executed [0-9]+ tests" test.log | tail -2 || echo "集計行なし"
-          echo "===== 最後の 10 行 ====="
-          tail -10 test.log
+          grep -E "^Executed [0-9]+ tests" test.log | tail -1
