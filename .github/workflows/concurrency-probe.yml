@@ -22,9 +22,14 @@ jobs:
           echo "error 行: $(grep -c 'error:' tidy.log || true)"
           echo "warning 行: $(grep -c 'warning:' tidy.log || true)"
       - name: Test
+        env:
+          SWIFT_BACKTRACE: enable=no
         run: |
           swift test 2>&1 | tee test.log || true
-          echo "===== 失敗したテスト ====="
-          grep -E "error:|failed" test.log | head -30 || true
-          echo "===== 結果 ====="
-          tail -5 test.log
+          echo "===== 失敗・クラッシュ ====="
+          grep -E "^Test Case .* (failed|passed \\(.*\\))|: error:|Fatal error|Crash|signal" test.log \
+            | grep -v "passed" | head -25 || true
+          echo "===== 集計 ====="
+          grep -E "^Executed [0-9]+ tests" test.log | tail -2 || echo "集計行なし"
+          echo "===== 最後の 10 行 ====="
+          tail -10 test.log
