@@ -12,13 +12,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and count diagnostics
         run: |
-          swift build 2>&1 | tee build.log || true
+          swift build --build-tests 2>&1 | tee build.log || true
           echo "===== エラーの内訳 ====="
           grep -o "error: .*" build.log | sed 's/[0-9]\{1,\}/N/g' | sort | uniq -c | sort -rn | head -40
           echo "===== エラーのファイル別 ====="
           grep -o "^/__w/[^:]*:[0-9]*:[0-9]*: error" build.log | cut -d: -f1 | sed 's#.*/tui-swift/##' | sort | uniq -c | sort -rn
           echo "===== エラーの箇所（重複除去） ====="
-          grep -o "^/__w/[^:]*:[0-9]*:[0-9]*: error" build.log | sed 's#.*/tui-swift/##' | sort -u | wc -l
+          grep -o "^/__w/[^:]*:[0-9]*:[0-9]*: error" build.log | sed 's#.*/tui-swift/##' | sort -u
           echo "===== 警告のファイル別 ====="
           grep -o "^/__w/[^:]*:[0-9]*:[0-9]*: warning" build.log | cut -d: -f1 | sed 's#.*/tui-swift/##' | sort | uniq -c | sort -rn
           echo "===== 合計 ====="

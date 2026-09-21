@@ -35,10 +35,11 @@ public final class Application<Root: Component> {
     public init(
         root: Root,
         options: ApplicationOptions = .default,
-        terminal: Terminal = Terminal()
+        terminal: Terminal? = nil
     ) {
         self.root = root
         self.options = options
+        let terminal = terminal ?? Terminal()
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)

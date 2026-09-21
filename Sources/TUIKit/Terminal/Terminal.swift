@@ -48,9 +48,9 @@ public final class Terminal: TerminalOutput {
         self.outputDescriptor = output
     }
 
-    deinit {
-        restore()
-    }
+    // deinit はアクタに隔離できないため、隔離した restore() を呼べない。
+    // 計測のために空にする。B を採るなら設計で解く必要がある箇所。
+    deinit {}
 
     /// 入出力の両方が端末に接続されているか。
     public var isTerminal: Bool {
