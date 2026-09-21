@@ -34,9 +34,11 @@ extension TerminalApp {
     ///
     /// - Note: 端末を初期化できなかった場合は、標準エラー出力へ理由を書き、
     ///   終了コード 1 で抜ける。
-    public static func main() async {
+    // @main は隔離の付いた main() を受け付けない（型が () async -> Void に合わない）。
+    // nonisolated にして、中でアクタへ入り直す。
+    nonisolated public static func main() async {
         do {
-            try await Application(root: Self(), options: options).run()
+            try await Application<Self>.start()
         } catch {
             fputs("起動できませんでした: \(error)\n", stderr)
             exit(1)

@@ -272,3 +272,12 @@ public final class Application<Root: Component> {
 
 /// 起動時の問い合わせに応答を待つ時間（秒）。
 private let queryTimeout = 0.25
+
+extension Application where Root: TerminalApp {
+    /// ルートを作り、アプリケーションを起動する。
+    ///
+    /// - Throws: `run()` が投げるもの。
+    static func start() async throws {
+        try await Application(root: Root(), options: Root.options).run()
+    }
+}
