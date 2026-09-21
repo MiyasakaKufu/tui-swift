@@ -1,0 +1,23 @@
+name: Concurrency Probe
+
+on:
+  push:
+    branches: ["claude/issue-106-**"]
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    container: swift:5.9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and count warnings
+        run: |
+          swift build 2>&1 | tee build.log || true
+          echo "===== 警告の内訳 ====="
+          grep -o "warning: .*" build.log | sed 's/[0-9]\{1,\}/N/g' | sort | uniq -c | sort -rn
+          echo "===== ファイル別 ====="
+          grep -o "^/__w/[^:]*:[0-9]*:[0-9]*: warning" build.log | cut -d: -f1 | sort | uniq -c | sort -rn
+          echo "===== 合計 ====="
+          grep -c "warning:" build.log || true
+      - name: Run isolation probe
+        run: swift test --filter ConcurrencyIsolationProbe 2>&1 | tail -40
