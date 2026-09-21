@@ -176,7 +176,7 @@ final class ApplicationMessageTests: XCTestCase {
     }
 
     /// 上限に達した後の送信は捨てられる。
-    func testSenderReportsFullQueue() throws {
+    func testSenderReportsFullQueue() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
 

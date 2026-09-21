@@ -5,7 +5,7 @@ import XCTest
 @TUIActor
 final class ModifierGenericsTests: XCTestCase {
 
-    func testModifiersReturnConcreteTypes() {
+    func testModifiersReturnConcreteTypes() async {
         let padded: PaddingView<Text> = Text("x").padding(1)
         let bordered: BorderView<Text> = Text("x").border(.ascii, title: "T")
         let background: BackgroundView<Text> = Text("x").background(.red)
@@ -21,13 +21,13 @@ final class ModifierGenericsTests: XCTestCase {
         XCTAssertEqual(aligned.horizontal, .center)
     }
 
-    func testChainedModifiersKeepContentType() {
+    func testChainedModifiersKeepContentType() async {
         let view: BorderView<PaddingView<Text>> = Text("x").padding(1).border(.ascii)
 
         XCTAssertEqual(view.content.content.content, "x")
     }
 
-    func testPaddingHorizontalVerticalReturnsConcreteType() {
+    func testPaddingHorizontalVerticalReturnsConcreteType() async {
         let view: PaddingView<Text> = Text("x").padding(horizontal: 2, vertical: 1)
         XCTAssertEqual(view.insets, EdgeInsets(horizontal: 2, vertical: 1))
     }

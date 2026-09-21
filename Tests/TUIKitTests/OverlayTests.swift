@@ -13,7 +13,7 @@ final class OverlayTests: XCTestCase {
 
     // MARK: - ZStack
 
-    func testZStackDrawsLaterChildOnTop() {
+    func testZStackDrawsLaterChildOnTop() async {
         let view = ZStack(horizontal: .leading, vertical: .top) {
             Fill(".")
             Text("ab")
@@ -21,7 +21,7 @@ final class OverlayTests: XCTestCase {
         XCTAssertEqual(render(view, width: 4, height: 2), "ab..\n....")
     }
 
-    func testZStackCentersChildrenByDefault() {
+    func testZStackCentersChildrenByDefault() async {
         let view = ZStack {
             Fill(".")
             Text("ab")
@@ -29,19 +29,19 @@ final class OverlayTests: XCTestCase {
         XCTAssertEqual(render(view, width: 4, height: 3), "....\n.ab.\n....")
     }
 
-    func testZStackSizeIsLargestChild() {
+    func testZStackSizeIsLargestChild() async {
         let view = ZStack(children: [Text("abc"), Fill("#").frame(width: 2, height: 3)])
         XCTAssertEqual(view.sizeThatFits(Size(width: 10, height: 10)), Size(width: 3, height: 3))
     }
 
-    func testZStackWithoutChildrenHasNoSize() {
+    func testZStackWithoutChildrenHasNoSize() async {
         let view = ZStack(children: [])
         XCTAssertEqual(view.sizeThatFits(Size(width: 10, height: 10)), .zero)
     }
 
     // MARK: - overlay
 
-    func testOverlayKeepsSizeOfContent() {
+    func testOverlayKeepsSizeOfContent() async {
         let content = Text("ab")
         let view = content.overlay(Fill("#"))
         let proposal = Size(width: 10, height: 10)
@@ -50,7 +50,7 @@ final class OverlayTests: XCTestCase {
         XCTAssertEqual(view.layoutTraits, content.layoutTraits)
     }
 
-    func testOverlayDoesNotMoveSiblings() {
+    func testOverlayDoesNotMoveSiblings() async {
         let view = VStack {
             Text("ab").overlay(Text("!"), horizontal: .trailing, vertical: .top)
             Text("cd")
@@ -58,7 +58,7 @@ final class OverlayTests: XCTestCase {
         XCTAssertEqual(render(view, width: 4, height: 2), "a!  \ncd  ")
     }
 
-    func testOverlayStaysInsideContentRect() {
+    func testOverlayStaysInsideContentRect() async {
         let view = VStack {
             Text("ab").overlay(Fill("#"))
             Text("cd")
@@ -68,7 +68,7 @@ final class OverlayTests: XCTestCase {
 
     // MARK: - screenOverlay
 
-    func testScreenOverlayCentersOnWholeBuffer() {
+    func testScreenOverlayCentersOnWholeBuffer() async {
         let view = VStack {
             Text("ab")
             Text("cd").screenOverlay(Text("#"))
@@ -76,7 +76,7 @@ final class OverlayTests: XCTestCase {
         XCTAssertEqual(render(view, width: 5, height: 5), "ab   \ncd   \n  #  \n     \n     ")
     }
 
-    func testScreenOverlayKeepsSizeOfContent() {
+    func testScreenOverlayKeepsSizeOfContent() async {
         let content = Text("ab")
         let view = content.screenOverlay(Fill("#"))
         let proposal = Size(width: 10, height: 10)
@@ -85,14 +85,14 @@ final class OverlayTests: XCTestCase {
         XCTAssertEqual(view.layoutTraits, content.layoutTraits)
     }
 
-    func testScreenOverlayAlignsToScreenEdge() {
+    func testScreenOverlayAlignsToScreenEdge() async {
         let view = Text("ab").screenOverlay(Text("#"), horizontal: .trailing, vertical: .bottom)
         XCTAssertEqual(render(view, width: 3, height: 2), "ab \n  #")
     }
 
     // MARK: - 下を覆う
 
-    func testBackgroundCoversContentBelow() {
+    func testBackgroundCoversContentBelow() async {
         let view = ZStack {
             Fill(".")
             Text("ok").padding(1).background(style: Style(background: .blue))
@@ -105,7 +105,7 @@ final class OverlayTests: XCTestCase {
 
     // MARK: - 全角文字
 
-    func testOverlayOnWideCharacterHeadKeepsColumns() {
+    func testOverlayOnWideCharacterHeadKeepsColumns() async {
         let view = ZStack(horizontal: .leading, vertical: .top) {
             Text("あいう")
             Text("X")
@@ -113,7 +113,7 @@ final class OverlayTests: XCTestCase {
         XCTAssertEqual(render(view, width: 6, height: 1), "X いう")
     }
 
-    func testOverlayOnWideCharacterContinuationKeepsColumns() {
+    func testOverlayOnWideCharacterContinuationKeepsColumns() async {
         let view = ZStack(horizontal: .leading, vertical: .top) {
             Text("あい")
             Text("X").padding(horizontal: 1)
@@ -121,7 +121,7 @@ final class OverlayTests: XCTestCase {
         XCTAssertEqual(render(view, width: 6, height: 1), " Xい  ")
     }
 
-    func testDialogOverWideCharactersKeepsRowWidth() {
+    func testDialogOverWideCharactersKeepsRowWidth() async {
         let view = ZStack {
             Fill("あ")
             Text("確認").padding(1).background(style: Style(background: .blue))

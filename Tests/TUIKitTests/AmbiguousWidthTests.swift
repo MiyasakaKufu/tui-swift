@@ -35,7 +35,7 @@ final class AmbiguousWidthTests: XCTestCase {
 
     // MARK: - 幅の計算
 
-    func testAmbiguousCharactersAreNarrowByDefault() {
+    func testAmbiguousCharactersAreNarrowByDefault() async {
         XCTAssertEqual(DisplayWidth.width(of: "─"), 1)
         XCTAssertEqual(DisplayWidth.width(of: "╭"), 1)
         XCTAssertEqual(DisplayWidth.width(of: "…"), 1)
@@ -43,7 +43,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(DisplayWidth.width(of: "↑"), 1)
     }
 
-    func testAmbiguousCharactersAreWideWhenConfigured() {
+    func testAmbiguousCharactersAreWideWhenConfigured() async {
         DisplayWidth.ambiguousWidth = .wide
         XCTAssertEqual(DisplayWidth.width(of: "─"), 2)
         XCTAssertEqual(DisplayWidth.width(of: "╭"), 2)
@@ -52,7 +52,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(DisplayWidth.width(of: "↑"), 2)
     }
 
-    func testPerCallSettingOverridesTheGlobalOne() {
+    func testPerCallSettingOverridesTheGlobalOne() async {
         DisplayWidth.ambiguousWidth = .narrow
         XCTAssertEqual(DisplayWidth.width(of: "─", ambiguous: .wide), 2)
 
@@ -60,30 +60,30 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(DisplayWidth.width(of: "─", ambiguous: .narrow), 1)
     }
 
-    func testStringWidthFollowsTheSetting() {
+    func testStringWidthFollowsTheSetting() async {
         XCTAssertEqual(DisplayWidth.width(of: "─a あ", ambiguous: .narrow), 5)
         XCTAssertEqual(DisplayWidth.width(of: "─a あ", ambiguous: .wide), 6)
     }
 
-    func testASCIIAndFullWidthAreNotAffected() {
+    func testASCIIAndFullWidthAreNotAffected() async {
         XCTAssertEqual(DisplayWidth.width(of: "hello", ambiguous: .wide), 5)
         XCTAssertEqual(DisplayWidth.width(of: "日本語", ambiguous: .wide), 6)
         XCTAssertEqual(DisplayWidth.width(of: "🎉", ambiguous: .wide), 2)
     }
 
     /// Ambiguous でもある結合文字は、曖昧幅の設定に関わらず 0 桁になる。
-    func testZeroWidthCharactersStayZero() {
+    func testZeroWidthCharactersStayZero() async {
         let combiningAcuteAccent = "\u{0301}"
         XCTAssertEqual(DisplayWidth.width(of: "e" + combiningAcuteAccent, ambiguous: .wide), 1)
         XCTAssertEqual(DisplayWidth.width(of: "\u{07}", ambiguous: .wide), 0)
     }
 
-    func testPrefixFollowsTheSetting() {
+    func testPrefixFollowsTheSetting() async {
         XCTAssertEqual(String(DisplayWidth.prefix(of: "───", width: 3, ambiguous: .narrow)), "───")
         XCTAssertEqual(String(DisplayWidth.prefix(of: "───", width: 3, ambiguous: .wide)), "─")
     }
 
-    func testTruncateCountsTheEllipsisWithTheSetting() {
+    func testTruncateCountsTheEllipsisWithTheSetting() async {
         XCTAssertEqual(DisplayWidth.truncate("abcdefgh", to: 5, ambiguous: .narrow), "abcd…")
         XCTAssertEqual(DisplayWidth.truncate("abcdefgh", to: 5, ambiguous: .wide), "abc…")
         XCTAssertEqual(
@@ -92,7 +92,7 @@ final class AmbiguousWidthTests: XCTestCase {
         )
     }
 
-    func testRangeTablesAreSortedAndDisjoint() {
+    func testRangeTablesAreSortedAndDisjoint() async {
         for ranges in [DisplayWidth.wideRanges, DisplayWidth.ambiguousRanges] {
             for (previous, next) in zip(ranges, ranges.dropFirst()) {
                 XCTAssertLessThan(previous.upperBound, next.lowerBound)
@@ -102,7 +102,7 @@ final class AmbiguousWidthTests: XCTestCase {
 
     // MARK: - 設定の解決
 
-    func testEnvironmentValueParsing() {
+    func testEnvironmentValueParsing() async {
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(environmentValue: "1"), .wide)
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(environmentValue: "0"), .narrow)
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(environmentValue: "true"), .narrow)
@@ -110,7 +110,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertNil(DisplayWidth.parseAmbiguousWidth(environmentValue: nil))
     }
 
-    func testLocaleValueParsing() {
+    func testLocaleValueParsing() async {
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(localeValue: "ja_JP.UTF-8"), .wide)
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(localeValue: "zh_CN.utf8"), .wide)
         XCTAssertEqual(DisplayWidth.parseAmbiguousWidth(localeValue: "ko_KR.UTF-8@euro"), .wide)
@@ -120,7 +120,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertNil(DisplayWidth.parseAmbiguousWidth(localeValue: nil))
     }
 
-    func testEnvironmentVariableOverridesTheResolvedSetting() {
+    func testEnvironmentVariableOverridesTheResolvedSetting() async {
         let name = DisplayWidth.ambiguousWidthEnvironmentVariable
         let original = getenv(name).map { String(cString: $0) }
         defer {
@@ -146,7 +146,7 @@ final class AmbiguousWidthTests: XCTestCase {
 
     // MARK: - 描画側の切り替え
 
-    func testBorderStyleReportsWhetherItFitsInSingleColumn() {
+    func testBorderStyleReportsWhetherItFitsInSingleColumn() async {
         XCTAssertTrue(BorderStyle.rounded.fitsInSingleColumn)
         XCTAssertTrue(BorderStyle.ascii.fitsInSingleColumn)
 
@@ -155,7 +155,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertTrue(BorderStyle.ascii.fitsInSingleColumn)
     }
 
-    func testBorderFallsBackToASCIIWhenAmbiguousIsWide() {
+    func testBorderFallsBackToASCIIWhenAmbiguousIsWide() async {
         let view = Text("ab").border(.rounded)
         XCTAssertEqual(render(view, width: 4, height: 3), "╭──╮\n│ab│\n╰──╯")
 
@@ -165,7 +165,7 @@ final class AmbiguousWidthTests: XCTestCase {
 
     /// 曖昧幅が 2 桁のとき、埋まる側（Ambiguous の `█`）だけが 2 桁になり、
     /// 残りの側（Neutral の `░`）は 1 桁のまま行の幅が保たれる。
-    func testProgressBarKeepsRowWidthWhenAmbiguousIsWide() {
+    func testProgressBarKeepsRowWidthWhenAmbiguousIsWide() async {
         XCTAssertEqual(render(ProgressBar(value: 0.5), width: 10, height: 1), "█████░░░░░")
 
         DisplayWidth.ambiguousWidth = .wide

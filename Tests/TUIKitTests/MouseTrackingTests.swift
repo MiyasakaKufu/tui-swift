@@ -13,19 +13,19 @@ import Glibc
 final class MouseTrackingTests: XCTestCase {
 
     /// `.buttons` では移動の報告（1003）を求めない。
-    func testButtonTrackingDoesNotAskForMotionReports() {
+    func testButtonTrackingDoesNotAskForMotionReports() async {
         XCTAssertFalse(ANSI.enableMouseTracking.contains("1003"))
         XCTAssertTrue(ANSI.enableMouseMotionTracking.contains("\u{1B}[?1003h"))
     }
 
     /// 通知を止めるときは移動の報告も止める。
-    func testStoppingMouseTrackingAlsoStopsMotionReports() {
+    func testStoppingMouseTrackingAlsoStopsMotionReports() async {
         XCTAssertTrue(ANSI.disableMouseTracking.contains("\u{1B}[?1003l"))
         XCTAssertTrue(CrashRestorer.restoreSequence.contains(ANSI.disableMouseTracking))
     }
 
     /// 範囲ごとに対応するシーケンスを送り、同じ範囲を選び直しても送り直さない。
-    func testTerminalSendsTheSequenceForEachRange() throws {
+    func testTerminalSendsTheSequenceForEachRange() async throws {
         var descriptors: [Int32] = [-1, -1]
         guard pipe(&descriptors) == 0 else { throw Failure.pipeUnavailable(errno: errno) }
         defer {
@@ -50,7 +50,7 @@ final class MouseTrackingTests: XCTestCase {
     }
 
     /// 範囲を狭めるときは、いったんすべて止めてから入れ直す。
-    func testNarrowingTheRangeStopsMotionReports() throws {
+    func testNarrowingTheRangeStopsMotionReports() async throws {
         var descriptors: [Int32] = [-1, -1]
         guard pipe(&descriptors) == 0 else { throw Failure.pipeUnavailable(errno: errno) }
         defer {

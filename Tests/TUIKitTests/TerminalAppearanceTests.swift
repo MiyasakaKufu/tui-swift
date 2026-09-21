@@ -14,12 +14,12 @@ import Glibc
 final class TerminalAppearanceTests: XCTestCase {
 
     /// タイトルは `OSC 0` とベルで囲んで送る。
-    func testWindowTitleSequenceWrapsTitleInOperatingSystemCommand() {
+    func testWindowTitleSequenceWrapsTitleInOperatingSystemCommand() async {
         XCTAssertEqual(ANSI.setWindowTitle("タイトル"), "\u{1B}]0;タイトル\u{07}")
     }
 
     /// タイトルに混じった制御文字は落とす。
-    func testWindowTitleSequenceDropsControlCharacters() {
+    func testWindowTitleSequenceDropsControlCharacters() async {
         XCTAssertEqual(
             ANSI.setWindowTitle("a\u{07}b\u{1B}c\u{7F}d\u{9C}e"),
             "\u{1B}]0;abcde\u{07}"
@@ -27,7 +27,7 @@ final class TerminalAppearanceTests: XCTestCase {
     }
 
     /// カーソル形状は `DECSCUSR` の番号で送る。
-    func testCursorShapeSequencesUseDECSCUSRParameters() {
+    func testCursorShapeSequencesUseDECSCUSRParameters() async {
         XCTAssertEqual(ANSI.setCursorShape(.default), "\u{1B}[0 q")
         XCTAssertEqual(ANSI.setCursorShape(.blinkingBlock), "\u{1B}[1 q")
         XCTAssertEqual(ANSI.setCursorShape(.block), "\u{1B}[2 q")
@@ -38,13 +38,13 @@ final class TerminalAppearanceTests: XCTestCase {
     }
 
     /// クラッシュしたときも、カーソル形状とタイトルが戻る。
-    func testCrashRestoreSequenceResetsCursorShapeAndWindowTitle() {
+    func testCrashRestoreSequenceResetsCursorShapeAndWindowTitle() async {
         XCTAssertTrue(CrashRestorer.restoreSequence.contains(ANSI.setCursorShape(.default)))
         XCTAssertTrue(CrashRestorer.restoreSequence.contains(ANSI.restoreWindowTitle))
     }
 
     /// 設定すると、タイトルを積んでから送り、カーソル形状を送る。
-    func testSettingTitleAndShapeSavesTitleFirst() throws {
+    func testSettingTitleAndShapeSavesTitleFirst() async throws {
         let pty = try openPseudoTerminal()
         defer { pty.close() }
 
@@ -62,7 +62,7 @@ final class TerminalAppearanceTests: XCTestCase {
     }
 
     /// 一時停止では設定する前のタイトルと形へ戻し、再開では設定し直す。
-    func testDeactivateRestoresTitleAndShapeAndReactivateAppliesThemAgain() throws {
+    func testDeactivateRestoresTitleAndShapeAndReactivateAppliesThemAgain() async throws {
         let pty = try openPseudoTerminal()
         defer { pty.close() }
 
@@ -100,7 +100,7 @@ final class TerminalAppearanceTests: XCTestCase {
     }
 
     /// 設定していなければ、一時停止でどちらの復元も送らない。
-    func testDeactivateSendsNoRestoreWhenNothingWasSet() throws {
+    func testDeactivateSendsNoRestoreWhenNothingWasSet() async throws {
         let pty = try openPseudoTerminal()
         defer { pty.close() }
 
@@ -115,7 +115,7 @@ final class TerminalAppearanceTests: XCTestCase {
     }
 
     /// 終了すると、次に設定するときはタイトルを積み直す。
-    func testRestoreForgetsTitleSoTheNextSetSavesAgain() throws {
+    func testRestoreForgetsTitleSoTheNextSetSavesAgain() async throws {
         let pty = try openPseudoTerminal()
         defer { pty.close() }
 

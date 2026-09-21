@@ -57,7 +57,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// 外から送られた SIGINT / SIGQUIT を終了シグナルとして受け取る。
-    func testInterruptAndQuitAreTreatedAsTermination() throws {
+    func testInterruptAndQuitAreTreatedAsTermination() async throws {
         SignalWatcher.install()
         let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
 
@@ -79,7 +79,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// 外から送られた SIGTSTP / SIGCONT を一時停止・再開として受け取る。
-    func testSuspendAndContinueAreReported() throws {
+    func testSuspendAndContinueAreReported() async throws {
         SignalWatcher.install()
         let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
 
@@ -102,7 +102,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// シグナルハンドラが、起こすためのパイプへ書き込む。
-    func testSignalWritesToWakeupDescriptor() throws {
+    func testSignalWritesToWakeupDescriptor() async throws {
         SignalWatcher.install()
         let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
 
@@ -119,7 +119,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// 起こすための記述子が読めるようになれば、入力がなくても待ちが終わる。
-    func testWaitReturnsWhenWakeupDescriptorBecomesReadable() throws {
+    func testWaitReturnsWhenWakeupDescriptorBecomesReadable() async throws {
         let input = try PipePair()
         defer { input.close() }
         let wakeup = try PipePair()
