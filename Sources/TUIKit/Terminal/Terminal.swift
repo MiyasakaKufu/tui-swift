@@ -17,6 +17,7 @@ public enum TerminalError: Error, Equatable {
 }
 
 /// 端末そのものを表し、raw モードや代替画面の切り替えと出力を担当する。
+@TUIActor
 public final class Terminal: TerminalOutput {
     /// 入力を読み取るファイル記述子。
     public let inputDescriptor: Int32

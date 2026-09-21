@@ -5,6 +5,7 @@ import Glibc
 #endif
 
 /// 端末を初期化し、入力・描画のループを回すアプリケーション。
+@TUIActor
 public final class Application<Root: Component> {
 
     private let root: Root
@@ -106,7 +107,7 @@ public final class Application<Root: Component> {
     ///   戻るときは端末を起動前の状態へ戻し、カーソルを表示に戻す。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
-    public func run() throws {
+    public func run() async throws {
         guard terminal.isTerminal else { throw TerminalError.notATerminal }
 
         try terminal.enableRawMode()

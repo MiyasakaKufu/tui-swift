@@ -17,6 +17,7 @@ import Glibc
 ///
 /// - Note: `main.swift` という名前のファイルでは `@main` を使えないため、
 ///   ファイル名は型名に合わせる（`Counter.swift` など）。
+@TUIActor
 public protocol TerminalApp: Component {
     /// 起動時に呼ばれる、引数のないイニシャライザ。
     init()
@@ -33,9 +34,9 @@ extension TerminalApp {
     ///
     /// - Note: 端末を初期化できなかった場合は、標準エラー出力へ理由を書き、
     ///   終了コード 1 で抜ける。
-    public static func main() {
+    public static func main() async {
         do {
-            try Application(root: Self(), options: options).run()
+            try await Application(root: Self(), options: options).run()
         } catch {
             fputs("起動できませんでした: \(error)\n", stderr)
             exit(1)
