@@ -10,6 +10,7 @@ import CTUITestSupport
 @testable import TUIKit
 
 /// 疑似端末（pty）の上で `Application` を実際に動かして確かめるテスト。
+@TUIActor
 final class ApplicationBugReproductionTests: XCTestCase {
 
     /// イベントを処理している最中に端末サイズが変わっても `.resize` が届く。

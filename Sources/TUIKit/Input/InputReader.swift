@@ -5,6 +5,7 @@ import Glibc
 #endif
 
 /// ファイル記述子からイベントを読み出す。
+@TUIActor
 public final class InputReader {
     private let descriptor: Int32
     private var parser = InputParser()
