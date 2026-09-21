@@ -53,6 +53,15 @@ public final class Application<Root: Component> {
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
+
+        // 古いほうを捨ててはいけない。すでに積んだと答えたイベントを、後から無かったことに
+        // するため。`bufferingOldest` は溢れたときに新しいほうを落とす。
+        let (stream, continuation) = AsyncStream<LoopEvent<Root.Message>>.makeStream(
+            bufferingPolicy: .bufferingOldest(options.messageQueueLimit)
+        )
+        self.stream = stream
+        self.continuation = continuation
+        self.sender = MessageSender(continuation: continuation)
     }
 
     /// ループを終了させる。イベントハンドラの中からも呼べる。
