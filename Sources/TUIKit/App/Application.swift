@@ -47,8 +47,8 @@ public final class Application<Root: Component> {
         options: ApplicationOptions = .default,
         terminal: Terminal? = nil
     ) {
-        // 既定値に `Terminal()` と書き直すとコンパイルが通らない。既定引数の式はこの
-        // 宣言の隔離を継承せず、非隔離の文脈からの呼び出しになる。
+        // 既定値に `Terminal()` と書き直すとコンパイルが通らない。
+        // 既定引数の式はこの宣言の隔離を継承せず、非隔離の文脈からの呼び出しになる。
         let terminal = terminal ?? Terminal()
         self.root = root
         self.options = options
@@ -56,8 +56,9 @@ public final class Application<Root: Component> {
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
 
-        // 古いほうを捨ててはいけない。すでに積んだと答えたイベントを、後から無かったことに
-        // するため。`bufferingOldest` は溢れたときに新しいほうを落とす。
+        // 古いほうを捨ててはいけない。
+        // すでに積んだと答えたイベントを、後から無かったことにするため。
+        // `bufferingOldest` は溢れたときに新しいほうを落とす。
         let (stream, continuation) = AsyncStream<LoopEvent<Root.Message>>.makeStream(
             bufferingPolicy: .bufferingOldest(options.messageQueueLimit)
         )
@@ -201,10 +202,10 @@ public final class Application<Root: Component> {
 
         isRunning = false
 
-        // 読み取りスレッドの終了を待たずに戻ってはいけない。残ったスレッドが自己パイプを
-        // 読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
-        // 列を閉じてから起こす順序も変えてはいけない。逆にすると閉じる前の列へ yield し、
-        // `poll(2)` へ戻って次の入力まで終わらない。
+        // 読み取りスレッドの終了を待たずに戻ってはいけない。
+        // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
+        // 列を閉じてから起こす順序も変えてはいけない。
+        // 逆にすると閉じる前の列へ yield し、`poll(2)` へ戻って次の入力まで終わらない。
         continuation.finish()
         SignalWatcher.wakeUp()
         for await _ in inputStopped {}
@@ -214,8 +215,8 @@ public final class Application<Root: Component> {
 
     /// 端末の入力を読む専用スレッドを起こし、読んだものを列へ流す。
     ///
-    /// - Note: `poll(2)` はアクタの上に置けない。アクタを止めると、外部から送られたイベントが
-    ///   実行の機会を得られないため。
+    /// - Note: `poll(2)` はアクタの上に置けない。
+    ///   アクタを止めると、外部から送られたイベントが実行の機会を得られないため。
     /// - Returns: スレッドが終わったときに終了する列。
     private func startReadingInput() -> AsyncStream<Void> {
         let (stopped, stoppedContinuation) = AsyncStream<Void>.makeStream()

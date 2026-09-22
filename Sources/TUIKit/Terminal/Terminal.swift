@@ -94,9 +94,9 @@ public final class Terminal: TerminalOutput {
     /// - Postcondition: 元の端末属性を覚えるため、`disableRawMode()` で戻せる。
     ///   すでに raw モードなら何もしない。
     /// - Note: クラッシュしても端末が戻るよう、シグナルハンドラを仕掛ける。
-    /// - Note: `restore()` を呼ばずにこの `Terminal` を捨てた場合、端末が戻るのは
-    ///   プロセスが終わるときになる。捨てた後も同じプロセスで端末を使うなら、
-    ///   `restore()` を呼ぶこと。
+    /// - Note: `restore()` を呼ばずにこの `Terminal` を捨てた場合、
+    ///   端末が戻るのはプロセスが終わるときになる。
+    ///   捨てた後も同じプロセスで端末を使うなら、`restore()` を呼ぶこと。
     public func enableRawMode() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
         guard !isRawModeActive else { return }

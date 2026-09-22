@@ -132,8 +132,8 @@ private func prepareRestoreSequence() {
 
 /// プロセスが終わるときに端末を戻すよう仕掛ける。
 private func installExitHandler() {
-    // この guard を外すと、arm() を呼ぶたびにハンドラが積まれ、終了時に同じ列が
-    // その回数だけ端末へ流れる。
+    // この guard を外すと、arm() を呼ぶたびにハンドラが積まれる。
+    // 終了時に同じ列が、その回数だけ端末へ流れる。
     guard !isExitHandlerInstalled else { return }
     isExitHandlerInstalled = true
     atexit { CrashRestorer.restoreTerminal() }

@@ -153,13 +153,14 @@ final class ApplicationMessageTests: XCTestCase {
         let sender = application.sender
         let loop = Task { try await application.run() }
 
-        // 最初の描画を待たずに送ると届かない。raw モードへの切り替えが、入力待ちの
-        // バイト列を捨てる。
+        // 最初の描画を待たずに送ると届かない。
+        // raw モードへの切り替えが、入力待ちのバイト列を捨てる。
         let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
 
-        // 順序を入れ替えてはいけない。キーを先に書くと、ループがそれを読んだのと送ったのと
-        // どちらが先か決まらず、確かめたい順序そのものが揺れる。
+        // 順序を入れ替えてはいけない。
+        // キーを先に書くと、ループがそれを読んだのと送ったのとどちらが先か決まらず、
+        // 確かめたい順序そのものが揺れる。
         sender.send(.first)
         writeByte(pty.master, UInt8(ascii: "a"))
         let gotBoth = await waitUntil(timeout: 5) { component.records.count >= 2 }
