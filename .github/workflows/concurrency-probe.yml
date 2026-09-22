@@ -54,16 +54,22 @@ jobs:
         run: bash .github/scripts/measure-h11.sh
 
       - name: H13 の計測
+        if: always()
+        continue-on-error: true
         env:
           SWIFT_BACKTRACE: enable=no
         run: bash .github/scripts/measure-h13.sh
 
       - name: H14 の計測
+        if: always()
+        continue-on-error: true
         env:
           SWIFT_BACKTRACE: enable=no
         run: bash .github/scripts/measure-h14.sh
 
       - name: H16 の計測
+        if: always()
+        continue-on-error: true
         env:
           SWIFT_BACKTRACE: enable=no
         run: bash .github/scripts/measure-h16.sh

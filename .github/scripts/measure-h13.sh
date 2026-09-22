@@ -34,19 +34,24 @@ awk '
 ' Package.swift > Package.swift.new
 mv Package.swift.new Package.swift
 
-swift run DeinitProbe > h13.log 2>&1
-report "検査なし" "$?" h13.log
+for mode in touch escape; do
+  swift run DeinitProbe "$mode" > "h13-$mode.log" 2>&1
+  report "検査なし / $mode" "$?" "h13-$mode.log"
+done
 
 rm -rf .build
-swift run --sanitize=address DeinitProbe > h13-asan.log 2>&1
-report "アドレスサニタイザあり" "$?" h13-asan.log
+for mode in touch escape; do
+  swift run --sanitize=address DeinitProbe "$mode" > "h13-asan-$mode.log" 2>&1
+  report "サニタイザあり / $mode" "$?" "h13-asan-$mode.log"
+done
 
 # 本物の Terminal で deinit { restore() } が生きている形は main 側。案 B のブランチでは
 # restore() が @TUIActor に隔離されているので deinit から呼べずコンパイルできない。
 git checkout HEAD -- Package.swift
 git fetch --no-tags origin main >/dev/null 2>&1
 git checkout origin/main -- Sources Package.swift
-if ! grep -q 'deinit { restore() }' Sources/TUIKit/Terminal/Terminal.swift; then
+# main の deinit は 3 行に分かれている。1 行で書かれている前提にしない。
+if ! grep -A 1 'deinit {' Sources/TUIKit/Terminal/Terminal.swift | grep -q 'restore()'; then
   echo "  main の deinit を取り出せなかった" >> summary.txt
   exit 1
 fi
