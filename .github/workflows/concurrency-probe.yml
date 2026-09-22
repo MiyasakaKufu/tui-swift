@@ -27,6 +27,10 @@ jobs:
           echo "## U14 / H10 の G8: strict concurrency" >> summary.txt
           echo "  error 行: $(grep -c 'error:' tidy.log || true)" >> summary.txt
           echo "  warning 行: $(grep -c 'warning:' tidy.log || true)" >> summary.txt
+          echo "  エラーの箇所:" >> summary.txt
+          grep -o "^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: error" tidy.log | sort -u | sed 's/^/    /' >> summary.txt
+          echo "  エラーの内訳:" >> summary.txt
+          grep -o "error: .*" tidy.log | sed 's/[0-9]\{1,\}/N/g' | sort -u | head -8 | sed 's/^/    /' >> summary.txt
           echo "  警告のファイル別（重複除去した箇所）:" >> summary.txt
           grep -o "^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: warning" tidy.log | sort -u \
             | cut -d: -f1 | sort | uniq -c | sort -rn | sed 's/^/    /' >> summary.txt
