@@ -2,6 +2,9 @@
 # H11 の計測。同じ計測用コードを 3 通りの構成でビルドし、診断の件数を比べる。
 set -u
 
+# コンテナの中では git の所有者検査に引っかかる。ここを通さないと取り出しができない。
+git config --global --add safe.directory "$PWD"
+
 count_probe_diagnostics() {
   local label="$1"
   swift build --target InstabilityProbe 2>&1 | sed 's#.*/tui-swift/##' > h11.log || true
