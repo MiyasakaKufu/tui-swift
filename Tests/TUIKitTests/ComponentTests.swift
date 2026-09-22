@@ -20,7 +20,7 @@ private final class MinimalApp: TerminalApp {
     }
 }
 
-@TUIActor
+@MainActor
 final class ComponentTests: XCTestCase {
 
     func testDefaultHandleIgnoresEvents() async {

@@ -2,7 +2,7 @@
 ///
 /// - Invariant: 内容もカーソル位置も書記素クラスタ（`Character`）単位で、
 ///   国旗や ZWJ で結合した絵文字も 1 文字として数える。
-@TUIActor
+@MainActor
 public final class TextFieldState {
     private var characters: [Character]
     /// カーソルの文字インデックス（0 〜 文字数）。

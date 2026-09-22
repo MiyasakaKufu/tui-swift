@@ -1,5 +1,5 @@
 /// スタックの主軸方向のサイズ配分。
-@TUIActor
+@MainActor
 enum StackLayout {
 
     /// 各子ビューに割り当てる主軸方向のサイズを求める。

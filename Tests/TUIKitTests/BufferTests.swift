@@ -1,7 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-@TUIActor
+@MainActor
 final class BufferTests: XCTestCase {
 
     func testWriteASCII() async {

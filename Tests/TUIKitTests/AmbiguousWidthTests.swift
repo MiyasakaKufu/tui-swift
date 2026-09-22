@@ -10,7 +10,7 @@ import XCTest
 /// 退避した曖昧幅の設定。
 private var savedAmbiguousWidth: DisplayWidth.AmbiguousWidth = .narrow
 
-@TUIActor
+@MainActor
 final class AmbiguousWidthTests: XCTestCase {
 
     // setUp / tearDown は非隔離の宣言を override するので、隔離を付けられない。

@@ -1,5 +1,5 @@
 /// レンダラの出力先。
-@TUIActor
+@MainActor
 public protocol TerminalOutput: AnyObject {
     /// 文字列を出力バッファへ追加する。
     ///

@@ -10,7 +10,7 @@ import CTUITestSupport
 @testable import TUIKit
 
 /// 外部から届いたイベントがイベントループへ渡るかを、疑似端末（pty）の上で確かめる。
-@TUIActor
+@MainActor
 final class ApplicationMessageTests: XCTestCase {
 
     private var captured = ""
@@ -343,7 +343,7 @@ private final class PseudoTerminal {
     /// slave 側を入出力に使う端末を作る。
     ///
     /// - Returns: slave 側につながった端末。
-    @TUIActor
+    @MainActor
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
     }
