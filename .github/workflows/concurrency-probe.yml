@@ -63,6 +63,11 @@ jobs:
           SWIFT_BACKTRACE: enable=no
         run: bash .github/scripts/measure-h14.sh
 
+      - name: H16 の計測
+        env:
+          SWIFT_BACKTRACE: enable=no
+        run: bash .github/scripts/measure-h16.sh
+
       - name: まとめ
         if: always()
         run: cat summary.txt
