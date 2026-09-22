@@ -97,6 +97,20 @@ count_probe_diagnostics "案 A（隔離なし・strict concurrency あり・型�
 
 # 5. 案 B（現ブランチ）+ 型の側に Sendable を宣言
 # 同じ逃げ道が案 B に効くかを見る。効かないなら、案 B の診断は型の宣言では消せない。
+# ブランチの Package.swift には計測用ターゲットが既にあるので、差し込まずにフラグだけ足す。
 git checkout HEAD -- Sources/TUIKit Package.swift
-inject_probe_target escape
+# フラグ行は 2 つある（TUIKit と計測用ターゲット）。計測用ターゲットの側だけを直す。
+awk '
+  /name: "InstabilityProbe"/ { seen = 1 }
+  seen && /-strict-concurrency=complete/ {
+    sub(/"-strict-concurrency=complete"\]/, "\"-strict-concurrency=complete\", \"-DPROBE_ESCAPE\"]")
+    seen = 0
+  }
+  { print }
+' Package.swift > Package.swift.new
+mv Package.swift.new Package.swift
+if [ "$(grep -c 'PROBE_ESCAPE' Package.swift)" -ne 1 ]; then
+  echo "  案 B 側にフラグを足せなかった" >> summary.txt
+  exit 1
+fi
 count_probe_diagnostics "案 B（隔離あり・型に @unchecked Sendable）"
