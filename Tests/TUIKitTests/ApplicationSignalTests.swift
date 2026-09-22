@@ -11,10 +11,10 @@ import Glibc
 #endif
 
 /// シグナルがイベントループへ届くかを、疑似端末（pty）の上で確かめる。
-@TUIActor
 final class ApplicationSignalTests: XCTestCase {
 
     /// イベント待ちに入る直前の SIGWINCH でも、入力なしで再描画される。
+    @TUIActor
     func testResizeJustBeforeWaitingTriggersRedraw() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -40,6 +40,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// イベント待ちに入る直前の SIGTERM でも、入力なしでループが終わる。
+    @TUIActor
     func testTerminationJustBeforeWaitingEndsLoop() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -57,7 +58,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// 外から送られた SIGINT / SIGQUIT を終了シグナルとして受け取る。
-    func testInterruptAndQuitAreTreatedAsTermination() async throws {
+    func testInterruptAndQuitAreTreatedAsTermination() throws {
         SignalWatcher.install()
         let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
 
@@ -79,7 +80,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// 外から送られた SIGTSTP / SIGCONT を一時停止・再開として受け取る。
-    func testSuspendAndContinueAreReported() async throws {
+    func testSuspendAndContinueAreReported() throws {
         SignalWatcher.install()
         let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
 
@@ -102,7 +103,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// シグナルハンドラが、起こすためのパイプへ書き込む。
-    func testSignalWritesToWakeupDescriptor() async throws {
+    func testSignalWritesToWakeupDescriptor() throws {
         SignalWatcher.install()
         let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
 
@@ -119,7 +120,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// 起こすための記述子が読めるようになれば、入力がなくても待ちが終わる。
-    func testWaitReturnsWhenWakeupDescriptorBecomesReadable() async throws {
+    func testWaitReturnsWhenWakeupDescriptorBecomesReadable() throws {
         let input = try PipePair()
         defer { input.close() }
         let wakeup = try PipePair()
@@ -140,6 +141,7 @@ final class ApplicationSignalTests: XCTestCase {
     ///   - root: ループに渡すコンポーネント。
     ///   - terminal: 入出力に使う端末。
     /// - Returns: ループの終了を待つための expectation と、`run()` が投げたエラーの入れ物。
+    @TUIActor
     private func runInBackground<Root: Component>(
         root: Root,
         terminal: Terminal
