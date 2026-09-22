@@ -94,3 +94,9 @@ count_probe_diagnostics "案 A（隔離なし・strict concurrency なし）"
 git checkout origin/main -- Package.swift
 inject_probe_target escape
 count_probe_diagnostics "案 A（隔離なし・strict concurrency あり・型に @unchecked Sendable）"
+
+# 5. 案 B（現ブランチ）+ 型の側に Sendable を宣言
+# 同じ逃げ道が案 B に効くかを見る。効かないなら、案 B の診断は型の宣言では消せない。
+git checkout HEAD -- Sources/TUIKit Package.swift
+inject_probe_target escape
+count_probe_diagnostics "案 B（隔離あり・型に @unchecked Sendable）"
