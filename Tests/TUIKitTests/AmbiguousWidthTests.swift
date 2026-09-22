@@ -13,8 +13,8 @@ private var savedAmbiguousWidth: DisplayWidth.AmbiguousWidth = .narrow
 @MainActor
 final class AmbiguousWidthTests: XCTestCase {
 
-    // setUp / tearDown は非隔離の宣言を override するので、隔離を付けられない。
-    // 退避先をクラスの外へ出す。`DisplayWidth.ambiguousWidth` 自体は隔離されていない。
+    // 退避先をクラスの中へ戻すと、setUp / tearDown から触れなくなる。どちらも非隔離の
+    // 宣言を override するので隔離を付けられず、隔離された記憶域を読み書きできない。
     override func setUp() {
         super.setUp()
         savedAmbiguousWidth = DisplayWidth.ambiguousWidth

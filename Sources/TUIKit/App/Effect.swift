@@ -37,7 +37,7 @@ public struct Effect<Message: Sendable>: Sendable {
     /// - Parameters:
     ///   - work: 走らせる処理。渡された関数を呼ぶたびに値が `Component.receive(_:)` へ渡る。
     /// - Returns: 組み立てた作業。
-    /// - Note: 打ち切りは `Task.isCancelled` と、`Task.sleep(nanoseconds:)` が投げるエラーで伝わる。
+    /// - Note: 打ち切りは `Task.isCancelled` と、`Task.sleep` が投げるエラーで伝わる。
     ///   どちらも見ない処理は、ループが終わってもプロセスが終わるまで走り続ける。
     public static func stream(
         _ work: @escaping @Sendable (@escaping @Sendable (Message) -> Void) async -> Void

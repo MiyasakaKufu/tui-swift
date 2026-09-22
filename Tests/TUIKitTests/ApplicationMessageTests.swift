@@ -153,7 +153,8 @@ final class ApplicationMessageTests: XCTestCase {
         let sender = application.sender
         let loop = Task { try await application.run() }
 
-        // raw モードへの切り替えは入力待ちのバイト列を捨てるため、最初の描画を待ってから送る。
+        // 最初の描画を待たずに送ると届かない。raw モードへの切り替えが、入力待ちの
+        // バイト列を捨てる。
         let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
 
@@ -220,11 +221,11 @@ final class ApplicationMessageTests: XCTestCase {
     ///   - timeout: 待つ秒数の上限。
     ///   - condition: 満たされたかを返す処理。
     /// - Returns: 時間内に満たされれば `true`。
-    /// - Note: `Thread.sleep` で待ってはいけない。アクタを止めるとイベントループが進まない。
     private func waitUntil(timeout: Double, condition: () -> Bool) async -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while !condition() {
             if Date() > deadline { return false }
+            // `Thread.sleep` で待つと、アクタが止まってイベントループが進まない。
             try? await Task.sleep(nanoseconds: 5_000_000)
         }
         return true

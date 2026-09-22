@@ -224,8 +224,7 @@ public final class Application<Root: Component> {
         let timeout = options.frameInterval
         let continuation = self.continuation
 
-        // 読み取り器をこのスレッドの中で作る。外で作って渡すと、非 Sendable の参照が
-        // スレッドを跨ぐ。
+        // 読み取り器を外で作って渡すと、非 Sendable の参照がスレッドを跨ぐ。
         Thread.detachNewThread {
             let reader = InputReader(descriptor: descriptor)
             reader.wakeupDescriptor = wakeupDescriptor
