@@ -1,7 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-@MainActor
+@TUIActor
 final class TextWrappingTests: XCTestCase {
 
     func testNewlinesAlwaysSplit() async {

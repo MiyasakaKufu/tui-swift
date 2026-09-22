@@ -9,7 +9,7 @@ import Glibc
 #endif
 
 /// 制御コードが途中で分かれて届いたときの `InputReader` の振る舞いを確かめる。
-@MainActor
+@TUIActor
 final class InputReaderTests: XCTestCase {
 
     /// 途中までの制御コードは確定させず、続きが届いてから 1 つのイベントにする。

@@ -14,7 +14,7 @@ import Glibc
 final class ApplicationSignalTests: XCTestCase {
 
     /// イベント待ちに入る直前の SIGWINCH でも、入力なしで再描画される。
-    @MainActor
+    @TUIActor
     func testResizeJustBeforeWaitingTriggersRedraw() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -40,7 +40,7 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// イベント待ちに入る直前の SIGTERM でも、入力なしでループが終わる。
-    @MainActor
+    @TUIActor
     func testTerminationJustBeforeWaitingEndsLoop() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -141,7 +141,7 @@ final class ApplicationSignalTests: XCTestCase {
     ///   - root: ループに渡すコンポーネント。
     ///   - terminal: 入出力に使う端末。
     /// - Returns: ループの終了を待つための expectation と、`run()` が投げたエラーの入れ物。
-    @MainActor
+    @TUIActor
     private func runInBackground<Root: Component>(
         root: Root,
         terminal: Terminal
@@ -251,7 +251,7 @@ private final class PseudoTerminal {
     }
 
     /// スレーブ側を入出力に使う端末を作る。
-    @MainActor
+    @TUIActor
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
     }

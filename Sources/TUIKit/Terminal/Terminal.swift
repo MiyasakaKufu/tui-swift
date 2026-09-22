@@ -17,7 +17,7 @@ public enum TerminalError: Error, Equatable {
 }
 
 /// 端末そのものを表し、raw モードや代替画面の切り替えと出力を担当する。
-@MainActor
+@TUIActor
 public final class Terminal: TerminalOutput {
     /// 入力を読み取るファイル記述子。
     public let inputDescriptor: Int32
@@ -48,9 +48,9 @@ public final class Terminal: TerminalOutput {
         self.outputDescriptor = output
     }
 
-    deinit {
-        restore()
-    }
+    // deinit はアクタに隔離できないため、隔離した restore() を呼べない。案 B を採るなら
+    // 設計で解く必要がある箇所。ここでは計測のために空にする。
+    deinit {}
 
     /// 入出力の両方が端末に接続されているか。
     public var isTerminal: Bool {

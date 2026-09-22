@@ -1,5 +1,5 @@
 /// 選択位置とスクロール位置を保持するリストの状態。
-@MainActor
+@TUIActor
 public final class ListState {
     /// 選択している項目の位置。
     public private(set) var selectedIndex: Int = 0

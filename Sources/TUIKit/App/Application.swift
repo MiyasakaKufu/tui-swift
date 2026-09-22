@@ -7,7 +7,7 @@ import Glibc
 #endif
 
 /// 端末を初期化し、入力・描画のループを回すアプリケーション。
-@MainActor
+@TUIActor
 public final class Application<Root: Component> {
 
     private let root: Root
@@ -45,11 +45,10 @@ public final class Application<Root: Component> {
     public init(
         root: Root,
         options: ApplicationOptions = .default,
-        terminal: Terminal? = nil
+        terminal: Terminal = Terminal()
     ) {
         self.root = root
         self.options = options
-        let terminal = terminal ?? Terminal()
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)

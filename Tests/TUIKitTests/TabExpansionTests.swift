@@ -1,7 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-@MainActor
+@TUIActor
 final class TabExpansionTests: XCTestCase {
 
     func testTabExpandsToNextTabStop() async {
