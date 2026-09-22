@@ -18,6 +18,8 @@ jobs:
 
       - name: 測る
         run: |
+          # 既定の shell は sh -e なので、失敗した時点で残りの計測ごと止まる。
+          set +e
           git config --global --add safe.directory "$PWD"
           git config --global user.email probe@example.com
           git config --global user.name probe
