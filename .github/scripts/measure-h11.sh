@@ -36,6 +36,8 @@ inject_probe_target() {
 count_probe_diagnostics() {
   local label="$1"
   local status
+  # 構成を変えたのにキャッシュで素通りすると、0 件が「診断なし」に見える。
+  rm -rf .build
   swift build --target InstabilityProbe > h11.raw 2>&1
   status=$?
   sed 's#.*/tui-swift/##' h11.raw > h11.log
@@ -49,8 +51,9 @@ count_probe_diagnostics() {
   echo "  swift build の終了値: $status（計測用コード以外の error 行: $other）" >> summary.txt
   echo "  Probe.swift をコンパイルしたか: $(grep -c 'Compiling InstabilityProbe' h11.log)" >> summary.txt
   echo "  error: $errors / warning: $warnings" >> summary.txt
-  grep -o "^Sources/InstabilityProbe/Probe.swift:[0-9]*:[0-9]*: \(error\|warning\)" h11.log \
-    | sort -u | sed 's/^/    /' >> summary.txt
+  # 件数だけでは案 A と案 B を判別できない。何を指摘しているかを出す。
+  grep "^Sources/InstabilityProbe/Probe.swift:[0-9]*:[0-9]*: \(error\|warning\):" h11.log \
+    | sort -u | cut -c1-200 | sed 's/^/    /' >> summary.txt
   if [ "$other" -ne 0 ]; then
     echo "  計測用コード以外のエラー:" >> summary.txt
     grep "error:" h11.log | grep -v "^Sources/InstabilityProbe/" | sort -u | head -5 | sed 's/^/    /' >> summary.txt
