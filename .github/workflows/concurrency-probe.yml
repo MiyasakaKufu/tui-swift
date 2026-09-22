@@ -13,49 +13,36 @@ jobs:
 
       - name: POSIX の一覧を確かめる
         run: |
-          {
-            echo "## U7 / H2: 非同期シグナル安全な関数の一覧"
-            if curl -sS -L "https://pubs.opengroup.org/onlinepubs/9799919799/functions/V2_chap02.html" -o posix.html; then
-              python3 -c "
-import re, html, pathlib
-body = html.unescape(re.sub(r'<[^>]+>', ' ', pathlib.Path('posix.html').read_text(errors='replace')))
-for name in ['pthread_mutex_lock', 'pthread_mutex_unlock', 'pthread_mutex_trylock', 'pthread_mutex']:
-    print(f'  {name}: {name in body}')
-for name in ['write(', 'sigaction(', '_Exit(']:
-    print(f'  対照 {name}: {name in body}')
-"
-            else
-              echo "  取得できない"
-            fi
-          } > summary.txt 2>&1
+          echo "## U7 / H2: 非同期シグナル安全な関数の一覧" > summary.txt
+          if curl -sS -L "https://pubs.opengroup.org/onlinepubs/9799919799/functions/V2_chap02.html" -o posix.html; then
+            python3 .github/scripts/check-posix-list.py >> summary.txt 2>&1
+          else
+            echo "  取得できない" >> summary.txt
+          fi
 
       - name: Build
         run: |
           swift build --build-tests 2>&1 | tee build.log || true
           sed 's#.*/tui-swift/##' build.log > tidy.log
-          {
-            echo "## U14 / H10 の G8: strict concurrency"
-            echo "  error 行: $(grep -c 'error:' tidy.log || true)"
-            echo "  warning 行: $(grep -c 'warning:' tidy.log || true)"
-            echo "  警告のファイル別（重複除去した箇所）:"
-            grep -o "^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: warning" tidy.log | sort -u \
-              | cut -d: -f1 | sort | uniq -c | sort -rn | sed 's/^/    /'
-            echo "  警告の内訳（上位）:"
-            grep -o "warning: .*" tidy.log | sed 's/[0-9]\{1,\}/N/g' | sort | uniq -c | sort -rn \
-              | head -8 | sed 's/^/    /'
-          } >> summary.txt 2>&1
+          echo "## U14 / H10 の G8: strict concurrency" >> summary.txt
+          echo "  error 行: $(grep -c 'error:' tidy.log || true)" >> summary.txt
+          echo "  warning 行: $(grep -c 'warning:' tidy.log || true)" >> summary.txt
+          echo "  警告のファイル別（重複除去した箇所）:" >> summary.txt
+          grep -o "^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: warning" tidy.log | sort -u \
+            | cut -d: -f1 | sort | uniq -c | sort -rn | sed 's/^/    /' >> summary.txt
+          echo "  警告の内訳（上位）:" >> summary.txt
+          grep -o "warning: .*" tidy.log | sed 's/[0-9]\{1,\}/N/g' | sort | uniq -c | sort -rn \
+            | head -8 | sed 's/^/    /' >> summary.txt
 
       - name: Test
         env:
           SWIFT_BACKTRACE: enable=no
         run: |
           swift test 2>&1 | tee test.log || true
-          {
-            echo "## テスト"
-            grep -E "^Executed [0-9]+ tests" test.log | tail -1 | sed 's/^/  /'
-            echo "  落ちたテスト:"
-            grep -o "Test Case '[^']*' failed" test.log | sort -u | sed 's/^/    /'
-          } >> summary.txt 2>&1
+          echo "## テスト" >> summary.txt
+          grep -E "^Executed [0-9]+ tests" test.log | tail -1 | sed 's/^/  /' >> summary.txt
+          echo "  落ちたテスト:" >> summary.txt
+          grep -o "Test Case '[^']*' failed" test.log | sort -u | sed 's/^/    /' >> summary.txt
 
       - name: まとめ
         if: always()
