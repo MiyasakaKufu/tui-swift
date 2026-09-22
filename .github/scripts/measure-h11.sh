@@ -8,9 +8,12 @@ git config --global --add safe.directory "$PWD"
 # 計測用ターゲットを Package.swift へ差し込む。swift:6.0 のコンテナには python3 が無い。
 inject_probe_target() {
   local mode="$1" settings=""
-  if [ "$mode" != "none" ]; then
+  if [ "$mode" = "complete" ]; then
     settings=',
             swiftSettings: [.unsafeFlags(["-strict-concurrency=complete"])]'
+  elif [ "$mode" = "escape" ]; then
+    settings=',
+            swiftSettings: [.unsafeFlags(["-strict-concurrency=complete", "-DPROBE_ESCAPE"])]'
   fi
   local anchor='        .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),'
   if [ "$(grep -c -F "$anchor" Package.swift)" -ne 1 ]; then
@@ -85,3 +88,9 @@ count_probe_diagnostics "案 A（隔離なし・strict concurrency あり）"
 git checkout origin/main -- Package.swift
 inject_probe_target none
 count_probe_diagnostics "案 A（隔離なし・strict concurrency なし）"
+
+# 4. 案 A（main の形）+ strict concurrency + 型の側に Sendable を宣言
+# H12。案 A で出る診断が、危険な参照をそのまま残して消せるかを見る。
+git checkout origin/main -- Package.swift
+inject_probe_target escape
+count_probe_diagnostics "案 A（隔離なし・strict concurrency あり・型に @unchecked Sendable）"

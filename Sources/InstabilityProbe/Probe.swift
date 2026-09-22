@@ -65,3 +65,13 @@ public func probeRendersFromThread(_ view: Text) {
 public func probeReadsBodyFromTask(_ component: ProbeMutatesOwnStateFromTask) {
     Task { _ = component.body }
 }
+
+// H12 の計測。案 A で出る診断が、危険な参照を残したまま消せるかを見る。
+// `PROBE_ESCAPE` を立てると、上のコードに一切手を入れず、型の側に Sendable を宣言する。
+#if PROBE_ESCAPE
+extension ProbeMutatesOwnStateFromTask: @unchecked Sendable {}
+extension ListState: @unchecked Sendable {}
+extension TextFieldState: @unchecked Sendable {}
+extension Terminal: @unchecked Sendable {}
+extension Text: @unchecked Sendable {}
+#endif
