@@ -5,6 +5,16 @@ set -u
 git config --global --add safe.directory "$PWD"
 git checkout HEAD -- Sources Tests Package.swift
 
+# H11 の計測用ターゲットはわざと診断が出るコードなので、ここでは外す。外さないと
+# その 6 件を「@MainActor に替えたせいのエラー」と読み違える。
+awk -f .github/scripts/strip-probe-target.awk Package.swift > Package.swift.new
+mv Package.swift.new Package.swift
+rm -rf Sources/InstabilityProbe
+if [ "$(grep -c InstabilityProbe Package.swift)" -ne 0 ]; then
+  echo "  計測用ターゲットを外せなかった" >> summary.txt
+  exit 1
+fi
+
 echo "## H16: 隔離先を @MainActor にする" >> summary.txt
 
 echo "  替える前の @TUIActor の箇所: $(grep -rn '@TUIActor' Sources Tests | wc -l)" >> summary.txt

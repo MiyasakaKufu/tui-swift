@@ -41,16 +41,18 @@ rm -rf .build
 swift run --sanitize=address DeinitProbe > h13-asan.log 2>&1
 report "アドレスサニタイザあり" "$?" h13-asan.log
 
-# 本物の Terminal で、元の deinit { restore() } を戻してテスト一式を走らせる。
+# 本物の Terminal で deinit { restore() } が生きている形は main 側。案 B のブランチでは
+# restore() が @TUIActor に隔離されているので deinit から呼べずコンパイルできない。
 git checkout HEAD -- Package.swift
-perl -0pi -e 's/    \/\/ deinit はアクタに隔離できないため.*?\n    \/\/ 設計で解く必要がある箇所。ここでは計測のために空にする。\n    deinit \{\}/    deinit { restore() }/s' Sources/TUIKit/Terminal/Terminal.swift
+git fetch --no-tags origin main >/dev/null 2>&1
+git checkout origin/main -- Sources Package.swift
 if ! grep -q 'deinit { restore() }' Sources/TUIKit/Terminal/Terminal.swift; then
-  echo "  deinit を戻せなかった" >> summary.txt
+  echo "  main の deinit を取り出せなかった" >> summary.txt
   exit 1
 fi
 rm -rf .build
 swift test --sanitize=address > h13-test.log 2>&1
-report "Terminal の deinit を戻してテスト一式（サニタイザあり）" "$?" h13-test.log
+report "main の形（deinit { restore() }）でテスト一式（サニタイザあり）" "$?" h13-test.log
 echo "  走ったテスト: $(grep -oE '^Executed [0-9]+ tests' h13-test.log | tail -1)" >> summary.txt
 echo "  落ちたテスト:" >> summary.txt
 grep -o "Test Case '[^']*' failed" h13-test.log | sort -u | head -10 | sed 's/^/    /' >> summary.txt
