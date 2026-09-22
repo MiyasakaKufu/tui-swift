@@ -48,6 +48,9 @@ jobs:
           echo "  落ちたテスト:" >> summary.txt
           grep -o "Test Case '[^']*' failed" test.log | sort -u | sed 's/^/    /' >> summary.txt
 
+      - name: H11 の計測
+        run: bash .github/scripts/measure-h11.sh
+
       - name: まとめ
         if: always()
         run: cat summary.txt
