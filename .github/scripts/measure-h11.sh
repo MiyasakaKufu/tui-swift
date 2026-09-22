@@ -20,11 +20,14 @@ echo "## H11: 別の実行文脈から UI の状態に触るコードの診断" 
 count_probe_diagnostics "案 B（隔離あり・strict concurrency あり）"
 
 # 2. 案 A（main の形）+ strict concurrency
-git checkout origin/main -- Sources/TUIKit Package.swift
+# 取り出しに失敗したまま進めてはいけない。3 つの構成が同じ数字になり、比較にならない。
+git fetch --no-tags origin main
+git checkout FETCH_HEAD -- Sources/TUIKit Package.swift || { echo "main を取り出せない" >> summary.txt; exit 1; }
+grep -q 'TUIActor' Sources/TUIKit/App/Component.swift && { echo "main の形になっていない" >> summary.txt; exit 1; }
 python3 .github/scripts/inject-probe-target.py complete
 count_probe_diagnostics "案 A（隔離なし・strict concurrency あり）"
 
 # 3. 案 A（main の形）、検査なし
-git checkout origin/main -- Package.swift
+git checkout FETCH_HEAD -- Package.swift
 python3 .github/scripts/inject-probe-target.py none
 count_probe_diagnostics "案 A（隔離なし・strict concurrency なし）"

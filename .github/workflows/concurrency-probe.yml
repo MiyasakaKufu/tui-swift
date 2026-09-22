@@ -10,6 +10,8 @@ jobs:
     container: swift:6.0
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: POSIX の一覧を確かめる
         run: |
