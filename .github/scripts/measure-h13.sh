@@ -61,6 +61,12 @@ fi
 rm -rf .build
 swift test --sanitize=address > h13-test.log 2>&1
 report "main の形（deinit { restore() }）でテスト一式（サニタイザあり）" "$?" h13-test.log
-echo "  走ったテスト: $(grep -oE '^Executed [0-9]+ tests' h13-test.log | tail -1)" >> summary.txt
+echo "  走ったテスト: $(grep -oE '[0-9]+ tests? passed|^Executed [0-9]+ tests' h13-test.log | tail -1)" >> summary.txt
 echo "  落ちたテスト:" >> summary.txt
 grep -o "Test Case '[^']*' failed" h13-test.log | sort -u | head -10 | sed 's/^/    /' >> summary.txt
+# 終了値が 1 でも落ちたテストが 0 件のことがある。理由を出す。
+echo "  失敗・中断の行:" >> summary.txt
+grep -iE 'failed|fatal|signal|abort|Segmentation|LeakSanitizer|SUMMARY' h13-test.log \
+  | grep -v 'ld.gold' | sort -u | cut -c1-160 | head -8 | sed 's/^/    /' >> summary.txt
+echo "  ログの末尾:" >> summary.txt
+tail -6 h13-test.log | cut -c1-160 | sed 's/^/    /' >> summary.txt

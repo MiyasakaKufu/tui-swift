@@ -19,6 +19,24 @@ echo "## H16: 隔離先を @MainActor にする" >> summary.txt
 
 echo "  替える前の @TUIActor の箇所: $(grep -rn '@TUIActor' Sources Tests | wc -l)" >> summary.txt
 
+# U22。警告の増減を見るには替える前の内訳が要る。同じ条件（計測用ターゲットを外した状態）で取る。
+warning_breakdown() {
+  local label="$1" log="$2"
+  echo "  [$label の警告]" >> summary.txt
+  echo "    warning 行: $(grep -c 'warning:' "$log" || true)" >> summary.txt
+  echo "    ファイル別（重複除去した箇所）:" >> summary.txt
+  grep -o '^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: warning' "$log" | sort -u \
+    | cut -d: -f1 | sort | uniq -c | sort -rn | head -8 | sed 's/^/      /' >> summary.txt
+  echo "    内訳（上位）:" >> summary.txt
+  grep -o 'warning: .*' "$log" | sed 's/[0-9]\{1,\}/N/g' | sort | uniq -c | sort -rn \
+    | head -8 | cut -c1-170 | sed 's/^/      /' >> summary.txt
+}
+
+rm -rf .build
+swift build --build-tests > h16-before.log 2>&1
+sed 's#.*/tui-swift/##' h16-before.log > h16-before-tidy.log
+warning_breakdown "替える前（@TUIActor）" h16-before-tidy.log
+
 # 専用アクタを捨てて @MainActor に替える。
 rm Sources/TUIKit/App/TUIActor.swift
 grep -rl '@TUIActor' Sources Tests | while read -r file; do
@@ -37,7 +55,7 @@ echo "  ビルドの終了値: $?" >> summary.txt
 sed 's#.*/tui-swift/##' h16-build.log > h16-tidy.log
 echo "  error 行: $(grep -c 'error:' h16-tidy.log || true)" >> summary.txt
 grep -o '^\(Sources\|Tests\)/[^:]*:[0-9]*:[0-9]*: error: .*' h16-tidy.log | sort -u | cut -c1-180 | head -10 | sed 's/^/    /' >> summary.txt
-echo "  warning 行: $(grep -c 'warning:' h16-tidy.log || true)" >> summary.txt
+warning_breakdown "替えた後（@MainActor）" h16-tidy.log
 
 swift test > h16-test.log 2>&1
 echo "  テストの終了値: $?" >> summary.txt
