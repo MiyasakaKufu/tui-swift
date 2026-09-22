@@ -5,6 +5,34 @@ set -u
 # コンテナの中では git の所有者検査に引っかかる。ここを通さないと取り出しができない。
 git config --global --add safe.directory "$PWD"
 
+# 計測用ターゲットを Package.swift へ差し込む。swift:6.0 のコンテナには python3 が無い。
+inject_probe_target() {
+  local mode="$1" settings=""
+  if [ "$mode" != "none" ]; then
+    settings=',
+            swiftSettings: [.unsafeFlags(["-strict-concurrency=complete"])]'
+  fi
+  local anchor='        .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),'
+  if [ "$(grep -c -F "$anchor" Package.swift)" -ne 1 ]; then
+    echo "  Package.swift に差し込み口が無い" >> summary.txt
+    exit 1
+  fi
+  awk -v settings="$settings" '
+    { print }
+    /^        \.executableTarget\(name: "TUIDemo", dependencies: \["TUIKit"\]\),$/ {
+      print "        .target("
+      print "            name: \"InstabilityProbe\","
+      printf "            dependencies: [\"TUIKit\"]%s\n", settings
+      print "        ),"
+    }
+  ' Package.swift > Package.swift.new
+  mv Package.swift.new Package.swift
+  if [ "$(grep -c 'name: "InstabilityProbe"' Package.swift)" -ne 1 ]; then
+    echo "  差し込みに失敗した" >> summary.txt
+    exit 1
+  fi
+}
+
 count_probe_diagnostics() {
   local label="$1"
   local status
@@ -47,10 +75,10 @@ if grep -q 'TUIActor' Sources/TUIKit/App/Component.swift; then
   echo "main の形になっていない" >> summary.txt
   exit 1
 fi
-python3 .github/scripts/inject-probe-target.py complete
+inject_probe_target complete
 count_probe_diagnostics "案 A（隔離なし・strict concurrency あり）"
 
 # 3. 案 A（main の形）、検査なし
 git checkout origin/main -- Package.swift
-python3 .github/scripts/inject-probe-target.py none
+inject_probe_target none
 count_probe_diagnostics "案 A（隔離なし・strict concurrency なし）"
