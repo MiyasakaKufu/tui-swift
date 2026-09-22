@@ -9,7 +9,7 @@ git checkout HEAD -- Sources Tests Package.swift
 # その 6 件を「@MainActor に替えたせいのエラー」と読み違える。
 awk -f .github/scripts/strip-probe-target.awk Package.swift > Package.swift.new
 mv Package.swift.new Package.swift
-rm -rf Sources/InstabilityProbe
+rm -rf Sources/InstabilityProbe Sources/DeinitProbe Sources/DeinitNecessityProbe
 if [ "$(grep -c InstabilityProbe Package.swift)" -ne 0 ]; then
   echo "  計測用ターゲットを外せなかった" >> summary.txt
   exit 1

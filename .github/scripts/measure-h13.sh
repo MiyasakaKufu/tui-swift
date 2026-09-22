@@ -49,7 +49,7 @@ done
 # restore() が @TUIActor に隔離されているので deinit から呼べずコンパイルできない。
 git checkout HEAD -- Package.swift
 git fetch --no-tags origin main >/dev/null 2>&1
-git checkout origin/main -- Sources Package.swift
+git checkout origin/main -- Sources Tests Package.swift
 # main の deinit は 3 行に分かれている。1 行で書かれている前提にしない。
 if ! grep -A 1 'deinit {' Sources/TUIKit/Terminal/Terminal.swift | grep -q 'restore()'; then
   echo "  main の deinit を取り出せなかった" >> summary.txt
