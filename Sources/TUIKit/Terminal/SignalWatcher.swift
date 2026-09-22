@@ -16,18 +16,22 @@ private func wakeUpEventLoop() {
 
 private func handleWindowResizeSignal(_ signalNumber: Int32) {
     ctui_signal_set_window_resize()
+    wakeUpEventLoop()
 }
 
 private func handleTerminationSignal(_ signalNumber: Int32) {
     ctui_signal_set_termination()
+    wakeUpEventLoop()
 }
 
 private func handleSuspendSignal(_ signalNumber: Int32) {
     ctui_signal_set_suspend()
+    wakeUpEventLoop()
 }
 
 private func handleContinueSignal(_ signalNumber: Int32) {
     ctui_signal_set_continue()
+    wakeUpEventLoop()
 }
 
 /// ウィンドウサイズ変更・終了・一時停止のシグナルの監視。
