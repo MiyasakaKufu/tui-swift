@@ -53,6 +53,11 @@ jobs:
       - name: H11 の計測
         run: bash .github/scripts/measure-h11.sh
 
+      - name: H13 の計測
+        env:
+          SWIFT_BACKTRACE: enable=no
+        run: bash .github/scripts/measure-h13.sh
+
       - name: まとめ
         if: always()
         run: cat summary.txt
