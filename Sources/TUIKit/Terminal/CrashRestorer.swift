@@ -30,31 +30,48 @@ enum CrashRestorer {
         + ANSI.reset
         + ANSI.showCursor
 
+    /// 仕掛けた一組を指す引換券。
+    ///
+    /// 仕掛けた側と外す側を結び付けるための印。
+    struct Ticket {
+        /// 仕掛けた順に振る通し番号。
+        fileprivate let serial: UInt64
+    }
+
     /// クラッシュしたときに端末を戻すハンドラを仕掛ける。
     ///
     /// - Parameters:
     ///   - input: 端末属性を戻すファイル記述子。
     ///   - output: 制御コードを書き出すファイル記述子。
     ///   - originalAttributes: 戻す先の端末属性。
-    /// - Note: 仕掛けられるのは一組だけ。二度目からは上書きされる。
-    static func arm(input: Int32, output: Int32, originalAttributes: termios) {
+    /// - Returns: この一組を指す引換券。`disarm(_:)` に渡すと外せる。
+    /// - Note: 仕掛けられるのは一組だけ。二度目からは上書きされ、前の引換券では外せなくなる。
+    static func arm(input: Int32, output: Int32, originalAttributes: termios) -> Ticket {
         #if canImport(Darwin) || canImport(Glibc)
         prepareRestoreSequence()
         restoreInputDescriptor = input
         restoreOutputDescriptor = output
         restoreAttributes = originalAttributes
         installHandlers()
+        armedSerial = nextSerial
+        nextSerial += 1
         isArmed = 1
+        return Ticket(serial: armedSerial)
+        #else
+        return Ticket(serial: 0)
         #endif
     }
 
     /// 仕掛けたハンドラを外し、前の設定へ戻す。
     ///
-    /// - Note: 二重に呼んでも安全。
-    static func disarm() {
+    /// - Parameters:
+    ///   - ticket: `arm(input:output:originalAttributes:)` で受け取った引換券。
+    /// - Note: 今仕掛けてあるものと違う引換券を渡しても何も起きない。二重に呼んでも安全。
+    static func disarm(_ ticket: Ticket) {
         #if canImport(Darwin) || canImport(Glibc)
-        guard isArmed != 0 else { return }
+        guard isArmed != 0, ticket.serial == armedSerial else { return }
         isArmed = 0
+        armedSerial = 0
         restoreInputDescriptor = -1
         restoreOutputDescriptor = -1
         removeHandlers()
@@ -88,6 +105,14 @@ private let crashSignalNumbers: [Int32] = [SIGILL, SIGTRAP, SIGABRT, SIGBUS, SIG
 
 /// ハンドラを仕掛けてあるか。シグナルハンドラから触れるのはこの種のフラグだけ。
 private var isArmed: sig_atomic_t = 0
+
+/// 次に配る引換券の通し番号。
+///
+/// - Invariant: 一度配った番号は配り直さない。外した後の引換券が別の一組を指すことはない。
+private var nextSerial: UInt64 = 1
+
+/// 今仕掛けてある一組の通し番号。何も仕掛けていなければ 0。
+private var armedSerial: UInt64 = 0
 
 private var restoreInputDescriptor: Int32 = -1
 private var restoreOutputDescriptor: Int32 = -1

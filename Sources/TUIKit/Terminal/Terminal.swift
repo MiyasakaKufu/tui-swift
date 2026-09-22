@@ -27,6 +27,8 @@ public final class Terminal: TerminalOutput {
     private var originalAttributes: termios?
     /// raw モードが今この端末に効いているか。
     private var isRawModeActive = false
+    /// クラッシュ時の復元を仕掛けたときに受け取った引換券。仕掛けていなければ `nil`。
+    private var crashRestoreTicket: CrashRestorer.Ticket?
     private var pendingOutput: [UInt8] = []
 
     private var isInAlternateScreen = false
@@ -135,7 +137,7 @@ public final class Terminal: TerminalOutput {
 
         originalAttributes = original
         isRawModeActive = true
-        CrashRestorer.arm(
+        crashRestoreTicket = CrashRestorer.arm(
             input: inputDescriptor,
             output: outputDescriptor,
             originalAttributes: original
@@ -146,7 +148,10 @@ public final class Terminal: TerminalOutput {
     public func disableRawMode() {
         applyOriginalAttributes()
         originalAttributes = nil
-        CrashRestorer.disarm()
+        if let ticket = crashRestoreTicket {
+            CrashRestorer.disarm(ticket)
+            crashRestoreTicket = nil
+        }
     }
 
     /// 覚えている端末属性を書き戻す。
