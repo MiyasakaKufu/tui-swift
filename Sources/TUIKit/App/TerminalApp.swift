@@ -1,3 +1,5 @@
+import CTUIShim
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -38,7 +40,7 @@ extension TerminalApp {
         do {
             try await Application<Self>.start()
         } catch {
-            fputs("起動できませんでした: \(error)\n", stderr)
+            ctui_write_standard_error("起動できませんでした: \(error)\n")
             exit(1)
         }
     }

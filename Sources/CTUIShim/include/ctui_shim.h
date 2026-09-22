@@ -88,3 +88,9 @@ int ctui_signal_wakeup_read_descriptor(void);
 /// - Note: シグナルハンドラから呼べる。`write(2)` は非同期シグナル安全な関数の一覧にあるが
 ///   `errno` を書き換えるため、退避して戻す。
 void ctui_signal_wake_up(void);
+
+/// 標準エラー出力へ書き出す。
+///
+/// - Parameters:
+///   - message: 書き出す文字列。ヌル終端。
+void ctui_write_standard_error(const char *message);

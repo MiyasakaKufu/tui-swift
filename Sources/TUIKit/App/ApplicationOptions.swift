@@ -1,5 +1,5 @@
 /// `Application` の起動時の設定。
-public struct ApplicationOptions {
+public struct ApplicationOptions: Sendable {
     /// 代替画面バッファへ切り替える（終了時に元の画面が戻る）。
     public var usesAlternateScreen: Bool
     /// マウスイベントを受け取る範囲。

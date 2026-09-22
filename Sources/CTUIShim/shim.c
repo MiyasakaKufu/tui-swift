@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stdio.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -74,4 +75,8 @@ void ctui_signal_wake_up(void) {
     unsigned char byte = 0;
     (void)write(descriptor, &byte, 1);
     errno = saved_errno;
+}
+
+void ctui_write_standard_error(const char *message) {
+    fputs(message, stderr);
 }
