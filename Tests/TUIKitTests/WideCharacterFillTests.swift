@@ -2,7 +2,7 @@ import XCTest
 @testable import TUIKit
 
 /// 1 セルずつ書き込む描画に全角文字を渡しても、行の表示幅がバッファの幅を超えないことを確かめる。
-@TUIActor
+@MainActor
 final class WideCharacterFillTests: XCTestCase {
 
     private func render(_ view: any View, width: Int, height: Int) -> Buffer {

@@ -1,7 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-@TUIActor
+@MainActor
 final class InputParserTests: XCTestCase {
 
     private func events(_ bytes: [UInt8]) -> [InputEvent] {

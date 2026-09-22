@@ -30,7 +30,7 @@ enum CrashRestorer {
         + ANSI.reset
         + ANSI.showCursor
 
-    /// クラッシュしたときに端末を戻すハンドラを仕掛ける。
+    /// クラッシュしたときとプロセスが終わるときに端末を戻すよう仕掛ける。
     ///
     /// - Parameters:
     ///   - input: 端末属性を戻すファイル記述子。
@@ -44,6 +44,7 @@ enum CrashRestorer {
         restoreOutputDescriptor = output
         restoreAttributes = originalAttributes
         installHandlers()
+        installExitHandler()
         isArmed = 1
         #endif
     }
@@ -89,6 +90,8 @@ private let crashSignalNumbers: [Int32] = [SIGILL, SIGTRAP, SIGABRT, SIGBUS, SIG
 /// ハンドラを仕掛けてあるか。シグナルハンドラから触れるのはこの種のフラグだけ。
 private var isArmed: sig_atomic_t = 0
 
+private var isExitHandlerInstalled = false
+
 private var restoreInputDescriptor: Int32 = -1
 private var restoreOutputDescriptor: Int32 = -1
 private var restoreAttributes = termios()
@@ -125,6 +128,15 @@ private func prepareRestoreSequence() {
     }
     restoreSequenceBytes = buffer
     restoreSequenceLength = bytes.count
+}
+
+/// プロセスが終わるときに端末を戻すよう仕掛ける。
+private func installExitHandler() {
+    // この guard を外すと、arm() を呼ぶたびにハンドラが積まれ、終了時に同じ列が
+    // その回数だけ端末へ流れる。
+    guard !isExitHandlerInstalled else { return }
+    isExitHandlerInstalled = true
+    atexit { CrashRestorer.restoreTerminal() }
 }
 
 /// クラッシュのシグナルにハンドラを仕掛ける。

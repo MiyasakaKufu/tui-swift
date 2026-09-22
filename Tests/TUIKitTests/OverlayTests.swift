@@ -1,7 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-@TUIActor
+@MainActor
 final class OverlayTests: XCTestCase {
 
     private func render(_ view: any View, width: Int, height: Int) -> String {

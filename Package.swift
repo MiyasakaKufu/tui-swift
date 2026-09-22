@@ -13,18 +13,8 @@ let package = Package(
     ],
     targets: [
         .target(name: "CTUIShim"),
-        .target(
-            name: "TUIKit",
-            dependencies: ["CTUIShim"],
-            swiftSettings: [.unsafeFlags(["-strict-concurrency=complete"])]
-        ),
+        .target(name: "TUIKit", dependencies: ["CTUIShim"]),
         .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),
-        // H11 の計測。製品には含めない。
-        .target(
-            name: "InstabilityProbe",
-            dependencies: ["TUIKit"],
-            swiftSettings: [.unsafeFlags(["-strict-concurrency=complete"])]
-        ),
         // 製品コードから参照できてしまうため、ライブラリ本体のターゲットには混ぜない。
         // glibc は posix_openpt などを機能テストマクロで隠すため、Linux では _GNU_SOURCE を立てる。
         .target(

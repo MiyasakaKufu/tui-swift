@@ -1,5 +1,5 @@
 /// 直前のフレームとの差分だけを端末へ書き出すレンダラ。
-@TUIActor
+@MainActor
 public final class Renderer {
     private let output: TerminalOutput
     private var previous: Buffer?

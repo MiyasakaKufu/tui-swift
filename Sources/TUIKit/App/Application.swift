@@ -7,7 +7,7 @@ import Glibc
 #endif
 
 /// 端末を初期化し、入力・描画のループを回すアプリケーション。
-@TUIActor
+@MainActor
 public final class Application<Root: Component> {
 
     private let root: Root

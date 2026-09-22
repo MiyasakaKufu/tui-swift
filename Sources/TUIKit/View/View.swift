@@ -36,7 +36,7 @@ public struct LayoutTraits: Hashable, Sendable {
 }
 
 /// 画面へ描画できるもの。
-@TUIActor
+@MainActor
 public protocol View {
     /// `proposal` の範囲で希望するサイズを返す。
     ///

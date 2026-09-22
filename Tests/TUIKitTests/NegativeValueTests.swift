@@ -2,7 +2,7 @@ import XCTest
 @testable import TUIKit
 
 /// 負の余白・サイズを渡しても領域の外に描かず、クラッシュもしないことを確かめる。
-@TUIActor
+@MainActor
 final class NegativeValueTests: XCTestCase {
 
     func testSizeClampsNegativeAssignment() async {

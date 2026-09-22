@@ -1,7 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-@TUIActor
+@MainActor
 final class DisplayWidthTests: XCTestCase {
 
     func testASCIIWidth() async {
