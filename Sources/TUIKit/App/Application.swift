@@ -158,15 +158,9 @@ public final class Application<Root: Component> {
         lastFrameTime = monotonicSeconds()
 
         let effectTasks = root.startupEffect.start(sending: sender)
-        // 列を閉じてから起こす順序を変えてはいけない。逆にすると読み取りスレッドが
-        // 閉じる前の列へ yield し、`poll(2)` へ戻って次の入力まで終わらない。
-        defer {
-            for task in effectTasks { task.cancel() }
-            continuation.finish()
-            SignalWatcher.wakeUp()
-        }
+        defer { for task in effectTasks { task.cancel() } }
 
-        startReadingInput()
+        let inputStopped = startReadingInput()
         draw()
 
         loop: for await event in stream {
@@ -204,6 +198,15 @@ public final class Application<Root: Component> {
         }
 
         isRunning = false
+
+        // 読み取りスレッドの終了を待たずに戻ってはいけない。残ったスレッドが自己パイプを
+        // 読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
+        // 列を閉じてから起こす順序も変えてはいけない。逆にすると閉じる前の列へ yield し、
+        // `poll(2)` へ戻って次の入力まで終わらない。
+        continuation.finish()
+        SignalWatcher.wakeUp()
+        for await _ in inputStopped {}
+
         terminal.setCursorVisible(true)
     }
 
@@ -211,7 +214,9 @@ public final class Application<Root: Component> {
     ///
     /// - Note: `poll(2)` はアクタの上に置けない。アクタを止めると、外部から送られたイベントが
     ///   実行の機会を得られないため。
-    private func startReadingInput() {
+    /// - Returns: スレッドが終わったときに終了する列。
+    private func startReadingInput() -> AsyncStream<Void> {
+        let (stopped, stoppedContinuation) = AsyncStream<Void>.makeStream()
         let descriptor = terminal.inputDescriptor
         let wakeupDescriptor = SignalWatcher.wakeupDescriptor
         let timeout = options.frameInterval
@@ -237,7 +242,11 @@ public final class Application<Root: Component> {
 
                 if case .terminated = continuation.yield(.wake) { break }
             }
+
+            stoppedContinuation.finish()
         }
+
+        return stopped
     }
 
     /// 端末が kitty keyboard protocol に対応しているかを問い合わせる。
