@@ -39,20 +39,20 @@ let count = 10_000
 for _ in 0..<count {
     _ = TouchesSelfInDeinit()
 }
-print("1. deinit から自分のメソッドを呼ぶ")
-print("   作った数: \(count)")
-print("   deinit に入った数: \(TouchesSelfInDeinit.deinitEntries)")
-print("   メソッドが走った数: \(TouchesSelfInDeinit.methodCalls)")
-print("   deinit が複数回走ったか: \(TouchesSelfInDeinit.deinitEntries != count)")
+print("H13: 1. deinit から自分のメソッドを呼ぶ")
+print("H13:    作った数: \(count)")
+print("H13:    deinit に入った数: \(TouchesSelfInDeinit.deinitEntries)")
+print("H13:    メソッドが走った数: \(TouchesSelfInDeinit.methodCalls)")
+print("H13:    deinit が複数回走ったか: \(TouchesSelfInDeinit.deinitEntries != count)")
 
 do {
     _ = EscapesSelfInDeinit()
 }
-print("2. deinit から self を外へ出す")
-print("   deinit に入った数: \(EscapesSelfInDeinit.deinitEntries)")
+print("H13: 2. deinit から self を外へ出す")
+print("H13:    deinit に入った数: \(EscapesSelfInDeinit.deinitEntries)")
 if let pointer = EscapesSelfInDeinit.escaped {
     // 解放済みなら、ここは未定義。ASan を付けて走らせて何が出るかを見る。
     let revived = Unmanaged<EscapesSelfInDeinit>.fromOpaque(pointer).takeUnretainedValue()
-    print("   deinit の後に読んだ値: \(revived.value)")
+    print("H13:    deinit の後に読んだ値: \(revived.value)")
 }
-print("3. ここまで到達した")
+print("H13: 3. ここまで到達した")
