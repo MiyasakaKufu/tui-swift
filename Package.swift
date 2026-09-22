@@ -13,7 +13,11 @@ let package = Package(
     ],
     targets: [
         .target(name: "CTUIShim"),
-        .target(name: "TUIKit", dependencies: ["CTUIShim"]),
+        .target(
+            name: "TUIKit",
+            dependencies: ["CTUIShim"],
+            swiftSettings: [.unsafeFlags(["-strict-concurrency=complete"])]
+        ),
         .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),
         // 製品コードから参照できてしまうため、ライブラリ本体のターゲットには混ぜない。
         // glibc は posix_openpt などを機能テストマクロで隠すため、Linux では _GNU_SOURCE を立てる。

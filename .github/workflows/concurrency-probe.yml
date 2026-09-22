@@ -10,6 +10,24 @@ jobs:
     container: swift:5.9
     steps:
       - uses: actions/checkout@v4
+      - name: POSIX の非同期シグナル安全な関数の一覧を確かめる
+        run: |
+          curl -sS -L "https://pubs.opengroup.org/onlinepubs/9799919799/functions/V2_chap02.html" -o posix.html || echo "取得できない"
+          if [ -f posix.html ]; then
+            python3 - <<'PY'
+          import re, html, pathlib
+          text = pathlib.Path("posix.html").read_text(errors="replace")
+          body = html.unescape(re.sub(r"<[^>]+>", " ", text))
+          print("pthread_mutex を含むか:", "pthread_mutex" in body)
+          for name in ["pthread_mutex_lock", "pthread_mutex_unlock", "pthread_mutex_trylock"]:
+              print(f"  {name}:", name in body)
+          for name in ["write(", "_Exit(", "sigaction("]:
+              print(f"  対照 {name}:", name in body)
+          m = re.search(r"not async-signal-safe[^.]{0,400}\.", body)
+          print("非安全な関数を呼んだ場合:", (m.group(0)[:300] if m else "該当文なし"))
+          PY
+          fi
+
       - name: Build
         run: |
           swift build --build-tests 2>&1 | tee build.log || true
