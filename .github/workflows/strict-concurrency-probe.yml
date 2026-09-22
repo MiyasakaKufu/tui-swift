@@ -59,10 +59,12 @@ jobs:
             grep -o 'error: .*' probe.log | sort -u | head -3 | cut -c1-150 | sed 's/^/    /' >> summary.txt
 
             # 別のパッケージから、git 越しの依存として取り込む。
-            rm -rf /tmp/src /tmp/consumer
+            # SwiftPM は作業ツリーのままのディレクトリからは clone できない。bare にする。
+            rm -rf /tmp/src /tmp/tui.git /tmp/consumer
             mkdir -p /tmp/src
             tar -c --exclude=.build --exclude=.git . | tar -x -C /tmp/src
             (cd /tmp/src && git init -q -b probe && git add -A && git commit -qm probe)
+            git clone -q --bare /tmp/src /tmp/tui.git
             mkdir -p /tmp/consumer/Sources/Consumer
             echo 'import TUIKit' > /tmp/consumer/Sources/Consumer/main.swift
             echo 'print(Size(width: 1, height: 1))' >> /tmp/consumer/Sources/Consumer/main.swift
@@ -73,11 +75,11 @@ jobs:
           let package = Package(
               name: "consumer",
               platforms: [.macOS(.v13)],
-              dependencies: [.package(url: "file:///tmp/src", branch: "probe")],
+              dependencies: [.package(url: "file:///tmp/tui.git", branch: "probe")],
               targets: [
                   .executableTarget(
                       name: "Consumer",
-                      dependencies: [.product(name: "TUIKit", package: "src")]
+                      dependencies: [.product(name: "TUIKit", package: "tui")]
                   )
               ]
           )
