@@ -74,6 +74,13 @@ jobs:
           SWIFT_BACKTRACE: enable=no
         run: bash .github/scripts/measure-h16.sh
 
+      - name: U21 の計測
+        if: always()
+        continue-on-error: true
+        env:
+          SWIFT_BACKTRACE: enable=no
+        run: bash .github/scripts/measure-u21.sh
+
       - name: まとめ
         if: always()
         run: cat summary.txt
