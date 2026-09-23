@@ -5,6 +5,24 @@ import TUIKit
 ///   swift run tui-demo
 @main
 final class DemoApp: TerminalApp {
+    /// 一覧の読み込みを始めてから、アプリケーションを起動する。
+    ///
+    /// - Throws: `Application.run()` が投げるもの。
+    static func main() async throws {
+        // `TerminalApp.main()` に任せてはいけない。中で作られる `Application` に届かず、
+        // 読み込みの結果を送る `sender` を手にできない。
+        let application = Application(root: DemoApp(), options: options)
+        let sender = application.sender
+        let duration = simulatedLoadDuration
+        let loaded = loadedItems
+        let loading = Task {
+            try? await Task.sleep(for: duration)
+            sender.send(.itemsLoaded(loaded))
+        }
+        defer { loading.cancel() }
+        try await application.run()
+    }
+
     static var options: ApplicationOptions {
         // 読み込みが終わった時点で画面が描き直されることを、このデモは示している。
         // frameInterval を設定すると一定間隔で描き直されるので示せなくなる。
@@ -136,16 +154,6 @@ final class DemoApp: TerminalApp {
         }
         .frame(height: 1)
         .flexible(horizontal: 1, vertical: 0)
-    }
-
-    /// 起動したら一覧を読み込む。
-    var startupEffect: Effect<Message> {
-        let duration = DemoApp.simulatedLoadDuration
-        let loaded = DemoApp.loadedItems
-        return .run {
-            try? await Task.sleep(for: duration)
-            return .itemsLoaded(loaded)
-        }
     }
 
     func receive(_ message: Message) -> EventResult {

@@ -15,8 +15,8 @@ final class ApplicationMessageTests: XCTestCase {
 
     private var captured = ""
 
-    /// 起動時の処理が返した値で、`frameInterval` なしでも画面が更新される。
-    func testStartupEffectResultUpdatesScreenWithoutFrameInterval() async throws {
+    /// 別スレッドから送ったイベントで、`frameInterval` なしでも画面が更新される。
+    func testMessageFromAnotherThreadUpdatesScreenWithoutFrameInterval() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
         XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
@@ -25,83 +25,26 @@ final class ApplicationMessageTests: XCTestCase {
         let capture = startCapturing(reader)
         defer { capture.cancel() }
 
-        let component = MessageRecordingComponent(startupEffect: .run { .arrived })
+        let component = MessageRecordingComponent()
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        let sender = application.sender
         let loop = Task { try await application.run() }
 
+        // 最初の描画より前に送ると、送ったことで描き直されたのか確かめられない。
+        let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
+
+        Thread.detachNewThread { sender.send(.arrived) }
+
         // 画面が変わるまで、キーのバイトを書いてはいけない。
-        // 処理の結果だけで変わることを確かめているので、キーで起きたのかどうかが分からなくなる。
+        // 送ったイベントだけで変わることを確かめているので、キーで起きたのかどうかが分からなくなる。
         let drew = await waitUntil(timeout: 5) { self.captured.contains(arrivedText) }
-        XCTAssertTrue(drew, "処理の結果が届いた後に画面が描き直されていない")
+        XCTAssertTrue(drew, "送ったイベントが届いた後に画面が描き直されていない")
 
         writeByte(pty.master, UInt8(ascii: "q"))
         try await loop.value
 
         XCTAssertEqual(component.messages, [.arrived])
-    }
-
-    /// 終わりの決まっていない処理は、値を何度でも届けられる。
-    func testStreamEffectDeliversManyMessages() async throws {
-        let pty = try PseudoTerminal()
-        defer { pty.close() }
-        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
-
-        let reader = OutputReader(descriptor: pty.master)
-        let capture = startCapturing(reader)
-        defer { capture.cancel() }
-
-        let component = MessageRecordingComponent(
-            quitsAfter: 3,
-            startupEffect: .stream { send in
-                for _ in 0..<3 {
-                    send(.arrived)
-                    try? await Task.sleep(nanoseconds: 1_000_000)
-                }
-            }
-        )
-        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
-        let loop = Task { try await application.run() }
-
-        try await loop.value
-
-        XCTAssertEqual(component.messages, [.arrived, .arrived, .arrived])
-    }
-
-    /// ループが終わると、走っている `Task` が打ち切られる。
-    func testStartupEffectIsCancelledWhenLoopEnds() async throws {
-        let pty = try PseudoTerminal()
-        defer { pty.close() }
-        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
-
-        let reader = OutputReader(descriptor: pty.master)
-        let capture = startCapturing(reader)
-        defer { capture.cancel() }
-
-        // 打ち切りの合図は `AsyncStream` で受ける。`Continuation` は `Sendable` なので、
-        // 打ち切りに気付く側がアクタの外に居ても箱を `@unchecked Sendable` にしなくてよい。
-        let (noticed, noticeContinuation) = AsyncStream<Void>.makeStream()
-        let component = MessageRecordingComponent(
-            quitsAfter: 1,
-            startupEffect: .stream { send in
-                send(.arrived)
-                while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 5_000_000)
-                }
-                noticeContinuation.yield(())
-                noticeContinuation.finish()
-            }
-        )
-        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
-        let loop = Task { try await application.run() }
-
-        try await loop.value
-
-        var sawCancellation = false
-        for await _ in noticed {
-            sawCancellation = true
-            break
-        }
-        XCTAssertTrue(sawCancellation, "ループが終わっても `Task` が打ち切られない")
     }
 
     /// 複数のスレッドから同時に送っても、すべてのイベントが届く。
@@ -333,16 +276,13 @@ private final class MessageRecordingComponent: Component {
     private(set) var drawCount = 0
 
     private let quitsAfter: Int
-    private let effect: Effect<TestMessage>
 
-    /// 受け取る件数と起動時の `Effect` を決めて作る。
+    /// 受け取る件数を決めて作る。
     ///
     /// - Parameters:
     ///   - quitsAfter: 記録がこの数に達したら終了する。`0` なら自分からは終了しない。
-    ///   - startupEffect: 起動時にイベントループへ走らせる `Effect`。
-    init(quitsAfter: Int = 0, startupEffect: Effect<TestMessage> = .none) {
+    init(quitsAfter: Int = 0) {
         self.quitsAfter = quitsAfter
-        self.effect = startupEffect
     }
 
     var body: some View {
@@ -350,8 +290,6 @@ private final class MessageRecordingComponent: Component {
         drawCount += 1
         return Text(messages.isEmpty ? waitingText : arrivedText)
     }
-
-    var startupEffect: Effect<TestMessage> { effect }
 
     func receive(_ message: TestMessage) -> EventResult {
         messages.append(message)
