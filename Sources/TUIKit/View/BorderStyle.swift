@@ -64,8 +64,7 @@ public struct BorderStyle: Hashable, Sendable {
     ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
     /// - Returns: すべて 1 桁なら `true`。
     /// - Note: 罫線素片は East Asian Width が Ambiguous なので、`ambiguous` が `.wide` のときは
-    ///   2 桁になる。このとき `init` の置き換え先（`single` と同じ罫線素片）も 2 桁なので、
-    ///   置き換えても 1 桁には収まらない。
+    ///   2 桁になる。`ascii` 以外の組み込みの文字組みは、どれも 1 桁に収まらない。
     public func fitsInSingleColumn(
         ambiguous: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> Bool {

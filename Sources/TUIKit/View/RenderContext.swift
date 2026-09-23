@@ -43,14 +43,18 @@ public struct RenderContext {
 
     /// East Asian Width が Ambiguous の文字を何桁として扱うか。
     ///
-    /// 文字列の幅を測るときは、`DisplayWidth` の各関数の `ambiguous` にこの値を渡す。
+    /// - Note: `DisplayWidth` の各関数は、`ambiguous` を省くと `DisplayWidth.defaultAmbiguousWidth`
+    ///   で測る。文字列の幅を測るときはこの値を渡す。渡さないと、アプリが指定した扱いと測った幅が
+    ///   食い違い、その行の桁がずれる。
     public let ambiguousWidth: DisplayWidth.AmbiguousWidth
 
     /// ルートのビューに渡す文脈を作る。
     ///
     /// - Parameters:
     ///   - screen: 画面全体の矩形。描画先のバッファ全体を渡す。
-    ///   - ambiguousWidth: 曖昧幅の文字の扱い。描画先のバッファと同じ値を渡す。
+    ///   - ambiguousWidth: 曖昧幅の文字の扱い。
+    /// - Precondition: `ambiguousWidth` が描画先のバッファの `ambiguousWidth` と同じ。
+    ///   違うと、ビューが測った幅とバッファに置かれるセルの桁が食い違う。
     public init(
         screen: Rect,
         ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
