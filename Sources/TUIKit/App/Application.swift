@@ -137,7 +137,6 @@ public final class Application<Root: Component> {
         defer { terminal.restore() }
 
         SignalWatcher.install()
-        reader.wakeupDescriptor = SignalWatcher.wakeupDescriptor
 
         if options.usesKeyboardProtocol, supportsKeyboardProtocol() {
             terminal.setKeyboardProtocolEnabled(true)
@@ -225,10 +224,15 @@ public final class Application<Root: Component> {
         let timeout = options.frameInterval
         let continuation = self.continuation
 
+        // 読み残しを引き渡さないと、`supportsKeyboardProtocol()` の待ちの間に届いたキーが落ちる。
+        // 待ちの間に読んだ分は、待った側のリーダーが抱えている。
+        let unread = reader.takeUnreadState()
+
         // 読み取り器を外で作って渡すと、非 Sendable の参照がスレッドを跨ぐ。
         Thread.detachNewThread {
             let reader = InputReader(descriptor: descriptor)
             reader.wakeupDescriptor = wakeupDescriptor
+            reader.adopt(unread)
 
             while true {
                 let events = reader.wait(timeout: timeout)

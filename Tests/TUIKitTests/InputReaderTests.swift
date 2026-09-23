@@ -104,6 +104,47 @@ final class InputReaderTests: XCTestCase {
         XCTAssertEqual(reader.waitForQueryReplies(timeout: 0.1), [])
     }
 
+    /// 応答を待つ間に届いたキーは、引き継いだ別のリーダーが返す。
+    func testUnreadEventsMoveToAnotherReader() async throws {
+        let input = try PipePair()
+        defer { input.close() }
+        let queryReader = InputReader(descriptor: input.readEnd)
+
+        input.send("a\u{1B}[?1u\u{1B}[?62;c")
+        XCTAssertEqual(
+            queryReader.waitForQueryReplies(timeout: 5),
+            [.keyboardProtocol(flags: 1), .deviceAttributes]
+        )
+
+        let other = try PipePair()
+        defer { other.close() }
+        let loopReader = InputReader(descriptor: other.readEnd)
+        loopReader.adopt(queryReader.takeUnreadState())
+
+        XCTAssertEqual(loopReader.wait(timeout: 0.1), [.key(KeyEvent(.character("a")))])
+        XCTAssertEqual(queryReader.wait(timeout: 0.1), [], "取り出した側に残っている")
+    }
+
+    /// ペーストの途中で起こされたときも、待ちから戻る。
+    func testWakeupReturnsWhileInPaste() async throws {
+        let input = try PipePair()
+        defer { input.close() }
+        let wakeup = try PipePair()
+        defer { wakeup.close() }
+        let reader = InputReader(descriptor: input.readEnd, wakeupDescriptor: wakeup.readEnd)
+
+        input.send("\u{1B}[200~abc")
+        XCTAssertEqual(reader.wait(timeout: 0.1), [])
+
+        // 同じ `poll(2)` の回で両方が読めるよう、待ちに入る前に書いておく。
+        input.send("d")
+        wakeup.send("\u{0}")
+
+        let started = Date()
+        XCTAssertEqual(reader.wait(timeout: 5), [])
+        XCTAssertLessThan(Date().timeIntervalSince(started), 1, "起こされたのに待ち続けている")
+    }
+
     /// 応答を待つ間に届いたキーは捨てず、次の待ちで返す。
     func testKeysArrivingWhileWaitingForRepliesAreKept() async throws {
         let input = try PipePair()

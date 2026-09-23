@@ -34,6 +34,38 @@ public final class InputReader {
         self.wakeupDescriptor = wakeupDescriptor
     }
 
+    /// 別のリーダーへ引き継ぐための、まだ返していない読み取り。
+    struct UnreadState: Sendable {
+        /// まだ返していないイベント。
+        var events: [InputEvent]
+        /// 未解釈のバイトを抱えたパーサ。
+        var parser: InputParser
+        /// 未解釈のバイトを最後に受け取った時刻。
+        var pendingSince: Double?
+    }
+
+    /// まだ返していない読み取りを取り出し、このリーダーを空にする。
+    ///
+    /// - Returns: 取り出した読み残し。
+    func takeUnreadState() -> UnreadState {
+        let state = UnreadState(events: bufferedEvents, parser: parser, pendingSince: pendingSince)
+        bufferedEvents.removeAll()
+        parser = InputParser()
+        pendingSince = nil
+        return state
+    }
+
+    /// 取り出した読み残しを引き継ぐ。
+    ///
+    /// - Parameters:
+    ///   - state: `takeUnreadState()` が返した読み残し。
+    /// - Precondition: まだ何も読んでいないリーダーであること。
+    func adopt(_ state: UnreadState) {
+        bufferedEvents = state.events
+        parser = state.parser
+        pendingSince = state.pendingSince
+    }
+
     /// 入力を待ち、届いたイベントを返す。
     ///
     /// 途中までしか届いていない制御コードは、続きを待つ時間が過ぎるまで確定させない。
@@ -74,6 +106,11 @@ public final class InputReader {
                 // 閉じた記述子はいつでも読み取り可能になり、`read(2)` は 0 を返す。
                 // 読めたバイト数を見ずに待ち直すと、入力が閉じた後は待ちの中で回り続ける。
                 if !events.isEmpty || byteCount == 0 { return events }
+
+                // 起こされた合図を食べた回は、確定しなくても返す。
+                // ここで待ち直すと、ペースト中は `pendingWaitDuration` が nil なので
+                // 続きが届くまで戻らず、起こした側は戻ったつもりで待ち続ける。
+                if readiness.contains(.wakeup) { return [] }
             } else if readiness.contains(.wakeup) {
                 // 起こされただけのときに確定させてはいけない。届きかけの ESC が壊れる。
                 return []

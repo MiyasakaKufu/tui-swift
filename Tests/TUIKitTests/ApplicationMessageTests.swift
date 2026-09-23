@@ -177,6 +177,42 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertEqual(component.records, ["message:first", "key:a", "key:b", "message:second"])
     }
 
+    /// 端末への問い合わせの応答を待つ間に届いたキーも、ループへ渡る。
+    func testKeysArrivingDuringTerminalQueryReachTheLoop() async throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let reader = OutputReader(descriptor: pty.master)
+        let capture = startCapturing(reader)
+        defer { capture.cancel() }
+
+        let component = MessageRecordingComponent()
+        let application = Application(
+            root: component,
+            options: ApplicationOptions(
+                usesAlternateScreen: false,
+                usesBracketedPaste: false,
+                usesKeyboardProtocol: true
+            ),
+            terminal: pty.terminal()
+        )
+        let loop = Task { try await application.run() }
+
+        // 問い合わせが出てから書く。先に書くと raw モードへの切り替えで捨てられる。
+        let asked = await waitUntil(timeout: 5) { self.captured.contains(ANSI.queryDeviceAttributes) }
+        XCTAssertTrue(asked, "問い合わせが出ない")
+
+        // 応答は返さない。返すと待ちが早く終わり、待ちの間に届いたことにならない。
+        writeByte(pty.master, UInt8(ascii: "a"))
+
+        let reached = await waitUntil(timeout: 5) { component.records == ["key:a"] }
+        XCTAssertTrue(reached, "問い合わせの間に届いたキーが落ちている: \(component.records)")
+
+        writeByte(pty.master, UInt8(ascii: "q"))
+        try await loop.value
+    }
+
     /// 上限に達した後の送信は捨てられる。
     func testSenderReportsFullQueue() async throws {
         let pty = try PseudoTerminal()
