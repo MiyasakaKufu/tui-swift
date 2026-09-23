@@ -21,8 +21,7 @@ public final class Application<Root: Component> {
     /// 外部で起きたことをイベントループへ届ける送り口。
     ///
     /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
-    /// - Note: `TerminalApp.main()` に起動を任せたアプリからは届かない。
-    ///   送るアプリは `Application` を自分で作り、`run()` を呼ぶ。
+    /// - Note: `TerminalApp` のアプリからは届かない。
     nonisolated public let sender: MessageSender<Root.Message>
 
     private var buffer = Buffer(size: .zero)

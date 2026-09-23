@@ -5,27 +5,7 @@ import TUIKit
 ///   swift run tui-demo
 @main
 final class DemoApp: TerminalApp {
-    /// 一覧の読み込みを始めてから、アプリケーションを起動する。
-    ///
-    /// - Throws: `Application.run()` が投げるもの。
-    static func main() async throws {
-        // `TerminalApp.main()` に任せてはいけない。中で作られる `Application` に届かず、
-        // 読み込みの結果を送る `sender` を手にできない。
-        let application = Application(root: DemoApp(), options: options)
-        let sender = application.sender
-        let duration = simulatedLoadDuration
-        let loaded = loadedItems
-        let loading = Task {
-            try? await Task.sleep(for: duration)
-            sender.send(.itemsLoaded(loaded))
-        }
-        defer { loading.cancel() }
-        try await application.run()
-    }
-
     static var options: ApplicationOptions {
-        // 読み込みが終わった時点で画面が描き直されることを、このデモは示している。
-        // frameInterval を設定すると一定間隔で描き直されるので示せなくなる。
         ApplicationOptions(
             mouseTracking: .motion,
             reportsFocus: true,
@@ -34,15 +14,7 @@ final class DemoApp: TerminalApp {
         )
     }
 
-    /// 外部から届くイベント。
-    enum Message: Sendable {
-        /// 一覧の読み込みが終わった。
-        case itemsLoaded([String])
-    }
-
-    private static let placeholderItems = ["読み込み中…"]
-
-    private static let loadedItems = [
+    private let items = [
         "差分レンダリング",
         "全角文字・絵文字の幅計算",
         "キー入力とマウスの解析",
@@ -52,13 +24,7 @@ final class DemoApp: TerminalApp {
         "テキスト入力",
         "ウィンドウサイズ変更への追従",
         "ビューの重ね描きとダイアログ",
-        "外部イベントによる更新",
     ]
-
-    private static let simulatedLoadDuration = Duration.milliseconds(800)
-
-    private var items = DemoApp.placeholderItems
-    private var isLoaded = false
 
     private let listState = ListState()
     private let inputState = TextFieldState()
@@ -117,7 +83,7 @@ final class DemoApp: TerminalApp {
             : "-"
 
         return VStack(spacing: 1) {
-            Text(isLoaded ? "選択中: \(selected)" : "一覧を読み込んでいます…", wrap: .word).bold()
+            Text("選択中: \(selected)", wrap: .word).bold()
             Text("端末サイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
             Text("直前のイベント: \(lastEventDescription)", wrap: .word)
 
@@ -154,16 +120,6 @@ final class DemoApp: TerminalApp {
         }
         .frame(height: 1)
         .flexible(horizontal: 1, vertical: 0)
-    }
-
-    func receive(_ message: Message) -> EventResult {
-        switch message {
-        case .itemsLoaded(let loaded):
-            items = loaded
-            isLoaded = true
-            lastEventDescription = "一覧の読み込みが終わりました（\(loaded.count) 件）"
-            return .handled
-        }
     }
 
     var cursorPosition: Point? {
@@ -219,7 +175,6 @@ final class DemoApp: TerminalApp {
             return inputState.handle(event) ? .handled : .ignored
         }
 
-        guard isLoaded else { return .ignored }
         return listState.handle(event) ? .handled : .ignored
     }
 
