@@ -104,7 +104,7 @@ final class InputReaderTests: XCTestCase {
         XCTAssertEqual(reader.waitForQueryReplies(timeout: 0.1), [])
     }
 
-    /// 応答を待つ間に届いたキーは、引き継いだ別のリーダーが返す。
+    /// 応答を待つ間に届いたキーは、引き継いだ別の `InputReader` が返す。
     func testUnreadEventsMoveToAnotherReader() async throws {
         let input = try PipePair()
         defer { input.close() }

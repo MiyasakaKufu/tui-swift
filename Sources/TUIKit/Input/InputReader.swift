@@ -24,7 +24,7 @@ public final class InputReader {
     /// - Precondition: 読み取り可能になったバイトは読み捨てるため、非ブロッキングであること。
     public var wakeupDescriptor: Int32?
 
-    /// 指定した記述子から読み出すリーダーを作る。
+    /// 指定した記述子から読み出す `InputReader` を作る。
     ///
     /// - Parameters:
     ///   - descriptor: 入力を読み取るファイル記述子。
@@ -34,7 +34,7 @@ public final class InputReader {
         self.wakeupDescriptor = wakeupDescriptor
     }
 
-    /// 別のリーダーへ引き継ぐための、まだ返していない読み取り。
+    /// 別の `InputReader` へ引き継ぐ、まだ返していない `InputEvent` と未解釈のバイト。
     struct UnreadState: Sendable {
         /// まだ返していないイベント。
         var events: [InputEvent]
@@ -44,9 +44,9 @@ public final class InputReader {
         var pendingSince: Double?
     }
 
-    /// まだ返していない読み取りを取り出し、このリーダーを空にする。
+    /// まだ返していない `InputEvent` と未解釈のバイトを取り出し、この `InputReader` を空にする。
     ///
-    /// - Returns: 取り出した読み残し。
+    /// - Returns: 取り出した分。引き継ぎ先で `adopt(_:)` へ渡す。
     func takeUnreadState() -> UnreadState {
         let state = UnreadState(events: bufferedEvents, parser: parser, pendingSince: pendingSince)
         bufferedEvents.removeAll()
@@ -55,11 +55,11 @@ public final class InputReader {
         return state
     }
 
-    /// 取り出した読み残しを引き継ぐ。
+    /// 取り出した分を引き継ぐ。
     ///
     /// - Parameters:
-    ///   - state: `takeUnreadState()` が返した読み残し。
-    /// - Precondition: まだ何も読んでいないリーダーであること。
+    ///   - state: `takeUnreadState()` が返した分。
+    /// - Precondition: まだ何も読んでいない `InputReader` であること。
     func adopt(_ state: UnreadState) {
         bufferedEvents = state.events
         parser = state.parser

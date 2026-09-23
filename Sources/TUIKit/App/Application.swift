@@ -201,7 +201,7 @@ public final class Application<Root: Component> {
 
         isRunning = false
 
-        // 読み取りスレッドの終了を待たずに戻ってはいけない。
+        // 専用スレッドの終了を待たずに戻ってはいけない。
         // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
         // 列を閉じてから起こす順序も変えてはいけない。
         // 逆にすると閉じる前の列へ yield し、`poll(2)` へ戻って次にバイトが届くまで終わらない。
@@ -224,11 +224,11 @@ public final class Application<Root: Component> {
         let timeout = options.frameInterval
         let continuation = self.continuation
 
-        // 読み残しを引き渡さないと、`supportsKeyboardProtocol()` の待ちの間に届いたキーが落ちる。
-        // 待ちの間に読んだ分は、待った側のリーダーが抱えている。
+        // まだ返していない分を引き渡さないと、`supportsKeyboardProtocol()` の待ちの間に
+        // 届いたキーが落ちる。待ちの間に読んだ分は、待った側の `InputReader` が抱えている。
         let unread = reader.takeUnreadState()
 
-        // 読み取り器を外で作って渡すと、非 Sendable の参照がスレッドを跨ぐ。
+        // `InputReader` を外で作って渡すと、非 Sendable の参照がスレッドを跨ぐ。
         Thread.detachNewThread {
             let reader = InputReader(descriptor: descriptor)
             reader.wakeupDescriptor = wakeupDescriptor
