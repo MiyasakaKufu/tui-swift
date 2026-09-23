@@ -1,12 +1,12 @@
 import Foundation
 
-/// イベントループへ届いた `LoopEvent` を溜めておき、ループが次に一巡するときにまとめて渡す箱。
+/// イベントループへ届いた `LoopEvent` を溜めておき、ループが次に一巡するときにまとめて渡すキュー。
 ///
 /// どのスレッド・どの `Task` からでも入れられる。
 ///
 /// - Invariant: 溜まっている `.wake` と `.idle` は、それぞれ多くとも 1 つ。
 ///   `.inputs` と `.message` は、入れた順にすべて残る。
-final class LoopMailbox<Message: Sendable>: @unchecked Sendable {
+final class LoopEventQueue<Message: Sendable>: @unchecked Sendable {
 
     /// 何かが入ったことをループへ知らせる `AsyncStream`。要素そのものは運ばない。
     let arrivals: AsyncStream<Void>
@@ -20,7 +20,7 @@ final class LoopMailbox<Message: Sendable>: @unchecked Sendable {
     private var hasPendingIdle = false
     private var isClosed = false
 
-    /// 空の箱を作る。
+    /// 空のキューを作る。
     init() {
         // 知らせの上限を外してはいけない。ループより速く入れられると、中身の無い知らせが
         // 溜まり続けてメモリが増え、ループは空の `take()` を溜まった数だけ繰り返す。

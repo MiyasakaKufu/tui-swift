@@ -1,35 +1,35 @@
 import XCTest
 @testable import TUIKit
 
-/// `LoopMailbox` が `LoopEvent` をどう溜め、どう取り出すかを確かめる。
-final class LoopMailboxTests: XCTestCase {
+/// `LoopEventQueue` が `LoopEvent` をどう溜め、どう取り出すかを確かめる。
+final class LoopEventQueueTests: XCTestCase {
 
     /// 取り出される前に何度入れても、`.wake` は 1 つしか溜まらない。
     func testWakesPostedBeforeTakeAreCoalesced() {
-        let mailbox = LoopMailbox<Int>()
-        for _ in 0..<1_000 { mailbox.post(.wake) }
+        let eventQueue = LoopEventQueue<Int>()
+        for _ in 0..<1_000 { eventQueue.post(.wake) }
 
-        XCTAssertEqual(labels(of: mailbox.take()), ["wake"])
-        XCTAssertEqual(labels(of: mailbox.take()), [])
+        XCTAssertEqual(labels(of: eventQueue.take()), ["wake"])
+        XCTAssertEqual(labels(of: eventQueue.take()), [])
     }
 
     /// 取り出される前に何度入れても、`.idle` は 1 つしか溜まらない。
     func testIdlesPostedBeforeTakeAreCoalesced() {
-        let mailbox = LoopMailbox<Int>()
-        for _ in 0..<1_000 { mailbox.post(.idle) }
+        let eventQueue = LoopEventQueue<Int>()
+        for _ in 0..<1_000 { eventQueue.post(.idle) }
 
-        XCTAssertEqual(labels(of: mailbox.take()), ["idle"])
+        XCTAssertEqual(labels(of: eventQueue.take()), ["idle"])
     }
 
     /// `.wake` を挟んでも、送った値はすべて入れた順に取り出される。
     func testMessagesKeepOrderAcrossWakes() {
-        let mailbox = LoopMailbox<Int>()
+        let eventQueue = LoopEventQueue<Int>()
         for value in 0..<100 {
-            mailbox.post(.message(value))
-            mailbox.post(.wake)
+            eventQueue.post(.message(value))
+            eventQueue.post(.wake)
         }
 
-        let events = mailbox.take()
+        let events = eventQueue.take()
         let messages = events.compactMap { event -> Int? in
             if case .message(let value) = event { return value }
             return nil
@@ -40,23 +40,23 @@ final class LoopMailboxTests: XCTestCase {
 
     /// 取り出した後に入れた `.wake` は、次に取り出すときにまた 1 つ渡る。
     func testWakeAfterTakeIsDeliveredAgain() {
-        let mailbox = LoopMailbox<Int>()
-        mailbox.post(.wake)
-        _ = mailbox.take()
-        mailbox.post(.wake)
+        let eventQueue = LoopEventQueue<Int>()
+        eventQueue.post(.wake)
+        _ = eventQueue.take()
+        eventQueue.post(.wake)
 
-        XCTAssertEqual(labels(of: mailbox.take()), ["wake"])
+        XCTAssertEqual(labels(of: eventQueue.take()), ["wake"])
     }
 
     /// 閉じた後は受け付けず、知らせの `AsyncStream` も終わる。
-    func testClosedMailboxRejectsEventsAndFinishesArrivals() async {
-        let mailbox = LoopMailbox<Int>()
-        XCTAssertTrue(mailbox.post(.message(1)))
-        mailbox.close()
+    func testClosedQueueRejectsEventsAndFinishesArrivals() async {
+        let eventQueue = LoopEventQueue<Int>()
+        XCTAssertTrue(eventQueue.post(.message(1)))
+        eventQueue.close()
 
-        XCTAssertFalse(mailbox.post(.message(2)))
+        XCTAssertFalse(eventQueue.post(.message(2)))
         var arrivals = 0
-        for await _ in mailbox.arrivals { arrivals += 1 }
+        for await _ in eventQueue.arrivals { arrivals += 1 }
         XCTAssertEqual(arrivals, 1)
     }
 

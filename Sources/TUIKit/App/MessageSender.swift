@@ -7,14 +7,14 @@
 ///   まとめて 1 回だけ描き直す。値 1 つごとには描き直さない。
 public struct MessageSender<Message: Sendable>: Sendable {
 
-    private let mailbox: LoopMailbox<Message>
+    private let eventQueue: LoopEventQueue<Message>
 
     /// 値を入れる先を指定して送り口を作る。
     ///
     /// - Parameters:
-    ///   - mailbox: 送られた値を入れる先。
-    init(mailbox: LoopMailbox<Message>) {
-        self.mailbox = mailbox
+    ///   - eventQueue: 送られた値を入れる先。
+    init(eventQueue: LoopEventQueue<Message>) {
+        self.eventQueue = eventQueue
     }
 
     /// 値をイベントループへ送る。
@@ -24,6 +24,6 @@ public struct MessageSender<Message: Sendable>: Sendable {
     /// - Returns: 送ったなら `true`。ループが終わっているなら `false`。
     @discardableResult
     public func send(_ message: Message) -> Bool {
-        mailbox.post(.message(message))
+        eventQueue.post(.message(message))
     }
 }
