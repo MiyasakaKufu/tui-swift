@@ -7,7 +7,7 @@ final class OverlayTests: XCTestCase {
     private func render(_ view: any View, width: Int, height: Int) -> String {
         var buffer = Buffer(size: Size(width: width, height: height))
         let bounds = buffer.bounds
-        view.render(into: &buffer, rect: bounds)
+        view.renderAsRoot(into: &buffer, rect: bounds)
         return buffer.debugText()
     }
 
@@ -31,12 +31,12 @@ final class OverlayTests: XCTestCase {
 
     func testZStackSizeIsLargestChild() async {
         let view = ZStack(children: [Text("abc"), Fill("#").frame(width: 2, height: 3)])
-        XCTAssertEqual(view.sizeThatFits(Size(width: 10, height: 10)), Size(width: 3, height: 3))
+        XCTAssertEqual(view.sizeThatFitsAsRoot(Size(width: 10, height: 10)), Size(width: 3, height: 3))
     }
 
     func testZStackWithoutChildrenHasNoSize() async {
         let view = ZStack(children: [])
-        XCTAssertEqual(view.sizeThatFits(Size(width: 10, height: 10)), .zero)
+        XCTAssertEqual(view.sizeThatFitsAsRoot(Size(width: 10, height: 10)), .zero)
     }
 
     // MARK: - overlay
@@ -46,7 +46,7 @@ final class OverlayTests: XCTestCase {
         let view = content.overlay(Fill("#"))
         let proposal = Size(width: 10, height: 10)
 
-        XCTAssertEqual(view.sizeThatFits(proposal), content.sizeThatFits(proposal))
+        XCTAssertEqual(view.sizeThatFitsAsRoot(proposal), content.sizeThatFitsAsRoot(proposal))
         XCTAssertEqual(view.layoutTraits, content.layoutTraits)
     }
 
@@ -81,7 +81,7 @@ final class OverlayTests: XCTestCase {
         let view = content.screenOverlay(Fill("#"))
         let proposal = Size(width: 10, height: 10)
 
-        XCTAssertEqual(view.sizeThatFits(proposal), content.sizeThatFits(proposal))
+        XCTAssertEqual(view.sizeThatFitsAsRoot(proposal), content.sizeThatFitsAsRoot(proposal))
         XCTAssertEqual(view.layoutTraits, content.layoutTraits)
     }
 
@@ -128,7 +128,7 @@ final class OverlayTests: XCTestCase {
         }
         var buffer = Buffer(size: Size(width: 9, height: 5))
         let bounds = buffer.bounds
-        view.render(into: &buffer, rect: bounds)
+        view.renderAsRoot(into: &buffer, rect: bounds)
 
         for y in 0..<buffer.size.height {
             XCTAssertEqual(DisplayWidth.width(of: buffer.text(ofRow: y)), 9, "行 \(y) の表示幅")

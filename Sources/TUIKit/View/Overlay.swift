@@ -6,18 +6,22 @@ enum OverlayLayout {
     ///
     /// - Parameters:
     ///   - child: 重ねて描く子ビュー。
+    ///   - index: 親の中での子の番号。
     ///   - rect: 重ね先の矩形。
     ///   - horizontal: 横に寄せる向き。
     ///   - vertical: 縦に寄せる向き。
+    ///   - context: 親が受け取った文脈。
     /// - Returns: `rect` に収まる、子ビューの矩形。伸びる子ビューは `rect` いっぱいを受け取る。
     static func childRect(
         for child: any View,
+        index: Int,
         in rect: Rect,
         horizontal: HorizontalAlignment,
-        vertical: VerticalAlignment
+        vertical: VerticalAlignment,
+        context: RenderContext
     ) -> Rect {
         let traits = child.layoutTraits
-        let desired = child.sizeThatFits(rect.size)
+        let desired = context.sizeThatFits(of: child, index: index, proposal: rect.size)
         let width = traits.horizontalFlex > 0 ? rect.width : min(desired.width, rect.width)
         let height = traits.verticalFlex > 0 ? rect.height : min(desired.height, rect.height)
         return Rect(
@@ -85,13 +89,14 @@ public struct ZStack: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 幅・高さのそれぞれで最大の子に合わせたサイズ。`proposal` は超えない。
-    public func sizeThatFits(_ proposal: Size) -> Size {
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         guard !children.isEmpty else { return .zero }
         var width = 0
         var height = 0
-        for child in children {
-            let desired = child.sizeThatFits(proposal)
+        for (index, child) in children.enumerated() {
+            let desired = context.sizeThatFits(of: child, index: index, proposal: proposal)
             width = max(width, desired.width)
             height = max(height, desired.height)
         }
@@ -103,16 +108,19 @@ public struct ZStack: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
-        for child in children {
+        for (index, child) in children.enumerated() {
             let childRect = OverlayLayout.childRect(
                 for: child,
+                index: index,
                 in: rect,
                 horizontal: horizontal,
-                vertical: vertical
+                vertical: vertical,
+                context: context
             )
-            child.render(into: &buffer, rect: childRect)
+            context.render(child, index: index, into: &buffer, rect: childRect)
         }
     }
 }
@@ -157,9 +165,10 @@ public struct OverlayView<Content: View, Overlay: View>: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 内容の希望サイズ。重ねるビューの大きさは影響しない。
-    public func sizeThatFits(_ proposal: Size) -> Size {
-        content.sizeThatFits(proposal)
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
+        context.sizeThatFits(of: content, index: 0, proposal: proposal)
     }
 
     /// 内容を描いてから、その上へ重ねるビューを描画する。
@@ -167,25 +176,28 @@ public struct OverlayView<Content: View, Overlay: View>: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
-        content.render(into: &buffer, rect: rect)
+        context.render(content, index: 0, into: &buffer, rect: rect)
         let overlayRect = OverlayLayout.childRect(
             for: overlay,
+            index: 1,
             in: rect,
             horizontal: horizontal,
-            vertical: vertical
+            vertical: vertical,
+            context: context
         )
-        overlay.render(into: &buffer, rect: overlayRect)
+        context.render(overlay, index: 1, into: &buffer, rect: overlayRect)
     }
 }
 
 /// 内容の上へ、画面全体を基準に置いたビューを重ねるビュー。
 ///
-/// 重ねるビューは親から渡された矩形ではなくバッファ全体を基準に配置されるため、画面の中央へ
-/// ダイアログを出せる。
+/// 重ねるビューは親から渡された矩形ではなく `RenderContext.screen` を基準に配置されるため、
+/// 画面の中央へダイアログを出せる。
 ///
-/// - Warning: 重ねるビューは `render(into:rect:)` に渡された矩形の外へも描く。`View` が約束する
+/// - Warning: 重ねるビューは `render(into:rect:context:)` に渡された矩形の外へも描く。`View` が約束する
 ///   「`rect` の外のセルは書き換えない」から外れる唯一のビュー。
 /// - Note: 重ねるビューが描かれるのは、このビューが描かれた時点。後から描かれる兄弟ビューには
 ///   上書きされるので、いちばん外側のビューへ付ける。
@@ -225,27 +237,31 @@ public struct ScreenOverlayView<Content: View, Overlay: View>: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 内容の希望サイズ。重ねるビューの大きさは影響しない。
-    public func sizeThatFits(_ proposal: Size) -> Size {
-        content.sizeThatFits(proposal)
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
+        context.sizeThatFits(of: content, index: 0, proposal: proposal)
     }
 
-    /// 内容を描いてから、バッファ全体を基準に重ねるビューを描画する。
+    /// 内容を描いてから、画面全体を基準に重ねるビューを描画する。
     ///
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 内容を描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
-        content.render(into: &buffer, rect: rect)
-        let screen = buffer.bounds
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
+        context.render(content, index: 0, into: &buffer, rect: rect)
+        let screen = context.screen
         guard !screen.isEmpty else { return }
         let overlayRect = OverlayLayout.childRect(
             for: overlay,
+            index: 1,
             in: screen,
             horizontal: horizontal,
-            vertical: vertical
+            vertical: vertical,
+            context: context
         )
-        overlay.render(into: &buffer, rect: overlayRect)
+        context.render(overlay, index: 1, into: &buffer, rect: overlayRect)
     }
 }
 

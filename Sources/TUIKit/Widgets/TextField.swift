@@ -293,8 +293,9 @@ public struct TextField: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: `proposal` の幅と、高さ 1 行のサイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size {
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         Size(width: proposal.width, height: min(1, proposal.height))
     }
 
@@ -325,9 +326,10 @@ public struct TextField: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。使うのは最初の 1 行だけ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Postcondition: `state.renderedCursorPoint` がカーソルの画面上の位置に更新される。
     ///   描く領域がなければ `nil` になる。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width > 0, rect.height > 0 else {
             state.renderedCursorPoint = nil
             return

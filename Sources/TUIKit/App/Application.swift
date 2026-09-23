@@ -353,7 +353,7 @@ public final class Application<Root: Component> {
 
         let view = root.body
         let bounds = buffer.bounds
-        view.render(into: &buffer, rect: bounds)
+        view.render(into: &buffer, rect: bounds, context: RenderContext(screen: bounds))
         renderer.render(buffer, cursor: root.cursorPosition)
     }
 }
