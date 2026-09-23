@@ -5,7 +5,8 @@
 ///
 /// - Note: `TextField` と `ListView` が書き戻すのは、状態の `handle(_:)` などの操作の中だけで、
 ///   描画（`sizeThatFits(_:context:)` と `render(into:rect:context:)`）では読み出すだけ。
-///   自作のビューも、描画の中で `wrappedValue` へ代入しない。
+/// - Warning: 自作のビューの描画の中で `wrappedValue` へ代入すると、1 フレームのうちに測定と描画で
+///   同じビューを二度辿るため、測ったときと描いたときで値が食い違う。
 @MainActor
 public struct Binding<Value> {
     private let getValue: @MainActor () -> Value

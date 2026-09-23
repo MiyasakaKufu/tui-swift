@@ -32,7 +32,7 @@ public final class TextFieldState {
 
     /// カーソルの文字インデックス（0 〜 文字数）。
     ///
-    /// - Note: `Binding` の先の値がアプリの側で短くなると、カーソルは末尾に来る。
+    /// - Note: `Binding` の先の値がアプリの側でカーソル位置より短くなると、カーソルは末尾に来る。
     public var cursor: Int {
         min(storedCursor, characters.count)
     }
