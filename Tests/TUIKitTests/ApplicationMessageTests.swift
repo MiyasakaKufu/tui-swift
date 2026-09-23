@@ -211,6 +211,75 @@ final class ApplicationMessageTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
+    /// ループより速く送った値は、送った順にすべて届き、値の数だけは描き直さない。
+    func testMessagesSentFasterThanLoopAllArriveInOrderWithOneRedraw() async throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let reader = OutputReader(descriptor: pty.master)
+        let capture = startCapturing(reader)
+        defer { capture.cancel() }
+
+        let total = 100
+        let component = MessageRecordingComponent()
+        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        let sender = application.sender
+        let loop = Task { try await application.run() }
+
+        let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drew, "最初の描画が終わらない")
+        let drawsBefore = component.drawCount
+
+        // 送る間に `await` を挟んではいけない。ループが同じアクタの上で割り込み、
+        // すべてが溜まってから取り出されたことにならない。
+        for value in 0..<total { sender.send(.numbered(value)) }
+
+        let reached = await waitUntil(timeout: 5) { component.messages.count == total }
+        XCTAssertTrue(reached, "送った値が届かない: \(component.messages.count)")
+        XCTAssertEqual(component.messages, (0..<total).map { TestMessage.numbered($0) })
+        XCTAssertEqual(component.drawCount - drawsBefore, 1)
+
+        writeByte(pty.master, UInt8(ascii: "q"))
+        try await waitForLoop(loop)
+    }
+
+    /// 1 周が `frameInterval` より長くても、キーが `handle(_:)` に届くまでの遅れが伸び続けない。
+    func testKeyLatencyStaysShortWhenLoopIsSlowerThanFrameInterval() async throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let reader = OutputReader(descriptor: pty.master)
+        let capture = startCapturing(reader)
+        defer { capture.cancel() }
+
+        let component = SlowUpdatingComponent(
+            updateDuration: 0.02,
+            keyWrittenAfter: 50,
+            master: pty.master
+        )
+        let application = Application(
+            root: component,
+            options: ApplicationOptions(
+                usesAlternateScreen: false,
+                usesBracketedPaste: false,
+                usesKeyboardProtocol: false,
+                frameInterval: 0.005
+            ),
+            terminal: pty.terminal()
+        )
+        let loop = Task { try await application.run() }
+
+        // キーをテストの側で待ってから書いてはいけない。`.wake` が絶えず溜まっている間、
+        // ループはアクタを明け渡さずに回ることがあり、テストの待ちが終わらない。
+        try await waitForLoop(loop, timeout: 20)
+
+        let written = try XCTUnwrap(component.keyWritten, "キーを書く前にループが終わった")
+        let arrival = try XCTUnwrap(component.keyArrival, "キーが届かない")
+        XCTAssertLessThan(arrival.timeIntervalSince(written), 0.5)
+    }
+
     /// ループの外から呼んだ `stop()` で、キーを待たずにループが終わる。
     func testStopFromOutsideLoopEndsLoopWithoutKeys() async throws {
         let pty = try PseudoTerminal()
@@ -310,6 +379,7 @@ private enum TestMessage: Hashable, Sendable {
     case arrived
     case first
     case second
+    case numbered(Int)
 }
 
 /// 値が届く前に画面へ出ている文字列。
@@ -381,7 +451,61 @@ private final class MessageRecordingComponent: Component {
         case .arrived: return "arrived"
         case .first: return "first"
         case .second: return "second"
+        case .numbered(let value): return "numbered:\(value)"
         }
+    }
+}
+
+/// `update(elapsed:)` のたびに決めた時間だけアクタを止め、決めた回数に達したらキーを書くコンポーネント。
+///
+/// 書いたキーが届いたら終了する。
+private final class SlowUpdatingComponent: Component {
+
+    /// キーを書いた時刻。まだ書いていなければ `nil`。
+    private(set) var keyWritten: Date?
+    /// 書いたキーが `handle(_:)` に届いた時刻。まだ届いていなければ `nil`。
+    private(set) var keyArrival: Date?
+
+    private let updateDuration: Double
+    private let keyWrittenAfter: Int
+    private let master: Int32
+    private var updateCount = 0
+
+    /// 1 周の長さと、キーを書く時点を決めて作る。
+    ///
+    /// - Parameters:
+    ///   - updateDuration: 1 回の `update(elapsed:)` で止める時間（秒）。
+    ///   - keyWrittenAfter: `update(elapsed:)` がこの回数に達したらキーを書く。
+    ///   - master: キーを書き込む pty の master 側の記述子。
+    init(updateDuration: Double, keyWrittenAfter: Int, master: Int32) {
+        self.updateDuration = updateDuration
+        self.keyWrittenAfter = keyWrittenAfter
+        self.master = master
+    }
+
+    var body: some View {
+        Text(waitingText)
+    }
+
+    func update(elapsed: Double) {
+        updateCount += 1
+        if updateCount == keyWrittenAfter {
+            keyWritten = Date()
+            writeByte(master, UInt8(ascii: "a"))
+        }
+        // `Thread.sleep` を外してはいけない。1 周が `frameInterval` より短くなり、
+        // `.wake` が溜まる条件にならない。
+        Thread.sleep(forTimeInterval: updateDuration)
+    }
+
+    func handle(_ event: InputEvent) -> EventResult {
+        guard case .key(let keyEvent) = event,
+              case .character("a") = keyEvent.key
+        else {
+            return .ignored
+        }
+        keyArrival = Date()
+        return .quit
     }
 }
 

@@ -15,8 +15,7 @@ public final class Application<Root: Component> {
     private let terminal: Terminal
     private let reader: InputReader
     private let renderer: Renderer
-    private let stream: AsyncStream<LoopEvent<Root.Message>>
-    private let continuation: AsyncStream<LoopEvent<Root.Message>>.Continuation
+    private let eventQueue: LoopEventQueue<Root.Message>
 
     /// 別スレッドや `Task` から、`Component.Message` の値をイベントループへ届ける送り口。
     ///
@@ -56,13 +55,9 @@ public final class Application<Root: Component> {
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
-
-        // 上限を付けてはいけない。満杯の `AsyncStream` は送る側を待たせられず、要素を捨てる。
-        // `MessageSender` で送られた値で埋まると、後から届いたキーが捨てられて終われなくなる。
-        let (stream, continuation) = AsyncStream<LoopEvent<Root.Message>>.makeStream()
-        self.stream = stream
-        self.continuation = continuation
-        self.sender = MessageSender(continuation: continuation)
+        let eventQueue = LoopEventQueue<Root.Message>()
+        self.eventQueue = eventQueue
+        self.sender = MessageSender(eventQueue: eventQueue)
     }
 
     /// ループを終了させる。イベントハンドラの中からも呼べる。
@@ -70,7 +65,7 @@ public final class Application<Root: Component> {
         isRunning = false
         // ループを起こさずに済ませてはいけない。`Task` から呼ばれたとき、ループは次の
         // `LoopEvent` を待ったまま `isRunning` を読み直さず、キーが届くまで終わらない。
-        continuation.yield(.wake)
+        eventQueue.post(.wake)
     }
 
     /// ウィンドウタイトルとアイコン名を設定する。
@@ -110,7 +105,7 @@ public final class Application<Root: Component> {
         resumeTerminal()
         // ループを起こさずに済ませてはいけない。`Task` から呼ばれたとき、次の `LoopEvent` が
         // 届くまで描き直されず、再開した後の画面が空のまま残る。
-        continuation.yield(.wake)
+        eventQueue.post(.wake)
     }
 
     /// 文字列をクリップボードへ渡す。
@@ -169,19 +164,27 @@ public final class Application<Root: Component> {
         let inputStopped = startReadingInput()
         draw()
 
-        loop: for await event in stream {
-            var isIdle = false
-            switch event {
-            case .inputs(let inputs):
-                for input in inputs {
-                    if !deliver(input) { break loop }
+        // `LoopEvent` を 1 つ取り出すたびに描き直してはいけない。ループより速く溜まると、
+        // 溜まった数だけ描き直しが走り、後から届いたキーが `handle(_:)` に届くまでの遅れが伸び続ける。
+        loop: for await _ in eventQueue.arrivals {
+            let events = eventQueue.take()
+            if events.isEmpty { continue loop }
+
+            var isIdle = events.allSatisfy { event in
+                if case .idle = event { return true }
+                return false
+            }
+            for event in events where isRunning {
+                switch event {
+                case .inputs(let inputs):
+                    for input in inputs {
+                        if !deliver(input) { break loop }
+                    }
+                case .message(let message):
+                    if root.receive(message) == .quit { break loop }
+                case .wake, .idle:
+                    break
                 }
-            case .message(let message):
-                if root.receive(message) == .quit { break loop }
-            case .wake:
-                break
-            case .idle:
-                isIdle = true
             }
 
             if SignalWatcher.consumeTermination() { break loop }
@@ -219,9 +222,9 @@ public final class Application<Root: Component> {
 
         // `startReadingInput()` が作ったスレッドの終了を待たずに戻ってはいけない。
         // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
-        // `LoopEvent` の `AsyncStream` を閉じてから起こす順序も変えてはいけない。
-        // 逆にすると閉じる前の `AsyncStream` へ yield し、`poll(2)` へ戻って次にバイトが届くまで終わらない。
-        continuation.finish()
+        // `LoopEventQueue` を閉じてから起こす順序も変えてはいけない。
+        // 逆にすると閉じる前の `LoopEventQueue` へ入れ、`poll(2)` へ戻って次にバイトが届くまで終わらない。
+        eventQueue.close()
         SignalWatcher.wakeUp()
         // `run()` の `Task` の中で直接待ってはいけない。その `Task` が打ち切られていると、
         // `for await` がすぐに抜けて、スレッドの終了を待たずに戻る。
@@ -230,7 +233,7 @@ public final class Application<Root: Component> {
         terminal.setCursorVisible(true)
     }
 
-    /// tty からバイト列を読み、組み立てた `InputEvent` を `LoopEvent` の `AsyncStream` へ流すスレッドを作る。
+    /// tty からバイト列を読み、組み立てた `InputEvent` を `LoopEventQueue` へ入れるスレッドを作る。
     ///
     /// - Returns: スレッドが終わったときに終了する `AsyncStream`。
     private func startReadingInput() -> AsyncStream<Void> {
@@ -242,7 +245,7 @@ public final class Application<Root: Component> {
         let isFallingBack = wakeupDescriptor == nil && options.frameInterval == nil
         let timeout = isFallingBack ? wakeupFallbackInterval : options.frameInterval
         let emptyEvent: LoopEvent<Root.Message> = isFallingBack ? .idle : .wake
-        let continuation = self.continuation
+        let eventQueue = self.eventQueue
 
         // まだ返していない分を引き渡さないと、`supportsKeyboardProtocol()` の待ちの間に
         // 届いたキーが落ちる。待ちの間に読んだ分は、待った側の `InputReader` が抱えている。
@@ -259,10 +262,8 @@ public final class Application<Root: Component> {
             while true {
                 let events = reader.wait(timeout: timeout)
 
-                // `InputEvent` を 1 つずつ yield してはいけない。
-                // ループは要素 1 つごとに描き直すので、描画が `InputEvent` の数だけ走る。
                 let event: LoopEvent<Root.Message> = events.isEmpty ? emptyEvent : .inputs(events)
-                if case .terminated = continuation.yield(event) { break }
+                if !eventQueue.post(event) { break }
             }
 
             stoppedContinuation.finish()

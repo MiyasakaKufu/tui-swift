@@ -1,7 +1,7 @@
-/// イベントループが 1 つの `AsyncStream` から受け取るもの。
+/// イベントループが `LoopEventQueue` から受け取るもの。
 ///
-/// `InputEvent` と、`MessageSender` で送られた値を同じ `AsyncStream` へ流すため、
-/// 取り出す順序は `yield` した順になる。
+/// `InputEvent` と、`MessageSender` で送られた値を同じ `LoopEventQueue` へ入れるため、
+/// 取り出す順序は入れた順になる。
 enum LoopEvent<Message: Sendable>: Sendable {
     /// tty から読んだバイト列を組み立てたもの。`InputReader.wait(timeout:)` 1 回分をまとめて運ぶ。
     case inputs([InputEvent])
