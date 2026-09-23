@@ -1,0 +1,62 @@
+# `restore()` せずに捨てたとき、termios と、エミュレータ宛の列のそれぞれが戻るかを測る。
+# 使い捨て。H17 の実証が termios だけだったため、列の側を確かめる。
+name: Restore Target Probe
+
+on:
+  push:
+    branches: ["claude/106-**"]
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: 測る
+        run: |
+          set +e
+          git config --global --add safe.directory "$PWD"
+          git fetch --no-tags origin main >/dev/null 2>&1
+          echo "## restore() せずに捨てたとき、何が戻るか" > summary.txt
+
+          anchor='        .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),'
+          inject() {
+            awk -v a="$anchor" '
+              { print }
+              $0 == a {
+                print "        .executableTarget(name: \"DeinitNecessityProbe\", dependencies: [\"TUIKit\", \"CTUITestSupport\"]),"
+              }
+            ' Package.swift > Package.swift.new
+            mv Package.swift.new Package.swift
+          }
+
+          run_case() {
+            local label="$1" status
+            rm -rf .build
+            swift run DeinitNecessityProbe > probe.log 2>&1
+            status=$?
+            echo "### $label" >> summary.txt
+            echo "  終了値: $status / error 行: $(grep -c 'error:' probe.log || true)" >> summary.txt
+            grep 'error:' probe.log | sed 's#.*/tui-swift/##' | sort -u | cut -c1-160 | head -4 | sed 's/^/    /' >> summary.txt
+            grep -o 'PROBE: .*' probe.log | sed 's/^/    /' >> summary.txt
+          }
+
+          # 1. このブランチの形（deinit なし + atexit）
+          git checkout HEAD -- Sources Package.swift
+          git checkout HEAD -- Sources/DeinitNecessityProbe
+          inject
+          run_case "このブランチ（deinit なし + atexit）"
+
+          # 2. main の形（deinit { restore() }）
+          rm -rf Sources Tests
+          git checkout origin/main -- Sources Tests Package.swift
+          git checkout HEAD -- Sources/DeinitNecessityProbe
+          inject
+          run_case "main（deinit { restore() }）"
+
+          # 3. main から deinit を空にしただけ（受け皿なし）
+          perl -0pi -e 's/    deinit \{\n        restore\(\)\n    \}/    deinit {}/s' Sources/TUIKit/Terminal/Terminal.swift
+          run_case "deinit を空にしただけ（受け皿なし）"
+      - name: まとめ
+        if: always()
+        run: cat summary.txt
