@@ -41,7 +41,7 @@ public final class Application<Root: Component> {
     /// - Parameters:
     ///   - root: 画面を組み立て、イベントを受け取るルート。
     ///   - options: 起動時の設定。
-    ///   - terminal: 使用する端末。省略すると標準入出力を使う。テストでは差し替える。
+    ///   - terminal: 使用する `Terminal`。省略すると標準入出力の記述子で作る。テストでは差し替える。
     public init(
         root: Root,
         options: ApplicationOptions = .default,
@@ -205,7 +205,7 @@ public final class Application<Root: Component> {
         // 読み取りスレッドの終了を待たずに戻ってはいけない。
         // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
         // 列を閉じてから起こす順序も変えてはいけない。
-        // 逆にすると閉じる前の列へ yield し、`poll(2)` へ戻って次の入力まで終わらない。
+        // 逆にすると閉じる前の列へ yield し、`poll(2)` へ戻って次にバイトが届くまで終わらない。
         continuation.finish()
         SignalWatcher.wakeUp()
         for await _ in inputStopped {}
@@ -213,7 +213,7 @@ public final class Application<Root: Component> {
         terminal.setCursorVisible(true)
     }
 
-    /// 端末の入力を読む専用スレッドを起こし、読んだものを列へ流す。
+    /// tty からバイト列を読み、組み立てた `InputEvent` を列へ流す専用スレッドを起こす。
     ///
     /// - Note: `poll(2)` はアクタの上に置けない。
     ///   アクタを止めると、外部から送られたイベントが実行の機会を得られないため。

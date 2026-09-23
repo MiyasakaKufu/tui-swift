@@ -7,7 +7,7 @@ import TUIKit
 final class DemoApp: TerminalApp {
     static var options: ApplicationOptions {
         // 読み込みが終わった時点で画面が描き直されることを、このデモは示している。
-        // frameInterval を設定すると、入力が無くても描き直されるので示せなくなる。
+        // frameInterval を設定すると一定間隔で描き直されるので示せなくなる。
         ApplicationOptions(
             mouseTracking: .motion,
             reportsFocus: true,

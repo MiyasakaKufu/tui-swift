@@ -29,8 +29,8 @@ final class ApplicationMessageTests: XCTestCase {
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
-        // 画面が変わるまで入力を送ってはいけない。作業の結果だけで変わることを確かめているので、
-        // 入力で起きたのかどうかが分からなくなる。
+        // 画面が変わるまで、キーのバイトを書いてはいけない。
+        // 作業の結果だけで変わることを確かめているので、キーで起きたのかどうかが分からなくなる。
         let drew = await waitUntil(timeout: 5) { self.captured.contains(arrivedText) }
         XCTAssertTrue(drew, "作業の結果が届いた後に画面が描き直されていない")
 
@@ -154,7 +154,7 @@ final class ApplicationMessageTests: XCTestCase {
         let loop = Task { try await application.run() }
 
         // 最初の描画を待たずに送ると届かない。
-        // raw モードへの切り替えが、入力待ちのバイト列を捨てる。
+        // raw モードへの切り替えが、まだ読まれていないバイト列を捨てる。
         let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
 
@@ -342,9 +342,9 @@ private final class PseudoTerminal {
         close()
     }
 
-    /// slave 側を入出力に使う端末を作る。
+    /// slave 側を入出力に使う `Terminal` を作る。
     ///
-    /// - Returns: slave 側につながった端末。
+    /// - Returns: slave 側につながった `Terminal`。
     @MainActor
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
@@ -401,17 +401,17 @@ private func closeDescriptor(_ descriptor: Int32) {
     close(descriptor)
 }
 
-/// 端末のサイズを設定する。
+/// tty のウィンドウサイズを設定する。
 ///
 /// - Parameters:
-///   - descriptor: 設定する端末のファイル記述子。
+///   - descriptor: 設定する tty のファイル記述子。
 ///   - size: 設定するサイズ。
 /// - Returns: 成功なら `0`。
 private func setTerminalSize(_ descriptor: Int32, _ size: Size) -> Int32 {
     ctui_test_set_terminal_size(descriptor, Int32(size.width), Int32(size.height))
 }
 
-/// 端末へ 1 バイト書く。
+/// 記述子へ 1 バイト書く。
 ///
 /// - Parameters:
 ///   - descriptor: 書き込む先のファイル記述子。
