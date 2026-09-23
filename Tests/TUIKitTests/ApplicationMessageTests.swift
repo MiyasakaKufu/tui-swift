@@ -342,9 +342,9 @@ private final class PseudoTerminal {
         close()
     }
 
-    /// slave 側を入出力に使う端末を作る。
+    /// slave 側を入出力に使う `Terminal` を作る。
     ///
-    /// - Returns: slave 側につながった端末。
+    /// - Returns: slave 側につながった `Terminal`。
     @MainActor
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
@@ -401,17 +401,17 @@ private func closeDescriptor(_ descriptor: Int32) {
     close(descriptor)
 }
 
-/// 端末のサイズを設定する。
+/// tty のウィンドウサイズを設定する。
 ///
 /// - Parameters:
-///   - descriptor: 設定する端末のファイル記述子。
+///   - descriptor: 設定する tty のファイル記述子。
 ///   - size: 設定するサイズ。
 /// - Returns: 成功なら `0`。
 private func setTerminalSize(_ descriptor: Int32, _ size: Size) -> Int32 {
     ctui_test_set_terminal_size(descriptor, Int32(size.width), Int32(size.height))
 }
 
-/// 端末へ 1 バイト書く。
+/// 記述子へ 1 バイト書く。
 ///
 /// - Parameters:
 ///   - descriptor: 書き込む先のファイル記述子。

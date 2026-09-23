@@ -41,7 +41,7 @@ public final class Application<Root: Component> {
     /// - Parameters:
     ///   - root: 画面を組み立て、イベントを受け取るルート。
     ///   - options: 起動時の設定。
-    ///   - terminal: 使用する端末。省略すると標準入出力を使う。テストでは差し替える。
+    ///   - terminal: 使用する `Terminal`。省略すると標準入出力の記述子で作る。テストでは差し替える。
     public init(
         root: Root,
         options: ApplicationOptions = .default,
