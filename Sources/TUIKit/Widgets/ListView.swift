@@ -255,8 +255,9 @@ public struct ListView: View {
     ///   - context: ライブラリから渡される文脈。
     /// - Returns: 最も長い項目の幅に印の幅を足した幅と、項目数から決まるサイズ。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        let width = items.reduce(0) { max($0, DisplayWidth.width(of: $1)) }
-            + DisplayWidth.width(of: selectionMarker)
+        let ambiguous = context.ambiguousWidth
+        let width = items.reduce(0) { max($0, DisplayWidth.width(of: $1, ambiguous: ambiguous)) }
+            + DisplayWidth.width(of: selectionMarker, ambiguous: ambiguous)
         return Size(
             width: min(width, proposal.width),
             height: min(items.count, proposal.height)
@@ -285,7 +286,7 @@ public struct ListView: View {
 
         let margin = marginMarker ?? String(
             repeating: " ",
-            count: DisplayWidth.width(of: selectionMarker)
+            count: DisplayWidth.width(of: selectionMarker, ambiguous: context.ambiguousWidth)
         )
 
         for row in 0..<rect.height {
@@ -296,7 +297,7 @@ public struct ListView: View {
             let rowStyle = isSelected ? selectedStyle : style
             let prefix = isSelected ? selectionMarker : margin
             // 幅で切り詰める前に展開しないと、タブの分だけ桁数の計算がずれる。
-            let line = TabExpansion.expand(prefix + items[index])
+            let line = TabExpansion.expand(prefix + items[index], ambiguous: context.ambiguousWidth)
             let y = rect.minY + row
 
             // 選択行は行末まで塗って反転が途切れないようにする。
@@ -307,7 +308,7 @@ public struct ListView: View {
                 )
             }
             buffer.write(
-                DisplayWidth.truncate(line, to: rect.width),
+                DisplayWidth.truncate(line, to: rect.width, ambiguous: context.ambiguousWidth),
                 at: Point(x: rect.minX, y: y),
                 style: rowStyle,
                 clippedTo: rect

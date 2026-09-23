@@ -2,6 +2,8 @@
 public struct Buffer: Hashable, Sendable {
     /// バッファの大きさ。
     public private(set) var size: Size
+    /// East Asian Width が Ambiguous の文字を何桁のセルとして置くか。
+    public let ambiguousWidth: DisplayWidth.AmbiguousWidth
     private var cells: [Cell]
 
     /// 指定したサイズのバッファを作る。
@@ -9,8 +11,14 @@ public struct Buffer: Hashable, Sendable {
     /// - Parameters:
     ///   - size: バッファの大きさ。
     ///   - cell: 全体を埋めるセル。
-    public init(size: Size, filledWith cell: Cell = .empty) {
+    ///   - ambiguousWidth: 曖昧幅の文字の扱い。端末の設定に合わせる。
+    public init(
+        size: Size,
+        filledWith cell: Cell = .empty,
+        ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
+    ) {
         self.size = size
+        self.ambiguousWidth = ambiguousWidth
         self.cells = [Cell](repeating: cell, count: size.width * size.height)
     }
 
@@ -41,7 +49,7 @@ public struct Buffer: Hashable, Sendable {
             }
             if x + 1 < size.width,
                cells[y * size.width + x + 1].isContinuation,
-               !Buffer.coversNextColumn(newValue) {
+               !coversNextColumn(newValue) {
                 blankCell(atColumn: x + 1, row: y)
             }
             cells[y * size.width + x] = newValue
@@ -53,8 +61,8 @@ public struct Buffer: Hashable, Sendable {
     /// - Parameters:
     ///   - cell: 調べるセル。
     /// - Returns: 表示幅が 2 桁以上なら `true`。
-    private static func coversNextColumn(_ cell: Cell) -> Bool {
-        DisplayWidth.width(of: cell.character) > 1
+    private func coversNextColumn(_ cell: Cell) -> Bool {
+        DisplayWidth.width(of: cell.character, ambiguous: ambiguousWidth) > 1
     }
 
     /// 1 桁を、スタイルを保ったまま空白へ戻す。
@@ -124,7 +132,7 @@ public struct Buffer: Hashable, Sendable {
         let region = rect.intersection(bounds)
         guard !region.isEmpty else { return }
 
-        let characterWidth = DisplayWidth.width(of: character)
+        let characterWidth = DisplayWidth.width(of: character, ambiguous: ambiguousWidth)
         guard characterWidth >= 1 else {
             fill(region, with: Cell(character: " ", style: style))
             return
@@ -183,7 +191,7 @@ public struct Buffer: Hashable, Sendable {
         for character in text {
             if character.isNewline { break }
 
-            let characterWidth = DisplayWidth.width(of: character)
+            let characterWidth = DisplayWidth.width(of: character, ambiguous: ambiguousWidth)
             if characterWidth == 0 { continue }
             if x >= region.maxX { break }
 
@@ -236,7 +244,7 @@ public struct Buffer: Hashable, Sendable {
             let y = rect.minY + offset
             if y >= region.maxY { break }
             if y < region.minY { continue }
-            let lineWidth = DisplayWidth.width(of: line)
+            let lineWidth = DisplayWidth.width(of: line, ambiguous: ambiguousWidth)
             let x = rect.minX + alignment.offset(content: lineWidth, available: rect.width)
             write(line, at: Point(x: x, y: y), style: style, clippedTo: region)
         }

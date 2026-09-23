@@ -24,16 +24,18 @@ public enum TextWrapping {
     ///   - width: 1 行に許す表示幅。0 以下なら、各段落を空行として返す。
     ///   - mode: 折り返しの方法。
     ///   - tabSize: タブストップの間隔。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
     /// - Returns: 各行の文字列。タブは展開済み。
     public static func wrap(
         _ text: String,
         width: Int,
         mode: WrapMode,
-        tabSize: Int = TabExpansion.defaultSize
+        tabSize: Int = TabExpansion.defaultSize,
+        ambiguous: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> [String] {
         // 幅を計算する前に展開する。あとで展開すると、`DisplayWidth` が計算した幅と
         // 実際に描画される幅が食い違う。
-        let paragraphs = TabExpansion.expand(text, tabSize: tabSize)
+        let paragraphs = TabExpansion.expand(text, tabSize: tabSize, ambiguous: ambiguous)
             .split(omittingEmptySubsequences: false, whereSeparator: { $0.isNewline })
             .map(String.init)
         if width <= 0 { return paragraphs.map { _ in "" } }
@@ -42,26 +44,31 @@ public enum TextWrapping {
         for paragraph in paragraphs {
             switch mode {
             case .none:
-                lines.append(String(DisplayWidth.prefix(of: paragraph, width: width)))
+                let head = DisplayWidth.prefix(of: paragraph, width: width, ambiguous: ambiguous)
+                lines.append(String(head))
             case .truncate:
-                lines.append(DisplayWidth.truncate(paragraph, to: width))
+                lines.append(DisplayWidth.truncate(paragraph, to: width, ambiguous: ambiguous))
             case .character:
-                lines.append(contentsOf: splitByCharacter(paragraph, width: width))
+                lines.append(contentsOf: splitByCharacter(paragraph, width: width, ambiguous: ambiguous))
             case .word:
-                lines.append(contentsOf: splitByWord(paragraph, width: width))
+                lines.append(contentsOf: splitByWord(paragraph, width: width, ambiguous: ambiguous))
             }
         }
         return lines
     }
 
-    private static func splitByCharacter(_ text: String, width: Int) -> [String] {
+    private static func splitByCharacter(
+        _ text: String,
+        width: Int,
+        ambiguous: DisplayWidth.AmbiguousWidth
+    ) -> [String] {
         if text.isEmpty { return [""] }
 
         var lines: [String] = []
         var current = ""
         var used = 0
         for character in text {
-            let characterWidth = DisplayWidth.width(of: character)
+            let characterWidth = DisplayWidth.width(of: character, ambiguous: ambiguous)
             if used + characterWidth > width && !current.isEmpty {
                 lines.append(current)
                 current = ""
@@ -74,7 +81,11 @@ public enum TextWrapping {
         return lines
     }
 
-    private static func splitByWord(_ text: String, width: Int) -> [String] {
+    private static func splitByWord(
+        _ text: String,
+        width: Int,
+        ambiguous: DisplayWidth.AmbiguousWidth
+    ) -> [String] {
         if text.isEmpty { return [""] }
 
         var lines: [String] = []
@@ -88,7 +99,7 @@ public enum TextWrapping {
         }
 
         for word in tokenize(text) {
-            let wordWidth = DisplayWidth.width(of: word)
+            let wordWidth = DisplayWidth.width(of: word, ambiguous: ambiguous)
 
             if word.allSatisfy({ $0 == " " }) {
                 if current.isEmpty { continue }
@@ -115,10 +126,10 @@ public enum TextWrapping {
                 current = word
                 used = wordWidth
             } else {
-                let pieces = splitByCharacter(word, width: width)
+                let pieces = splitByCharacter(word, width: width, ambiguous: ambiguous)
                 lines.append(contentsOf: pieces.dropLast())
                 current = pieces.last ?? ""
-                used = DisplayWidth.width(of: current)
+                used = DisplayWidth.width(of: current, ambiguous: ambiguous)
             }
         }
 

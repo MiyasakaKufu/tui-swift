@@ -40,8 +40,11 @@ public struct Text: View {
     ///   - context: ライブラリから渡される文脈。
     /// - Returns: 最も長い行の幅と、折り返した行数から決まるサイズ。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        let lines = TextWrapping.wrap(content, width: proposal.width, mode: wrap, tabSize: tabSize)
-        let width = lines.reduce(0) { max($0, DisplayWidth.width(of: $1)) }
+        let ambiguous = context.ambiguousWidth
+        let lines = TextWrapping.wrap(
+            content, width: proposal.width, mode: wrap, tabSize: tabSize, ambiguous: ambiguous
+        )
+        let width = lines.reduce(0) { max($0, DisplayWidth.width(of: $1, ambiguous: ambiguous)) }
         return Size(width: min(width, proposal.width), height: lines.count)
     }
 
@@ -53,7 +56,9 @@ public struct Text: View {
     ///   - context: ライブラリから渡される文脈。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
-        let lines = TextWrapping.wrap(content, width: rect.width, mode: wrap, tabSize: tabSize)
+        let lines = TextWrapping.wrap(
+            content, width: rect.width, mode: wrap, tabSize: tabSize, ambiguous: context.ambiguousWidth
+        )
         // ここでタブを展開してはいけない。`TextWrapping.wrap` が展開した行が二重に広がる。
         buffer.write(lines: Array(lines.prefix(rect.height)), in: rect, style: style, alignment: alignment)
     }

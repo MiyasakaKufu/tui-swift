@@ -33,9 +33,15 @@ public final class TextFieldState {
     /// 文字列が空か。
     public var isEmpty: Bool { characters.isEmpty }
 
-    /// カーソル位置までの表示幅。
-    public var cursorColumn: Int {
-        DisplayWidth.width(of: String(characters.prefix(cursor)))
+    /// カーソル位置までの表示幅を返す。
+    ///
+    /// - Parameters:
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    /// - Returns: 先頭からカーソルの直前の文字までの桁数。
+    public func cursorColumn(
+        ambiguous: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
+    ) -> Int {
+        DisplayWidth.width(of: String(characters.prefix(cursor)), ambiguous: ambiguous)
     }
 
     /// 文字列を置き換える。
@@ -303,11 +309,15 @@ public struct TextField: View {
     ///
     /// - Parameters:
     ///   - width: 入力欄に使える幅。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
     /// - Returns: 隠す桁数。カーソルが幅の中に収まっていれば 0。
     /// - Postcondition: 全角文字を途中で割らない。
-    public func scrollOffset(forWidth width: Int) -> Int {
+    public func scrollOffset(
+        forWidth width: Int,
+        ambiguous: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
+    ) -> Int {
         guard width > 0 else { return 0 }
-        let column = state.cursorColumn
+        let column = state.cursorColumn(ambiguous: ambiguous)
         guard column >= width else { return 0 }
 
         // 必要な桁数で切ってはいけない。全角文字の途中で切れると左端が空白になる。
@@ -316,7 +326,7 @@ public struct TextField: View {
         var offset = 0
         for character in state.text {
             if offset >= required { break }
-            offset += DisplayWidth.width(of: character)
+            offset += DisplayWidth.width(of: character, ambiguous: ambiguous)
         }
         return offset
     }
@@ -339,7 +349,11 @@ public struct TextField: View {
 
         if state.isEmpty && !placeholder.isEmpty {
             buffer.write(
-                DisplayWidth.truncate(TextFieldState.sanitizedText(placeholder), to: rect.width),
+                DisplayWidth.truncate(
+                    TextFieldState.sanitizedText(placeholder),
+                    to: rect.width,
+                    ambiguous: context.ambiguousWidth
+                ),
                 at: Point(x: rect.minX, y: rect.minY),
                 style: placeholderStyle,
                 clippedTo: row
@@ -350,7 +364,7 @@ public struct TextField: View {
             return
         }
 
-        let offset = scrollOffset(forWidth: rect.width)
+        let offset = scrollOffset(forWidth: rect.width, ambiguous: context.ambiguousWidth)
         buffer.write(
             state.text,
             at: Point(x: rect.minX - offset, y: rect.minY),
@@ -360,7 +374,10 @@ public struct TextField: View {
 
         placeCursor(
             into: &buffer,
-            at: Point(x: rect.minX + state.cursorColumn - offset, y: rect.minY),
+            at: Point(
+                x: rect.minX + state.cursorColumn(ambiguous: context.ambiguousWidth) - offset,
+                y: rect.minY
+            ),
             in: rect
         )
     }

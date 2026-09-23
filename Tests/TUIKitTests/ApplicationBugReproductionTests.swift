@@ -115,6 +115,57 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
     }
 
+    /// `ambiguousWidth` の指定どおりの桁数で枠線が描かれる。
+    func testApplicationDrawsBorderWithTheAmbiguousWidthOption() async throws {
+        // 枠全体（`╭──╮`）を探してはいけない。ルートのビューは端末全体に広がるので、
+        // 角と角の間は端末の幅まで伸び、その並びは出力に現れない。
+        let cases: [(DisplayWidth.AmbiguousWidth, [String])] = [
+            (.narrow, ["╭──", "│ab"]),
+            (.wide, ["+--", "|ab"]),
+        ]
+        for (ambiguous, fragments) in cases {
+            var masterDescriptor: Int32 = -1
+            var slaveDescriptor: Int32 = -1
+            let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
+            try XCTSkipIf(openResult != 0, "疑似端末を開けない環境のため飛ばす")
+            let master = masterDescriptor
+            let slave = slaveDescriptor
+            defer {
+                close(slave)
+                close(master)
+            }
+
+            XCTAssertEqual(setTerminalSize(master, Size(width: 20, height: 5)), 0)
+
+            // 出力先が詰まるとループが止まるので、master 側は読み続ける。
+            let drain = OutputDrain(descriptor: master, recordsOutput: true)
+            drain.start()
+            defer { drain.stop() }
+
+            let component = BorderDrawingComponent()
+            let application = Application(
+                root: component,
+                options: ApplicationOptions(
+                    usesAlternateScreen: false,
+                    usesKeyboardProtocol: false,
+                    frameInterval: 1.0 / 60,
+                    ambiguousWidth: ambiguous
+                ),
+                terminal: Terminal(input: slave, output: slave)
+            )
+            component.onFramesDrawn = { [weak application] in application?.stop() }
+
+            try await application.run()
+
+            for fragment in fragments {
+                XCTAssertTrue(
+                    drain.waitForOutput(containing: fragment, timeout: 2),
+                    "\(ambiguous) のとき \(fragment) が描かれていない"
+                )
+            }
+        }
+    }
+
     /// `mouseTracking` が `.motion` なら、ボタンを押していない移動が `.move` として届く。
     func testApplicationEnablesMouseMotionTracking() async throws {
         var masterDescriptor: Int32 = -1
@@ -442,6 +493,26 @@ private final class FocusRecordingComponent: Component {
         hasStartedLoop.set()
         elapsedTotal += elapsed
         if elapsedTotal > 5 { onTimeout() }
+    }
+}
+
+/// 枠線で囲んだ文字列を描き、何フレームか回ったら終了するコンポーネント。
+private final class BorderDrawingComponent: Component {
+
+    /// 何フレームか回ったときに呼ばれる。
+    var onFramesDrawn: () -> Void = {}
+
+    private var elapsedTotal = 0.0
+
+    var body: some View {
+        Text("ab").border(.rounded)
+    }
+
+    func handle(_ event: InputEvent) -> EventResult { .ignored }
+
+    func update(elapsed: Double) {
+        elapsedTotal += elapsed
+        if elapsedTotal > 0.1 { onFramesDrawn() }
     }
 }
 

@@ -336,7 +336,7 @@ final class WidgetTests: XCTestCase {
         state.moveToStart()
         state.moveRight()
         XCTAssertEqual(state.cursor, 1)
-        XCTAssertEqual(state.cursorColumn, 2)
+        XCTAssertEqual(state.cursorColumn(), 2)
     }
 
     func testTextFieldControlShortcuts() async {
@@ -390,9 +390,9 @@ final class WidgetTests: XCTestCase {
         state.handle(.paste("a\r\nb"))
         state.moveToStart()
         state.moveRight()
-        XCTAssertEqual(state.cursorColumn, 1)
+        XCTAssertEqual(state.cursorColumn(), 1)
         state.moveRight()
-        XCTAssertEqual(state.cursorColumn, 2)
+        XCTAssertEqual(state.cursorColumn(), 2)
     }
 
     func testTextFieldInsertSanitizesControlCharacters() async {
@@ -461,7 +461,7 @@ final class WidgetTests: XCTestCase {
         typeText(familyEmoji, into: state)
         XCTAssertEqual(state.text, familyEmoji)
         XCTAssertEqual(state.cursor, 1)
-        XCTAssertEqual(state.cursorColumn, 2)
+        XCTAssertEqual(state.cursorColumn(), 2)
 
         XCTAssertTrue(state.deleteBackward())
         XCTAssertEqual(state.text, "")
@@ -552,7 +552,7 @@ final class WidgetTests: XCTestCase {
                     boundaries.contains(offset),
                     "幅 \(width)・内容 \(state.text) でスクロール量 \(offset) が文字の区切りにない"
                 )
-                XCTAssertLessThan(state.cursorColumn - offset, width)
+                XCTAssertLessThan(state.cursorColumn() - offset, width)
             }
         }
     }
