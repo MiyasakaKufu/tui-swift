@@ -31,7 +31,7 @@ final class ApplicationSignalTests: XCTestCase {
         let run = runInBackground(root: probe, terminal: pty.terminal())
 
         // 入力を送ってはいけない。シグナルだけでループが動くことを確かめている。
-        try await run.value
+        try await waitForLoop(run)
 
         XCTAssertEqual(
             probe.sizes,
@@ -54,7 +54,7 @@ final class ApplicationSignalTests: XCTestCase {
         let run = runInBackground(root: probe, terminal: pty.terminal())
 
         // 入力を送ってはいけない。シグナルだけでループが終わることを確かめている。
-        try await run.value
+        try await waitForLoop(run)
     }
 
     /// 外から送られた SIGINT / SIGQUIT を終了シグナルとして受け取る。
@@ -135,12 +135,12 @@ final class ApplicationSignalTests: XCTestCase {
 
     // MARK: - 補助
 
-    /// 別スレッドでイベントループを回す。
+    /// イベントループを回す `Task` を起こす。
     ///
     /// - Parameters:
     ///   - root: ループに渡すコンポーネント。
-    ///   - terminal: 入出力に使う端末。
-    /// - Returns: ループの終了を待つための expectation と、`run()` が投げたエラーの入れ物。
+    ///   - terminal: 入出力に使う `Terminal`。
+    /// - Returns: `run()` を回している `Task`。
     @MainActor
     private func runInBackground<Root: Component>(
         root: Root,
@@ -156,17 +156,6 @@ final class ApplicationSignalTests: XCTestCase {
     }
 }
 
-/// スレッドをまたいで結果を受け渡すための入れ物。
-///
-/// - Warning: 読み書きの順序は `XCTestExpectation` で揃える。
-private final class ResultBox<Value>: @unchecked Sendable {
-    var value: Value
-
-    init(_ value: Value) {
-        self.value = value
-    }
-}
-
 /// リサイズの通知を記録し、二度目の通知で終了するコンポーネント。
 ///
 /// 最初の描画で一度だけ、渡された処理を実行する。
@@ -175,7 +164,6 @@ private final class ResizeProbe: Component, @unchecked Sendable {
     private var hasDrawn = false
 
     private(set) var sizes: [Size] = []
-    let resized = XCTestExpectation(description: "新しいサイズが通知される")
 
     init(trigger: @escaping () -> Void) {
         self.trigger = trigger
@@ -193,7 +181,6 @@ private final class ResizeProbe: Component, @unchecked Sendable {
         guard case .resize(let size) = event else { return .ignored }
         sizes.append(size)
         guard sizes.count >= 2 else { return .handled }
-        resized.fulfill()
         return .quit
     }
 }

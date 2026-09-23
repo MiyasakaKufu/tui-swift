@@ -96,8 +96,9 @@ public final class Terminal: TerminalOutput {
     /// - Note: クラッシュしても端末が戻るよう、シグナルハンドラを仕掛ける。
     /// - Note: `restore()` を呼ばずにこの `Terminal` を捨てた場合、
     ///   tty の termios が戻り、送った設定を打ち消す制御コードが書き出されるのは、
-    ///   プロセスが終わるときになる。
-    ///   捨てた後も同じプロセスで tty を使うなら、`restore()` を呼ぶこと。
+    ///   プロセスが終わるときになる。その前に別の `Terminal` が raw モードへ入るか、
+    ///   `disableRawMode()`（`restore()` からも呼ばれる）を呼ぶと戻らない。
+    ///   戻す先は 1 組しか覚えておけないため。捨てる前に `restore()` を呼ぶこと。
     public func enableRawMode() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
         guard !isRawModeActive else { return }

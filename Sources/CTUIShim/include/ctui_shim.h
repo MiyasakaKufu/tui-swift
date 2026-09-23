@@ -39,8 +39,6 @@ int ctui_install_signal_handler(int signal_number,
 /// - Returns: 成功なら 0、失敗なら -1。
 int ctui_restore_signal_handler(int signal_number, const struct sigaction *previous);
 
-#endif /* CTUI_SHIM_H */
-
 // シグナルハンドラから触る状態を Swift のグローバル変数に置くと、並行性検査が
 // 「nonisolated global shared mutable state」として毎参照を指摘する。印を付けても
 // 非同期シグナル安全という制約は変わらないので、状態ごと C 側へ置く。
@@ -85,8 +83,11 @@ int ctui_signal_wakeup_read_descriptor(void);
 
 /// イベント待ちを起こす。
 ///
-/// - Note: シグナルハンドラから呼べる。`write(2)` は非同期シグナル安全な関数の一覧にあるが
-///   `errno` を書き換えるため、退避して戻す。
+/// シグナルハンドラから呼べる。使うのは非同期シグナル安全な `write(2)` だけ。
+///
+/// - Postcondition: `errno` は呼ぶ前の値のまま。
+/// - See: [The Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9799919799/) の
+///   「Signal Concepts」にある Async-Signal-Safe Functions。
 void ctui_signal_wake_up(void);
 
 /// 標準エラー出力へ書き出す。
@@ -94,3 +95,5 @@ void ctui_signal_wake_up(void);
 /// - Parameters:
 ///   - message: 書き出す文字列。ヌル終端。
 void ctui_write_standard_error(const char *message);
+
+#endif /* CTUI_SHIM_H */

@@ -7,9 +7,6 @@ import Glibc
 import CTUIShim
 
 /// イベント待ちを起こす。
-///
-/// - See: [The Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9799919799/) の
-///   「Signal Concepts」にある Async-Signal-Safe Functions。
 private func wakeUpEventLoop() {
     ctui_signal_wake_up()
 }

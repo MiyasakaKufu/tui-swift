@@ -71,8 +71,11 @@ void ctui_signal_wake_up(void) {
     int descriptor = (int)ctui_wakeup_write_descriptor;
     if (descriptor < 0) { return; }
 
+    // `errno` の退避を外してはいけない。割り込まれた側が、自分が呼んだ関数の `errno` を
+    // 読んだつもりで `write(2)` の結果を読む。
     int saved_errno = errno;
     unsigned char byte = 0;
+    // 書けなくても書き直さない。起こす合図は 1 バイトあれば足りる。
     (void)write(descriptor, &byte, 1);
     errno = saved_errno;
 }

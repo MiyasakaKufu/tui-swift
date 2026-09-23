@@ -42,7 +42,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertTrue(drew, "送ったイベントが届いた後に画面が描き直されていない")
 
         writeByte(pty.master, UInt8(ascii: "q"))
-        try await loop.value
+        try await waitForLoop(loop)
 
         XCTAssertEqual(component.messages, [.arrived])
     }
@@ -76,7 +76,7 @@ final class ApplicationMessageTests: XCTestCase {
             }
         }
 
-        try await loop.value
+        try await waitForLoop(loop)
 
         XCTAssertEqual(component.messages.count, total)
     }
@@ -96,7 +96,7 @@ final class ApplicationMessageTests: XCTestCase {
         let sender = application.sender
         let loop = Task { try await application.run() }
 
-        // 最初の描画を待たずに送ると届かない。
+        // 最初の描画を待たずにキーのバイトを書くと届かない。
         // raw モードへの切り替えが、まだ読まれていないバイト列を捨てる。
         let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
@@ -115,7 +115,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertTrue(gotSecondKey, "キーが届かない")
         sender.send(.second)
 
-        try await loop.value
+        try await waitForLoop(loop)
 
         XCTAssertEqual(component.records, ["message:first", "key:a", "key:b", "message:second"])
     }
@@ -153,7 +153,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertTrue(reached, "問い合わせの間に届いたキーが落ちている: \(component.records)")
 
         writeByte(pty.master, UInt8(ascii: "q"))
-        try await loop.value
+        try await waitForLoop(loop)
     }
 
     /// ループが動いている間の送信は受け付け、終わった後の送信は受け付けない。
@@ -176,7 +176,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertTrue(sender.send(.first), "動いているループが受け付けない")
 
         writeByte(pty.master, UInt8(ascii: "q"))
-        try await loop.value
+        try await waitForLoop(loop)
 
         XCTAssertFalse(sender.send(.second), "終わったループが受け付けている")
     }
@@ -206,7 +206,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertEqual(component.drawCount - drawsBefore, 1)
 
         writeByte(pty.master, UInt8(ascii: "q"))
-        try await loop.value
+        try await waitForLoop(loop)
     }
 
     // MARK: - 補助

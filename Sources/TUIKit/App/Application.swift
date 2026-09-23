@@ -30,6 +30,7 @@ public final class Application<Root: Component> {
     /// 最後にフレームを数えた時刻。
     private var lastFrameTime = 0.0
     private var isRunning = false
+    private var hasRun = false
 
     /// 端末を戻した後にプロセスを止める処理。
     ///
@@ -67,6 +68,9 @@ public final class Application<Root: Component> {
     /// ループを終了させる。イベントハンドラの中からも呼べる。
     public func stop() {
         isRunning = false
+        // ループを起こさずに済ませてはいけない。`Task` から呼ばれたとき、ループは次の
+        // `LoopEvent` を待ったまま `isRunning` を読み直さず、キーが届くまで終わらない。
+        continuation.yield(.wake)
     }
 
     /// ウィンドウタイトルとアイコン名を設定する。
@@ -104,6 +108,9 @@ public final class Application<Root: Component> {
         _ = SignalWatcher.consumeSuspend()
         _ = SignalWatcher.consumeContinue()
         resumeTerminal()
+        // ループを起こさずに済ませてはいけない。`Task` から呼ばれたとき、次の `LoopEvent` が
+        // 届くまで描き直されず、再開した後の画面が空のまま残る。
+        continuation.yield(.wake)
     }
 
     /// 文字列をクリップボードへ渡す。
@@ -125,9 +132,13 @@ public final class Application<Root: Component> {
     ///   raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの画面サイズで `.resize` を通知する。
     ///   戻るときは端末を起動前の状態へ戻し、カーソルを表示に戻す。
+    /// - Precondition: 1 つの `Application` で呼べるのは 1 回だけ。
+    ///   `sender` が送る先の `AsyncStream` は、戻るときに閉じる。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
     public func run() async throws {
+        precondition(!hasRun, "run() は 1 つの Application で 1 回だけ呼べる")
+        hasRun = true
         guard terminal.isTerminal else { throw TerminalError.notATerminal }
 
         try terminal.enableRawMode()
@@ -203,27 +214,33 @@ public final class Application<Root: Component> {
         // 逆にすると閉じる前の `AsyncStream` へ yield し、`poll(2)` へ戻って次にバイトが届くまで終わらない。
         continuation.finish()
         SignalWatcher.wakeUp()
-        for await _ in inputStopped {}
+        // `run()` の `Task` の中で直接待ってはいけない。その `Task` が打ち切られていると、
+        // `for await` がすぐに抜けて、スレッドの終了を待たずに戻る。
+        await Task { for await _ in inputStopped {} }.value
 
         terminal.setCursorVisible(true)
     }
 
     /// tty からバイト列を読み、組み立てた `InputEvent` を `LoopEvent` の `AsyncStream` へ流す専用スレッドを起こす。
     ///
-    /// - Note: `poll(2)` はアクタの上に置けない。
-    ///   アクタを止めると、外部から送られたイベントが実行の機会を得られないため。
     /// - Returns: スレッドが終わったときに終了する `AsyncStream`。
     private func startReadingInput() -> AsyncStream<Void> {
         let (stopped, stoppedContinuation) = AsyncStream<Void>.makeStream()
         let descriptor = terminal.inputDescriptor
         let wakeupDescriptor = SignalWatcher.wakeupDescriptor
-        let timeout = options.frameInterval
+        // 自己パイプが無いときに `frameInterval` のまま待ってはいけない。`nil` なら `poll(2)` が
+        // 無期限に待ち、終了時に起こせないので `run()` が戻らない。
+        let timeout = wakeupDescriptor == nil
+            ? (options.frameInterval ?? wakeupFallbackInterval)
+            : options.frameInterval
         let continuation = self.continuation
 
         // まだ返していない分を引き渡さないと、`supportsKeyboardProtocol()` の待ちの間に
         // 届いたキーが落ちる。待ちの間に読んだ分は、待った側の `InputReader` が抱えている。
         let unread = reader.takeUnreadState()
 
+        // `poll(2)` をアクタの上で呼んではいけない。キーが届くまでループが進まず、
+        // `MessageSender` で送られた値が処理されない。
         // `InputReader` を外で作って渡すと、非 Sendable の参照がスレッドを跨ぐ。
         Thread.detachNewThread {
             let reader = InputReader(descriptor: descriptor)
@@ -331,6 +348,11 @@ public final class Application<Root: Component> {
         renderer.render(buffer, cursor: root.cursorPosition)
     }
 }
+
+/// 自己パイプを作れなかったときに、`poll(2)` の待ちを切り上げる間隔（秒）。
+///
+/// 起こす手段が無いので、この間隔でループへ戻り、終了とシグナルを確かめる。
+private let wakeupFallbackInterval = 0.1
 
 /// 起動時の問い合わせに応答を待つ時間（秒）。
 private let queryTimeout = 0.25
