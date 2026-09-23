@@ -56,7 +56,7 @@ if child == 0 {
         try terminal.enableRawMode()
         // エミュレータ側に状態を作る。作らないと、戻ったかどうかを見分けられない。
         terminal.enterAlternateScreen()
-        terminal.setMouseTracking(.click)
+        terminal.setMouseTracking(.buttons)
         terminal.flush()
         _ = terminal
     } catch {

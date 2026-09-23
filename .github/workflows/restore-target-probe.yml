@@ -19,15 +19,20 @@ jobs:
           git fetch --no-tags origin main >/dev/null 2>&1
           echo "## restore() せずに捨てたとき、何が戻るか" > summary.txt
 
-          anchor='        .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),'
+          # 差し込み口は main とこのブランチで違う（このブランチは swiftLanguageMode を付けている）。
+          # 行全体の一致ではなく TUIDemo のターゲット行を探す。
           inject() {
-            awk -v a="$anchor" '
+            awk '
               { print }
-              $0 == a {
-                print "        .executableTarget(name: \"DeinitNecessityProbe\", dependencies: [\"TUIKit\", \"CTUITestSupport\"]),"
+              /^        \.executableTarget\(name: "TUIDemo"/ {
+                print "        .executableTarget(name: \"DeinitNecessityProbe\", dependencies: [\"TUIKit\", \"CTUITestSupport\"], swiftSettings: [.swiftLanguageMode(.v5)]),"
               }
             ' Package.swift > Package.swift.new
             mv Package.swift.new Package.swift
+            if [ "$(grep -c DeinitNecessityProbe Package.swift)" -ne 1 ]; then
+              echo "  差し込めなかった" >> summary.txt
+              return 1
+            fi
           }
 
           run_case() {
@@ -51,7 +56,9 @@ jobs:
           rm -rf Sources Tests
           git checkout origin/main -- Sources Tests Package.swift
           git checkout HEAD -- Sources/DeinitNecessityProbe
+          # main は tools-version 5.9 で swiftLanguageMode を書けない。
           inject
+          sed -i 's/, swiftSettings: \[.swiftLanguageMode(.v5)\]//' Package.swift
           run_case "main（deinit { restore() }）"
 
           # 3. main から deinit を空にしただけ（受け皿なし）
