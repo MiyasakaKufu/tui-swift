@@ -30,7 +30,8 @@ enum CrashRestorer {
         + ANSI.reset
         + ANSI.showCursor
 
-    /// クラッシュしたときとプロセスが終わるときに端末を戻すよう仕掛ける。
+    /// クラッシュしたときとプロセスが終わるときに、termios を戻し、
+    /// 打ち消す列を書き出すよう仕掛ける。
     ///
     /// - Parameters:
     ///   - input: 端末属性を戻すファイル記述子。
@@ -130,10 +131,10 @@ private func prepareRestoreSequence() {
     restoreSequenceLength = bytes.count
 }
 
-/// プロセスが終わるときに端末を戻すよう仕掛ける。
+/// プロセスが終わるときに termios を戻し、打ち消す列を書き出すよう仕掛ける。
 private func installExitHandler() {
     // この guard を外すと、arm() を呼ぶたびにハンドラが積まれる。
-    // 終了時に同じ列が、その回数だけ端末へ流れる。
+    // 終了時に同じ列が、その回数だけ tty へ書き出される。
     guard !isExitHandlerInstalled else { return }
     isExitHandlerInstalled = true
     atexit { CrashRestorer.restoreTerminal() }
