@@ -17,6 +17,7 @@ public enum TerminalError: Error, Equatable {
 }
 
 /// 端末そのものを表し、raw モードや代替画面の切り替えと出力を担当する。
+@MainActor
 public final class Terminal: TerminalOutput {
     /// 入力を読み取るファイル記述子。
     public let inputDescriptor: Int32
@@ -45,10 +46,6 @@ public final class Terminal: TerminalOutput {
     public init(input: Int32 = 0, output: Int32 = 1) {
         self.inputDescriptor = input
         self.outputDescriptor = output
-    }
-
-    deinit {
-        restore()
     }
 
     /// 入出力の両方が端末に接続されているか。
@@ -97,6 +94,14 @@ public final class Terminal: TerminalOutput {
     /// - Postcondition: 元の端末属性を覚えるため、`disableRawMode()` で戻せる。
     ///   すでに raw モードなら何もしない。
     /// - Note: クラッシュしても端末が戻るよう、シグナルハンドラを仕掛ける。
+    /// - Note: `restore()` を呼ばずにこの `Terminal` を捨てた場合、
+    ///   tty の termios が戻り、送った設定を打ち消す制御コードが書き出されるのは、
+    ///   プロセスが終わるときになる。その前に別の `Terminal` が raw モードへ入るか、
+    ///   `disableRawMode()`（`restore()` からも呼ばれる）を呼ぶと戻らない。
+    ///   戻す先は 1 組しか覚えておけないため。捨てる前に `restore()` を呼ぶこと。
+    ///   入出力のファイル記述子を閉じる前にも `restore()` を呼ぶこと。呼ばずに閉じると、
+    ///   プロセスが終わるときに、同じ番号を割り当てられた別のファイルへ制御コードを書き込み、
+    ///   termios を設定しようとする。
     public func enableRawMode() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
         guard !isRawModeActive else { return }

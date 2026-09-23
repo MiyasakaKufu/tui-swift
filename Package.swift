@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 
 import PackageDescription
 
@@ -13,8 +13,10 @@ let package = Package(
     ],
     targets: [
         .target(name: "CTUIShim"),
-        .target(name: "TUIKit", dependencies: ["CTUIShim"]),
-        .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"]),
+        // swiftLanguageMode(.v5) を外すとビルドが通らない。
+        // tools-version 6.0 の既定は v6 で、並行性検査が警告ではなく error になる。
+        .target(name: "TUIKit", dependencies: ["CTUIShim"], swiftSettings: [.swiftLanguageMode(.v5)]),
+        .executableTarget(name: "TUIDemo", dependencies: ["TUIKit"], swiftSettings: [.swiftLanguageMode(.v5)]),
         // 製品コードから参照できてしまうため、ライブラリ本体のターゲットには混ぜない。
         // glibc は posix_openpt などを機能テストマクロで隠すため、Linux では _GNU_SOURCE を立てる。
         .target(
@@ -22,6 +24,10 @@ let package = Package(
             path: "Tests/CTUITestSupport",
             cSettings: [.define("_GNU_SOURCE", .when(platforms: [.linux]))]
         ),
-        .testTarget(name: "TUIKitTests", dependencies: ["TUIKit", "CTUITestSupport"]),
+        .testTarget(
+            name: "TUIKitTests",
+            dependencies: ["TUIKit", "CTUITestSupport"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
     ]
 )

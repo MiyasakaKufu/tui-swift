@@ -13,14 +13,15 @@ import Glibc
 /// シグナルがイベントループへ届くかを、疑似端末（pty）の上で確かめる。
 final class ApplicationSignalTests: XCTestCase {
 
-    /// イベント待ちに入る直前の SIGWINCH でも、入力なしで再描画される。
-    func testResizeJustBeforeWaitingTriggersRedraw() throws {
+    /// ループが次の `LoopEvent` を待つ直前の SIGWINCH でも、入力なしで再描画される。
+    @MainActor
+    func testResizeJustBeforeWaitingTriggersRedraw() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
 
         XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 20, 5), 0, "初期サイズを設定できない")
 
-        // `body` はサイズを確認した後・イベント待ちに入る前に呼ばれる。
+        // `body` はサイズを確認した後・次の `LoopEvent` を待つ前に呼ばれる。
         // ここでリサイズすることで、シグナルが届くタイミングを狙って揃えられる。
         let probe = ResizeProbe {
             XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 30, 8), 0, "サイズを変更できない")
@@ -30,17 +31,17 @@ final class ApplicationSignalTests: XCTestCase {
         let run = runInBackground(root: probe, terminal: pty.terminal())
 
         // 入力を送ってはいけない。シグナルだけでループが動くことを確かめている。
-        wait(for: [probe.resized, run.finished], timeout: 5)
+        try await waitForLoop(run)
 
-        XCTAssertNil(run.error.value)
         XCTAssertEqual(
             probe.sizes,
             [Size(width: 20, height: 5), Size(width: 30, height: 8)]
         )
     }
 
-    /// イベント待ちに入る直前の SIGTERM でも、入力なしでループが終わる。
-    func testTerminationJustBeforeWaitingEndsLoop() throws {
+    /// ループが次の `LoopEvent` を待つ直前の SIGTERM でも、入力なしでループが終わる。
+    @MainActor
+    func testTerminationJustBeforeWaitingEndsLoop() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
 
@@ -53,9 +54,7 @@ final class ApplicationSignalTests: XCTestCase {
         let run = runInBackground(root: probe, terminal: pty.terminal())
 
         // 入力を送ってはいけない。シグナルだけでループが終わることを確かめている。
-        wait(for: [run.finished], timeout: 5)
-
-        XCTAssertNil(run.error.value)
+        try await waitForLoop(run)
     }
 
     /// 外から送られた SIGINT / SIGQUIT を終了シグナルとして受け取る。
@@ -70,13 +69,13 @@ final class ApplicationSignalTests: XCTestCase {
         raise(SIGINT)
 
         XCTAssertTrue(SignalWatcher.consumeTermination(), "SIGINT が終了として扱われていない")
-        XCTAssertTrue(isReadable(descriptor), "SIGINT でイベント待ちが起こされない")
+        XCTAssertTrue(isReadable(descriptor), "SIGINT で `poll(2)` の待ちが起こされない")
         discard(descriptor)
 
         raise(SIGQUIT)
 
         XCTAssertTrue(SignalWatcher.consumeTermination(), "SIGQUIT が終了として扱われていない")
-        XCTAssertTrue(isReadable(descriptor), "SIGQUIT でイベント待ちが起こされない")
+        XCTAssertTrue(isReadable(descriptor), "SIGQUIT で `poll(2)` の待ちが起こされない")
         discard(descriptor)
     }
 
@@ -93,17 +92,17 @@ final class ApplicationSignalTests: XCTestCase {
         raise(SIGTSTP)
 
         XCTAssertTrue(SignalWatcher.consumeSuspend(), "SIGTSTP が一時停止として扱われていない")
-        XCTAssertTrue(isReadable(descriptor), "SIGTSTP でイベント待ちが起こされない")
+        XCTAssertTrue(isReadable(descriptor), "SIGTSTP で `poll(2)` の待ちが起こされない")
         discard(descriptor)
 
         raise(SIGCONT)
 
         XCTAssertTrue(SignalWatcher.consumeContinue(), "SIGCONT が再開として扱われていない")
-        XCTAssertTrue(isReadable(descriptor), "SIGCONT でイベント待ちが起こされない")
+        XCTAssertTrue(isReadable(descriptor), "SIGCONT で `poll(2)` の待ちが起こされない")
         discard(descriptor)
     }
 
-    /// シグナルハンドラが、起こすためのパイプへ書き込む。
+    /// シグナルハンドラが、`poll(2)` の待ちを起こすためのパイプへ書き込む。
     func testSignalWritesToWakeupDescriptor() throws {
         SignalWatcher.install()
         let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
@@ -136,45 +135,24 @@ final class ApplicationSignalTests: XCTestCase {
 
     // MARK: - 補助
 
-    /// 別スレッドでイベントループを回す。
+    /// イベントループを回す `Task` を作る。
     ///
     /// - Parameters:
     ///   - root: ループに渡すコンポーネント。
-    ///   - terminal: 入出力に使う端末。
-    /// - Returns: ループの終了を待つための expectation と、`run()` が投げたエラーの入れ物。
+    ///   - terminal: 入出力に使う `Terminal`。
+    /// - Returns: `run()` を回している `Task`。
+    @MainActor
     private func runInBackground<Root: Component>(
         root: Root,
         terminal: Terminal
-    ) -> (finished: XCTestExpectation, error: ResultBox<Error?>) {
+    ) -> Task<Void, Error> {
         let application = Application(
             root: root,
             options: ApplicationOptions(usesAlternateScreen: false, usesBracketedPaste: false),
             terminal: terminal
         )
-        let finished = XCTestExpectation(description: "イベントループが終わる")
-        let error = ResultBox<Error?>(nil)
-
-        Thread.detachNewThread {
-            do {
-                try application.run()
-            } catch let thrown {
-                error.value = thrown
-            }
-            finished.fulfill()
-        }
-
-        return (finished, error)
-    }
-}
-
-/// スレッドをまたいで結果を受け渡すための入れ物。
-///
-/// - Warning: 読み書きの順序は `XCTestExpectation` で揃える。
-private final class ResultBox<Value>: @unchecked Sendable {
-    var value: Value
-
-    init(_ value: Value) {
-        self.value = value
+        // 別スレッドでは回せない。`run()` はアクタの上に居るため、同じアクタの `Task` にする。
+        return Task { try await application.run() }
     }
 }
 
@@ -186,7 +164,6 @@ private final class ResizeProbe: Component, @unchecked Sendable {
     private var hasDrawn = false
 
     private(set) var sizes: [Size] = []
-    let resized = XCTestExpectation(description: "新しいサイズが通知される")
 
     init(trigger: @escaping () -> Void) {
         self.trigger = trigger
@@ -204,7 +181,6 @@ private final class ResizeProbe: Component, @unchecked Sendable {
         guard case .resize(let size) = event else { return .ignored }
         sizes.append(size)
         guard sizes.count >= 2 else { return .handled }
-        resized.fulfill()
         return .quit
     }
 }
@@ -262,6 +238,7 @@ private final class PseudoTerminal {
     }
 
     /// スレーブ側を入出力に使う端末を作る。
+    @MainActor
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
     }

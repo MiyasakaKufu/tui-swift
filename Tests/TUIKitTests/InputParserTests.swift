@@ -1,6 +1,7 @@
 import XCTest
 @testable import TUIKit
 
+@MainActor
 final class InputParserTests: XCTestCase {
 
     private func events(_ bytes: [UInt8]) -> [InputEvent] {
@@ -12,39 +13,39 @@ final class InputParserTests: XCTestCase {
         Array(text.utf8)
     }
 
-    func testPlainCharacter() {
+    func testPlainCharacter() async {
         XCTAssertEqual(events([0x61]), [.key(KeyEvent(.character("a")))])
     }
 
-    func testEnterAndTabAndBackspace() {
+    func testEnterAndTabAndBackspace() async {
         XCTAssertEqual(events([0x0D]), [.key(KeyEvent(.enter))])
         XCTAssertEqual(events([0x09]), [.key(KeyEvent(.tab))])
         XCTAssertEqual(events([0x7F]), [.key(KeyEvent(.backspace))])
     }
 
-    func testControlCharacter() {
+    func testControlCharacter() async {
         XCTAssertEqual(events([0x03]), [.key(KeyEvent(.character("c"), modifiers: .control))])
     }
 
-    func testArrowKeys() {
+    func testArrowKeys() async {
         XCTAssertEqual(events(bytes("\u{1B}[A")), [.key(KeyEvent(.up))])
         XCTAssertEqual(events(bytes("\u{1B}[B")), [.key(KeyEvent(.down))])
         XCTAssertEqual(events(bytes("\u{1B}[C")), [.key(KeyEvent(.right))])
         XCTAssertEqual(events(bytes("\u{1B}[D")), [.key(KeyEvent(.left))])
     }
 
-    func testArrowKeyWithModifier() {
+    func testArrowKeyWithModifier() async {
         XCTAssertEqual(
             events(bytes("\u{1B}[1;5D")),
             [.key(KeyEvent(.left, modifiers: .control))]
         )
     }
 
-    func testFunctionKeysFromSS3() {
+    func testFunctionKeysFromSS3() async {
         XCTAssertEqual(events(bytes("\u{1B}OP")), [.key(KeyEvent(.function(1)))])
     }
 
-    func testFunctionKeysOneToFourWithModifiers() {
+    func testFunctionKeysOneToFourWithModifiers() async {
         XCTAssertEqual(
             events(bytes("\u{1B}[1;2P")),
             [.key(KeyEvent(.function(1), modifiers: .shift))]
@@ -68,16 +69,16 @@ final class InputParserTests: XCTestCase {
     }
 
     /// 修飾パラメータのない `CSI P`〜`CSI S` も F1〜F4 として扱う。
-    func testFunctionKeysOneToFourWithoutModifiers() {
+    func testFunctionKeysOneToFourWithoutModifiers() async {
         XCTAssertEqual(events(bytes("\u{1B}[P")), [.key(KeyEvent(.function(1)))])
         XCTAssertEqual(events(bytes("\u{1B}[S")), [.key(KeyEvent(.function(4)))])
     }
 
-    func testFunctionKeyFromTildeSequence() {
+    func testFunctionKeyFromTildeSequence() async {
         XCTAssertEqual(events(bytes("\u{1B}[15~")), [.key(KeyEvent(.function(5)))])
     }
 
-    func testNavigationKeys() {
+    func testNavigationKeys() async {
         XCTAssertEqual(events(bytes("\u{1B}[3~")), [.key(KeyEvent(.delete))])
         XCTAssertEqual(events(bytes("\u{1B}[5~")), [.key(KeyEvent(.pageUp))])
         XCTAssertEqual(events(bytes("\u{1B}[6~")), [.key(KeyEvent(.pageDown))])
@@ -85,18 +86,18 @@ final class InputParserTests: XCTestCase {
         XCTAssertEqual(events(bytes("\u{1B}[F")), [.key(KeyEvent(.end))])
     }
 
-    func testShiftTab() {
+    func testShiftTab() async {
         XCTAssertEqual(events(bytes("\u{1B}[Z")), [.key(KeyEvent(.backTab))])
     }
 
-    func testAltCharacter() {
+    func testAltCharacter() async {
         XCTAssertEqual(
             events(bytes("\u{1B}a")),
             [.key(KeyEvent(.character("a"), modifiers: .alt))]
         )
     }
 
-    func testLoneEscapeNeedsFlush() {
+    func testLoneEscapeNeedsFlush() async {
         var parser = InputParser()
         XCTAssertTrue(parser.feed([0x1B]).isEmpty)
         XCTAssertTrue(parser.hasPendingBytes)
@@ -104,7 +105,7 @@ final class InputParserTests: XCTestCase {
         XCTAssertFalse(parser.hasPendingBytes)
     }
 
-    func testTimedOutBracketAndOBecomeAltKeys() {
+    func testTimedOutBracketAndOBecomeAltKeys() async {
         for (text, character) in [("\u{1B}[", Character("[")), ("\u{1B}O", Character("O"))] {
             var parser = InputParser()
             XCTAssertTrue(parser.feed(bytes(text)).isEmpty)
@@ -116,14 +117,14 @@ final class InputParserTests: XCTestCase {
         }
     }
 
-    func testTimedOutHalfSequenceIsDiscarded() {
+    func testTimedOutHalfSequenceIsDiscarded() async {
         var parser = InputParser()
         XCTAssertTrue(parser.feed(bytes("\u{1B}[<65;10")).isEmpty)
         XCTAssertEqual(parser.flush(), [])
         XCTAssertFalse(parser.hasPendingBytes)
     }
 
-    func testSequenceSplitMidwayIsParsedWhenTheRestArrives() {
+    func testSequenceSplitMidwayIsParsedWhenTheRestArrives() async {
         var parser = InputParser()
         XCTAssertTrue(parser.feed(bytes("\u{1B}[<65;10")).isEmpty)
         XCTAssertEqual(parser.feed(bytes(";5M")), [
@@ -131,7 +132,7 @@ final class InputParserTests: XCTestCase {
         ])
     }
 
-    func testStartedSequenceIsWaitedForLongerThanLoneEscape() {
+    func testStartedSequenceIsWaitedForLongerThanLoneEscape() async {
         var parser = InputParser()
         XCTAssertNil(parser.pendingWaitDuration)
 
@@ -145,7 +146,7 @@ final class InputParserTests: XCTestCase {
         XCTAssertLessThan(escapeDuration ?? 0, sequenceDuration ?? 0)
     }
 
-    func testPasteIsNotWaitedFor() {
+    func testPasteIsNotWaitedFor() async {
         var parser = InputParser()
         XCTAssertTrue(parser.feed(bytes("\u{1B}[200~ab")).isEmpty)
         XCTAssertNil(parser.pendingWaitDuration)
@@ -153,47 +154,47 @@ final class InputParserTests: XCTestCase {
         XCTAssertEqual(parser.feed(bytes("\u{1B}[201~")), [.paste("ab")])
     }
 
-    func testIncompleteSequenceIsBuffered() {
+    func testIncompleteSequenceIsBuffered() async {
         var parser = InputParser()
         XCTAssertTrue(parser.feed([0x1B, 0x5B]).isEmpty)
         XCTAssertEqual(parser.feed([0x41]), [.key(KeyEvent(.up))])
     }
 
-    func testMultiByteCharacterSplitAcrossReads() {
+    func testMultiByteCharacterSplitAcrossReads() async {
         var parser = InputParser()
         XCTAssertTrue(parser.feed([0xE3]).isEmpty)
         XCTAssertEqual(parser.feed([0x81, 0x82]), [.key(KeyEvent(.character("あ")))])
     }
 
-    func testMultipleEventsInOneChunk() {
+    func testMultipleEventsInOneChunk() async {
         XCTAssertEqual(
             events(bytes("ab")),
             [.key(KeyEvent(.character("a"))), .key(KeyEvent(.character("b")))]
         )
     }
 
-    func testMousePress() {
+    func testMousePress() async {
         let result = events(bytes("\u{1B}[<0;10;5M"))
         XCTAssertEqual(result, [
             .mouse(MouseEvent(position: Point(x: 9, y: 4), button: .left, action: .press))
         ])
     }
 
-    func testMouseRelease() {
+    func testMouseRelease() async {
         let result = events(bytes("\u{1B}[<0;1;1m"))
         XCTAssertEqual(result, [
             .mouse(MouseEvent(position: Point(x: 0, y: 0), button: .left, action: .release))
         ])
     }
 
-    func testMouseScroll() {
+    func testMouseScroll() async {
         let result = events(bytes("\u{1B}[<64;3;4M"))
         XCTAssertEqual(result, [
             .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .scrollUp))
         ])
     }
 
-    func testMouseWheelFourDirections() {
+    func testMouseWheelFourDirections() async {
         XCTAssertEqual(events(bytes("\u{1B}[<64;3;4M")), [
             .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .scrollUp))
         ])
@@ -208,7 +209,7 @@ final class InputParserTests: XCTestCase {
         ])
     }
 
-    func testHorizontalWheelIsNotReportedAsVerticalScroll() {
+    func testHorizontalWheelIsNotReportedAsVerticalScroll() async {
         for text in ["\u{1B}[<66;10;5M", "\u{1B}[<67;10;5M"] {
             guard case .mouse(let mouseEvent)? = events(bytes(text)).first else {
                 return XCTFail("マウスイベントが得られなかった: \(text)")
@@ -218,25 +219,25 @@ final class InputParserTests: XCTestCase {
         }
     }
 
-    func testMouseWheelWithModifiers() {
+    func testMouseWheelWithModifiers() async {
         XCTAssertEqual(events(bytes("\u{1B}[<70;3;4M")), [
             .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .scrollLeft, modifiers: [.shift]))
         ])
     }
 
-    func testMouseMove() {
+    func testMouseMove() async {
         XCTAssertEqual(events(bytes("\u{1B}[<35;10;5M")), [
             .mouse(MouseEvent(position: Point(x: 9, y: 4), button: .none, action: .move))
         ])
     }
 
-    func testMouseMoveWithModifiers() {
+    func testMouseMoveWithModifiers() async {
         XCTAssertEqual(events(bytes("\u{1B}[<39;3;4M")), [
             .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .none, action: .move, modifiers: [.shift]))
         ])
     }
 
-    func testMoveWithButtonHeldIsReportedAsDrag() {
+    func testMoveWithButtonHeldIsReportedAsDrag() async {
         XCTAssertEqual(events(bytes("\u{1B}[<32;3;4M")), [
             .mouse(MouseEvent(position: Point(x: 2, y: 3), button: .left, action: .drag))
         ])
@@ -248,7 +249,7 @@ final class InputParserTests: XCTestCase {
         ])
     }
 
-    func testExtraMouseButtons() {
+    func testExtraMouseButtons() async {
         XCTAssertEqual(events(bytes("\u{1B}[<128;1;1M")), [
             .mouse(MouseEvent(position: .zero, button: .backward, action: .press))
         ])
@@ -269,7 +270,7 @@ final class InputParserTests: XCTestCase {
         ])
     }
 
-    func testExtraMouseButtonsAreNotReportedAsPrimaryButtons() {
+    func testExtraMouseButtonsAreNotReportedAsPrimaryButtons() async {
         for text in ["\u{1B}[<128;1;1M", "\u{1B}[<129;1;1M"] {
             guard case .mouse(let mouseEvent)? = events(bytes(text)).first else {
                 return XCTFail("マウスイベントが得られなかった: \(text)")
@@ -280,20 +281,20 @@ final class InputParserTests: XCTestCase {
         }
     }
 
-    func testBracketedPaste() {
+    func testBracketedPaste() async {
         XCTAssertEqual(
             events(bytes("\u{1B}[200~hi\u{1B}[201~")),
             [.paste("hi")]
         )
     }
 
-    func testBracketedPasteSplitAcrossReads() {
+    func testBracketedPasteSplitAcrossReads() async {
         var parser = InputParser()
         XCTAssertTrue(parser.feed(bytes("\u{1B}[200~he")).isEmpty)
         XCTAssertEqual(parser.feed(bytes("llo\u{1B}[201~")), [.paste("hello")])
     }
 
-    func testFocusEvents() {
+    func testFocusEvents() async {
         XCTAssertEqual(events(bytes("\u{1B}[I")), [.focus(true)])
         XCTAssertEqual(events(bytes("\u{1B}[O")), [.focus(false)])
     }
@@ -301,7 +302,7 @@ final class InputParserTests: XCTestCase {
     // MARK: - kitty keyboard protocol
 
     /// `CSI u` 形式では、同じバイト列になっていたキーが別のキーとして届く。
-    func testKeyboardProtocolDisambiguatesControlKeys() {
+    func testKeyboardProtocolDisambiguatesControlKeys() async {
         XCTAssertEqual(
             events(bytes("\u{1B}[105;5u")),
             [.key(KeyEvent(.character("i"), modifiers: .control))]
@@ -315,7 +316,7 @@ final class InputParserTests: XCTestCase {
     }
 
     /// `CSI u` 形式の Escape・Backspace も、時間切れを待たずに確定する。
-    func testKeyboardProtocolNamedKeys() {
+    func testKeyboardProtocolNamedKeys() async {
         XCTAssertEqual(events(bytes("\u{1B}[27u")), [.key(KeyEvent(.escape))])
         XCTAssertEqual(events(bytes("\u{1B}[127u")), [.key(KeyEvent(.backspace))])
         XCTAssertEqual(
@@ -325,7 +326,7 @@ final class InputParserTests: XCTestCase {
     }
 
     /// Shift+Tab は、形式が変わっても `CSI Z` と同じキーになる。
-    func testKeyboardProtocolShiftTabMatchesLegacyBackTab() {
+    func testKeyboardProtocolShiftTabMatchesLegacyBackTab() async {
         XCTAssertEqual(events(bytes("\u{1B}[9;2u")), events(bytes("\u{1B}[Z")))
         XCTAssertEqual(events(bytes("\u{1B}[9;2u")), [.key(KeyEvent(.backTab))])
         XCTAssertEqual(
@@ -335,7 +336,7 @@ final class InputParserTests: XCTestCase {
     }
 
     /// 私用領域のキーコードは、対応するキーが無ければ文字にしない。
-    func testKeyboardProtocolFunctionalKeys() {
+    func testKeyboardProtocolFunctionalKeys() async {
         XCTAssertEqual(events(bytes("\u{1B}[57376u")), [.key(KeyEvent(.function(13)))])
         XCTAssertEqual(events(bytes("\u{1B}[57399u")), [.key(KeyEvent(.character("0")))])
         XCTAssertEqual(events(bytes("\u{1B}[57414u")), [.key(KeyEvent(.enter))])
@@ -345,7 +346,7 @@ final class InputParserTests: XCTestCase {
     }
 
     /// 下位パラメータ（`:`）は、上位のパラメータへ混ざらない。
-    func testKeyboardProtocolSubParametersDoNotMergeIntoModifiers() {
+    func testKeyboardProtocolSubParametersDoNotMergeIntoModifiers() async {
         XCTAssertEqual(
             events(bytes("\u{1B}[97;2:1u")),
             [.key(KeyEvent(.character("a"), modifiers: .shift))]
@@ -358,7 +359,7 @@ final class InputParserTests: XCTestCase {
     }
 
     /// 代替キーコード（`:`）が付いていても、先頭のキーコードで解釈する。
-    func testKeyboardProtocolAlternateKeyCodesAreIgnored() {
+    func testKeyboardProtocolAlternateKeyCodesAreIgnored() async {
         XCTAssertEqual(
             events(bytes("\u{1B}[97:65;2u")),
             [.key(KeyEvent(.character("a"), modifiers: .shift))]
@@ -366,7 +367,7 @@ final class InputParserTests: XCTestCase {
     }
 
     /// キーを離した通知は、押したときと同じキーを二重に届けない。
-    func testKeyboardProtocolReleaseIsIgnored() {
+    func testKeyboardProtocolReleaseIsIgnored() async {
         XCTAssertEqual(events(bytes("\u{1B}[97;1:3u")), [])
         XCTAssertEqual(events(bytes("\u{1B}[97;1:1u")), [.key(KeyEvent(.character("a")))])
         let keyRepeatEventType = 2
@@ -377,7 +378,7 @@ final class InputParserTests: XCTestCase {
     }
 
     /// 対応状況の応答はキーではなく、応答として取り出せる。
-    func testKeyboardProtocolReplyIsNotAKey() {
+    func testKeyboardProtocolReplyIsNotAKey() async {
         var parser = InputParser()
         XCTAssertEqual(parser.feed(bytes("\u{1B}[?1u")), [])
         XCTAssertEqual(parser.takeReplies(), [.keyboardProtocol(flags: 1)])
@@ -385,14 +386,14 @@ final class InputParserTests: XCTestCase {
     }
 
     /// 装置属性の応答はキーではなく、応答として取り出せる。
-    func testDeviceAttributesReplyIsNotAKey() {
+    func testDeviceAttributesReplyIsNotAKey() async {
         var parser = InputParser()
         XCTAssertEqual(parser.feed(bytes("\u{1B}[?62;9;c")), [])
         XCTAssertEqual(parser.takeReplies(), [.deviceAttributes])
     }
 
     /// 応答とキーが続けて届いても、キーは失われない。
-    func testRepliesAndKeysArriveTogether() {
+    func testRepliesAndKeysArriveTogether() async {
         var parser = InputParser()
         XCTAssertEqual(
             parser.feed(bytes("\u{1B}[?1u\u{1B}[?62;ca")),

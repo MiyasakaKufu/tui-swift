@@ -4,55 +4,31 @@ import Darwin
 import Glibc
 #endif
 
-/// シグナルハンドラから触れるフラグ。
-/// シグナルハンドラ内で行えるのはこの種のフラグ更新だけなので、実際の処理はイベントループ側で行う。
-private var windowResizeFlag: sig_atomic_t = 0
-private var terminationFlag: sig_atomic_t = 0
-private var suspendFlag: sig_atomic_t = 0
-private var continueFlag: sig_atomic_t = 0
+import CTUIShim
 
-/// 自己パイプ（self-pipe）の両端。
-private var wakeupReadDescriptor: Int32 = -1
-private var wakeupWriteDescriptor: Int32 = -1
-
-/// イベント待ちを起こす。
-///
-/// シグナルハンドラから呼ぶので、非同期シグナル安全な操作だけを使う。`write(2)` は
-/// 非同期シグナル安全な関数の一覧にあるが、`errno` を書き換える。
-///
-/// - See: [The Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9799919799/) の
-///   「Signal Concepts」にある Async-Signal-Safe Functions。
-private func wakeUpEventLoop() {
-    let descriptor = wakeupWriteDescriptor
-    guard descriptor >= 0 else { return }
-
-    // `errno` の退避を外してはいけない。割り込まれた側が、自分が呼んだ関数の `errno` を
-    // 読んだつもりで `write(2)` の結果を読む。
-    let savedErrno = errno
-    var byte: UInt8 = 0
-    // 書けなくても書き直さない。起こす合図は 1 バイトあれば足りる。
-    _ = write(descriptor, &byte, 1)
-    errno = savedErrno
+/// 自己パイプの読み取り側を待っている `poll(2)` を起こす。
+private func wakeUpPoll() {
+    ctui_signal_wake_up()
 }
 
 private func handleWindowResizeSignal(_ signalNumber: Int32) {
-    windowResizeFlag = 1
-    wakeUpEventLoop()
+    ctui_signal_set_window_resize()
+    wakeUpPoll()
 }
 
 private func handleTerminationSignal(_ signalNumber: Int32) {
-    terminationFlag = 1
-    wakeUpEventLoop()
+    ctui_signal_set_termination()
+    wakeUpPoll()
 }
 
 private func handleSuspendSignal(_ signalNumber: Int32) {
-    suspendFlag = 1
-    wakeUpEventLoop()
+    ctui_signal_set_suspend()
+    wakeUpPoll()
 }
 
 private func handleContinueSignal(_ signalNumber: Int32) {
-    continueFlag = 1
-    wakeUpEventLoop()
+    ctui_signal_set_continue()
+    wakeUpPoll()
 }
 
 /// ウィンドウサイズ変更・終了・一時停止のシグナルの監視。
@@ -92,13 +68,21 @@ public enum SignalWatcher {
         #endif
     }
 
+    /// 自己パイプの読み取り側を待っている `poll(2)` を、シグナル無しで起こす。
+    ///
+    /// - Note: `install()` を呼ぶ前は何も起こらない。
+    static func wakeUp() {
+        wakeUpPoll()
+    }
+
     /// シグナルが届いたことを知らせるパイプの読み取り側。
     ///
     /// `install()` を呼ぶ前や、パイプを作れなかったときは `nil`。
     ///
     /// - Note: 非ブロッキングなので、読み取り可能になった後は EAGAIN になるまで読み捨てられる。
     public static var wakeupDescriptor: Int32? {
-        wakeupReadDescriptor >= 0 ? wakeupReadDescriptor : nil
+        let descriptor = ctui_signal_wakeup_read_descriptor()
+        return descriptor >= 0 ? descriptor : nil
     }
 
     /// ウィンドウサイズ変更の通知を受け取る。
@@ -106,11 +90,7 @@ public enum SignalWatcher {
     /// - Returns: 前回の呼び出し以降に SIGWINCH が届いていれば `true`。
     /// - Postcondition: 同じ通知を二度受け取ることはない。
     public static func consumeWindowResize() -> Bool {
-        if windowResizeFlag != 0 {
-            windowResizeFlag = 0
-            return true
-        }
-        return false
+        return ctui_signal_consume_window_resize() != 0
     }
 
     /// 終了シグナルの通知を受け取る。
@@ -119,11 +99,7 @@ public enum SignalWatcher {
     ///   いずれかが届いていれば `true`。
     /// - Postcondition: 同じ通知を二度受け取ることはない。
     public static func consumeTermination() -> Bool {
-        if terminationFlag != 0 {
-            terminationFlag = 0
-            return true
-        }
-        return false
+        return ctui_signal_consume_termination() != 0
     }
 
     /// 一時停止シグナルの通知を受け取る。
@@ -131,11 +107,7 @@ public enum SignalWatcher {
     /// - Returns: 前回の呼び出し以降に SIGTSTP が届いていれば `true`。
     /// - Postcondition: 同じ通知を二度受け取ることはない。
     public static func consumeSuspend() -> Bool {
-        if suspendFlag != 0 {
-            suspendFlag = 0
-            return true
-        }
-        return false
+        return ctui_signal_consume_suspend() != 0
     }
 
     /// 再開シグナルの通知を受け取る。
@@ -144,11 +116,7 @@ public enum SignalWatcher {
     /// - Postcondition: 同じ通知を二度受け取ることはない。
     /// - Note: 捕まえられない SIGSTOP で止められた場合も、再開されればこれで分かる。
     public static func consumeContinue() -> Bool {
-        if continueFlag != 0 {
-            continueFlag = 0
-            return true
-        }
-        return false
+        return ctui_signal_consume_continue() != 0
     }
 }
 
@@ -158,7 +126,7 @@ public enum SignalWatcher {
 ///
 /// - Note: 二度目以降の呼び出しでは何もしない。
 private func openWakeupPipe() {
-    guard wakeupReadDescriptor < 0 else { return }
+    guard ctui_signal_wakeup_read_descriptor() < 0 else { return }
 
     var descriptors: [Int32] = [-1, -1]
     guard pipe(&descriptors) == 0 else { return }
@@ -170,8 +138,7 @@ private func openWakeupPipe() {
     closeOnExec(descriptors[0])
     closeOnExec(descriptors[1])
 
-    wakeupReadDescriptor = descriptors[0]
-    wakeupWriteDescriptor = descriptors[1]
+    ctui_signal_set_wakeup_pipe(descriptors[0], descriptors[1])
 }
 
 private func makeNonBlocking(_ descriptor: Int32) {

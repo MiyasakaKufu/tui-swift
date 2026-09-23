@@ -1,4 +1,5 @@
 /// レンダラの出力先。
+@MainActor
 public protocol TerminalOutput: AnyObject {
     /// 文字列を出力バッファへ追加する。
     ///

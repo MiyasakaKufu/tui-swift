@@ -1,3 +1,5 @@
+import Foundation
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -5,6 +7,7 @@ import Glibc
 #endif
 
 /// 端末を初期化し、入力・描画のループを回すアプリケーション。
+@MainActor
 public final class Application<Root: Component> {
 
     private let root: Root
@@ -12,6 +15,14 @@ public final class Application<Root: Component> {
     private let terminal: Terminal
     private let reader: InputReader
     private let renderer: Renderer
+    private let stream: AsyncStream<LoopEvent<Root.Message>>
+    private let continuation: AsyncStream<LoopEvent<Root.Message>>.Continuation
+
+    /// 別スレッドや `Task` から、`Component.Message` の値をイベントループへ届ける送り口。
+    ///
+    /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
+    /// - Note: `TerminalApp` のアプリからは届かない。
+    nonisolated public let sender: MessageSender<Root.Message>
 
     private var buffer = Buffer(size: .zero)
     /// 最後に `.resize` として通知したサイズ。
@@ -19,6 +30,7 @@ public final class Application<Root: Component> {
     /// 最後にフレームを数えた時刻。
     private var lastFrameTime = 0.0
     private var isRunning = false
+    private var hasRun = false
 
     /// 端末を戻した後にプロセスを止める処理。
     ///
@@ -30,22 +42,35 @@ public final class Application<Root: Component> {
     /// - Parameters:
     ///   - root: 画面を組み立て、イベントを受け取るルート。
     ///   - options: 起動時の設定。
-    ///   - terminal: 使用する端末。テストでは差し替える。
+    ///   - terminal: 使用する `Terminal`。省略すると標準入出力の記述子で作る。テストでは差し替える。
     public init(
         root: Root,
         options: ApplicationOptions = .default,
-        terminal: Terminal = Terminal()
+        terminal: Terminal? = nil
     ) {
+        // 既定値に `Terminal()` と書き直すとコンパイルが通らない。
+        // 既定引数の式はこの宣言の隔離を継承せず、非隔離の文脈からの呼び出しになる。
+        let terminal = terminal ?? Terminal()
         self.root = root
         self.options = options
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
+
+        // 上限を付けてはいけない。満杯の `AsyncStream` は送る側を待たせられず、要素を捨てる。
+        // `MessageSender` で送られた値で埋まると、後から届いたキーが捨てられて終われなくなる。
+        let (stream, continuation) = AsyncStream<LoopEvent<Root.Message>>.makeStream()
+        self.stream = stream
+        self.continuation = continuation
+        self.sender = MessageSender(continuation: continuation)
     }
 
     /// ループを終了させる。イベントハンドラの中からも呼べる。
     public func stop() {
         isRunning = false
+        // ループを起こさずに済ませてはいけない。`Task` から呼ばれたとき、ループは次の
+        // `LoopEvent` を待ったまま `isRunning` を読み直さず、キーが届くまで終わらない。
+        continuation.yield(.wake)
     }
 
     /// ウィンドウタイトルとアイコン名を設定する。
@@ -83,6 +108,9 @@ public final class Application<Root: Component> {
         _ = SignalWatcher.consumeSuspend()
         _ = SignalWatcher.consumeContinue()
         resumeTerminal()
+        // ループを起こさずに済ませてはいけない。`Task` から呼ばれたとき、次の `LoopEvent` が
+        // 届くまで描き直されず、再開した後の画面が空のまま残る。
+        continuation.yield(.wake)
     }
 
     /// 文字列をクリップボードへ渡す。
@@ -104,16 +132,18 @@ public final class Application<Root: Component> {
     ///   raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの画面サイズで `.resize` を通知する。
     ///   戻るときは端末を起動前の状態へ戻し、カーソルを表示に戻す。
+    /// - Precondition: 1 つの `Application` で呼べるのは 1 回だけ。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
-    public func run() throws {
+    public func run() async throws {
+        precondition(!hasRun, "run() は 1 つの Application で 1 回だけ呼べる")
+        hasRun = true
         guard terminal.isTerminal else { throw TerminalError.notATerminal }
 
         try terminal.enableRawMode()
         defer { terminal.restore() }
 
         SignalWatcher.install()
-        reader.wakeupDescriptor = SignalWatcher.wakeupDescriptor
 
         if options.usesKeyboardProtocol, supportsKeyboardProtocol() {
             terminal.setKeyboardProtocolEnabled(true)
@@ -136,49 +166,109 @@ public final class Application<Root: Component> {
         isRunning = true
         lastFrameTime = monotonicSeconds()
 
-        while isRunning {
-            // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
-            if !synchronizeSize() {
-                isRunning = false
-                break
-            }
-            draw()
+        let inputStopped = startReadingInput()
+        draw()
 
-            let events = reader.wait(timeout: options.frameInterval)
-
-            if SignalWatcher.consumeTermination() {
-                isRunning = false
+        loop: for await event in stream {
+            var isIdle = false
+            switch event {
+            case .inputs(let inputs):
+                for input in inputs {
+                    if !deliver(input) { break loop }
+                }
+            case .message(let message):
+                if root.receive(message) == .quit { break loop }
+            case .wake:
                 break
+            case .idle:
+                isIdle = true
             }
+
+            if SignalWatcher.consumeTermination() { break loop }
 
             if SignalWatcher.consumeSuspend() {
+                isIdle = false
                 suspend()
-                if !isRunning { break }
+                if !isRunning { break loop }
             }
 
             // 捕まえられない SIGSTOP で止められた後は、端末の設定だけが失われている。
             if SignalWatcher.consumeContinue() {
+                isIdle = false
                 resumeTerminal()
-                if !isRunning { break }
+                if !isRunning { break loop }
             }
 
-            if SignalWatcher.consumeWindowResize(), !synchronizeSize() {
-                isRunning = false
-                break
-            }
+            // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
+            let sizeBeforeSynchronizing = reportedSize
+            if !synchronizeSize() { break loop }
 
-            for event in events {
-                if deliver(event) { continue }
-                isRunning = false
-                break
-            }
+            // 何も起きていない `.idle` で先へ進んではいけない。`frameInterval` が `nil` でも
+            // `update(elapsed:)` が一定の間隔で呼ばれ、描き直すたびに制御コードが書き出される。
+            if isIdle, reportedSize == sizeBeforeSynchronizing { continue loop }
 
             let now = monotonicSeconds()
             root.update(elapsed: now - lastFrameTime)
             lastFrameTime = now
+
+            if !isRunning { break loop }
+            draw()
         }
 
+        isRunning = false
+
+        // `startReadingInput()` が作ったスレッドの終了を待たずに戻ってはいけない。
+        // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
+        // `LoopEvent` の `AsyncStream` を閉じてから起こす順序も変えてはいけない。
+        // 逆にすると閉じる前の `AsyncStream` へ yield し、`poll(2)` へ戻って次にバイトが届くまで終わらない。
+        continuation.finish()
+        SignalWatcher.wakeUp()
+        // `run()` の `Task` の中で直接待ってはいけない。その `Task` が打ち切られていると、
+        // `for await` がすぐに抜けて、スレッドの終了を待たずに戻る。
+        await Task { for await _ in inputStopped {} }.value
+
         terminal.setCursorVisible(true)
+    }
+
+    /// tty からバイト列を読み、組み立てた `InputEvent` を `LoopEvent` の `AsyncStream` へ流すスレッドを作る。
+    ///
+    /// - Returns: スレッドが終わったときに終了する `AsyncStream`。
+    private func startReadingInput() -> AsyncStream<Void> {
+        let (stopped, stoppedContinuation) = AsyncStream<Void>.makeStream()
+        let descriptor = terminal.inputDescriptor
+        let wakeupDescriptor = SignalWatcher.wakeupDescriptor
+        // 自己パイプが無いときに `frameInterval` のまま待ってはいけない。`nil` なら `poll(2)` が
+        // 無期限に待ち、終了時に起こせないので `run()` が戻らない。
+        let isFallingBack = wakeupDescriptor == nil && options.frameInterval == nil
+        let timeout = isFallingBack ? wakeupFallbackInterval : options.frameInterval
+        let emptyEvent: LoopEvent<Root.Message> = isFallingBack ? .idle : .wake
+        let continuation = self.continuation
+
+        // まだ返していない分を引き渡さないと、`supportsKeyboardProtocol()` の待ちの間に
+        // 届いたキーが落ちる。待ちの間に読んだ分は、待った側の `InputReader` が抱えている。
+        let unread = reader.takeUnreadState()
+
+        // `poll(2)` をアクタの上で呼んではいけない。キーが届くまでループが進まず、
+        // `MessageSender` で送られた値が処理されない。
+        // `InputReader` を外で作って渡すと、非 Sendable の参照がスレッドを跨ぐ。
+        Thread.detachNewThread {
+            let reader = InputReader(descriptor: descriptor)
+            reader.wakeupDescriptor = wakeupDescriptor
+            reader.adopt(unread)
+
+            while true {
+                let events = reader.wait(timeout: timeout)
+
+                // `InputEvent` を 1 つずつ yield してはいけない。
+                // ループは要素 1 つごとに描き直すので、描画が `InputEvent` の数だけ走る。
+                let event: LoopEvent<Root.Message> = events.isEmpty ? emptyEvent : .inputs(events)
+                if case .terminated = continuation.yield(event) { break }
+            }
+
+            stoppedContinuation.finish()
+        }
+
+        return stopped
     }
 
     /// 端末が kitty keyboard protocol に対応しているかを問い合わせる。
@@ -268,5 +358,19 @@ public final class Application<Root: Component> {
     }
 }
 
+/// 自己パイプが無く、`frameInterval` も無いときに、`poll(2)` の待ちを切り上げる間隔（秒）。
+///
+/// 起こす手段が無いので、この間隔でループへ戻り、終了とシグナルを確かめる。
+private let wakeupFallbackInterval = 0.1
+
 /// 起動時の問い合わせに応答を待つ時間（秒）。
 private let queryTimeout = 0.25
+
+extension Application where Root: TerminalApp {
+    /// ルートを作り、アプリケーションを起動する。
+    ///
+    /// - Throws: `run()` が投げるもの。
+    static func start() async throws {
+        try await Application(root: Root(), options: Root.options).run()
+    }
+}

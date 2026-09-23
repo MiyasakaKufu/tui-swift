@@ -22,7 +22,7 @@ enum CrashRestorer {
         + ANSI.disableBracketedPaste
         + ANSI.disableFocusReporting
         + ANSI.exitAlternateScreen
-        // `Terminal.deactivate()` のように、設定したときだけ送る形にはできない。この列は
+        // `Terminal.deactivate()` のように、設定したときだけ送る形にはできない。この制御コードは
         // 仕掛けるときに組み立てるので、後から設定されたかどうかを織り込めない。設定して
         // いなければ、形は既定のままでタイトルのスタックは空なので、送っても何も起きない。
         + ANSI.setCursorShape(.default)
@@ -30,7 +30,8 @@ enum CrashRestorer {
         + ANSI.reset
         + ANSI.showCursor
 
-    /// クラッシュしたときに端末を戻すハンドラを仕掛ける。
+    /// クラッシュしたときとプロセスが終わるときに、termios を戻し、
+    /// 打ち消す制御コードを書き出すよう仕掛ける。
     ///
     /// - Parameters:
     ///   - input: 端末属性を戻すファイル記述子。
@@ -44,6 +45,7 @@ enum CrashRestorer {
         restoreOutputDescriptor = output
         restoreAttributes = originalAttributes
         installHandlers()
+        installExitHandler()
         isArmed = 1
         #endif
     }
@@ -89,6 +91,8 @@ private let crashSignalNumbers: [Int32] = [SIGILL, SIGTRAP, SIGABRT, SIGBUS, SIG
 /// ハンドラを仕掛けてあるか。シグナルハンドラから触れるのはこの種のフラグだけ。
 private var isArmed: sig_atomic_t = 0
 
+private var isExitHandlerInstalled = false
+
 private var restoreInputDescriptor: Int32 = -1
 private var restoreOutputDescriptor: Int32 = -1
 private var restoreAttributes = termios()
@@ -125,6 +129,15 @@ private func prepareRestoreSequence() {
     }
     restoreSequenceBytes = buffer
     restoreSequenceLength = bytes.count
+}
+
+/// プロセスが終わるときに termios を戻し、打ち消す制御コードを書き出すよう仕掛ける。
+private func installExitHandler() {
+    // この guard を外すと、arm() を呼ぶたびにハンドラが積まれる。
+    // 終了時に同じ制御コードが、その回数だけ tty へ書き出される。
+    guard !isExitHandlerInstalled else { return }
+    isExitHandlerInstalled = true
+    atexit { CrashRestorer.restoreTerminal() }
 }
 
 /// クラッシュのシグナルにハンドラを仕掛ける。
