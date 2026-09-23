@@ -171,6 +171,7 @@ public final class Application<Root: Component> {
         draw()
 
         loop: for await event in stream {
+            var isIdle = false
             switch event {
             case .inputs(let inputs):
                 for input in inputs {
@@ -180,23 +181,32 @@ public final class Application<Root: Component> {
                 if root.receive(message) == .quit { break loop }
             case .wake:
                 break
+            case .idle:
+                isIdle = true
             }
 
             if SignalWatcher.consumeTermination() { break loop }
 
             if SignalWatcher.consumeSuspend() {
+                isIdle = false
                 suspend()
                 if !isRunning { break loop }
             }
 
             // 捕まえられない SIGSTOP で止められた後は、端末の設定だけが失われている。
             if SignalWatcher.consumeContinue() {
+                isIdle = false
                 resumeTerminal()
                 if !isRunning { break loop }
             }
 
             // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
+            let sizeBeforeSynchronizing = reportedSize
             if !synchronizeSize() { break loop }
+
+            // 何も起きていない `.idle` で先へ進んではいけない。`frameInterval` が `nil` でも
+            // `update(elapsed:)` が一定の間隔で呼ばれ、描き直すたびに制御コードが書き出される。
+            if isIdle, reportedSize == sizeBeforeSynchronizing { continue loop }
 
             let now = monotonicSeconds()
             root.update(elapsed: now - lastFrameTime)
@@ -230,9 +240,9 @@ public final class Application<Root: Component> {
         let wakeupDescriptor = SignalWatcher.wakeupDescriptor
         // 自己パイプが無いときに `frameInterval` のまま待ってはいけない。`nil` なら `poll(2)` が
         // 無期限に待ち、終了時に起こせないので `run()` が戻らない。
-        let timeout = wakeupDescriptor == nil
-            ? (options.frameInterval ?? wakeupFallbackInterval)
-            : options.frameInterval
+        let isFallingBack = wakeupDescriptor == nil && options.frameInterval == nil
+        let timeout = isFallingBack ? wakeupFallbackInterval : options.frameInterval
+        let emptyEvent: LoopEvent<Root.Message> = isFallingBack ? .idle : .wake
         let continuation = self.continuation
 
         // まだ返していない分を引き渡さないと、`supportsKeyboardProtocol()` の待ちの間に
@@ -252,7 +262,7 @@ public final class Application<Root: Component> {
 
                 // `InputEvent` を 1 つずつ yield してはいけない。
                 // ループは要素 1 つごとに描き直すので、描画が `InputEvent` の数だけ走る。
-                let event: LoopEvent<Root.Message> = events.isEmpty ? .wake : .inputs(events)
+                let event: LoopEvent<Root.Message> = events.isEmpty ? emptyEvent : .inputs(events)
                 if case .terminated = continuation.yield(event) { break }
             }
 

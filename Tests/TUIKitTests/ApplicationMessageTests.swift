@@ -9,7 +9,7 @@ import XCTest
 import CTUITestSupport
 @testable import TUIKit
 
-/// 外部から届いたイベントがイベントループへ渡るかを、疑似端末（pty）の上で確かめる。
+/// イベントループの外から届いたイベントや呼び出しがループへ渡るかを、疑似端末（pty）の上で確かめる。
 @MainActor
 final class ApplicationMessageTests: XCTestCase {
 
@@ -204,6 +204,58 @@ final class ApplicationMessageTests: XCTestCase {
         let reached = await waitUntil(timeout: 5) { component.records.count == 3 }
         XCTAssertTrue(reached, "キーが届かない: \(component.records)")
         XCTAssertEqual(component.drawCount - drawsBefore, 1)
+
+        writeByte(pty.master, UInt8(ascii: "q"))
+        try await waitForLoop(loop)
+    }
+
+    /// ループの外から呼んだ `stop()` で、キーを待たずにループが終わる。
+    func testStopFromOutsideLoopEndsLoopWithoutKeys() async throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let reader = OutputReader(descriptor: pty.master)
+        let capture = startCapturing(reader)
+        defer { capture.cancel() }
+
+        let component = MessageRecordingComponent()
+        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        let loop = Task { try await application.run() }
+
+        // 最初の描画より前に呼ぶと、ループが待ちに入る前に止まり、待ちから抜けられるのか確かめられない。
+        let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drew, "最初の描画が終わらない")
+
+        application.stop()
+        try await waitForLoop(loop)
+    }
+
+    /// ループの外から呼んだ `suspend()` で、キーを待たずに再開後の画面を描き直す。
+    func testSuspendFromOutsideLoopRedrawsWithoutKeys() async throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let reader = OutputReader(descriptor: pty.master)
+        let capture = startCapturing(reader)
+        defer { capture.cancel() }
+
+        let component = MessageRecordingComponent()
+        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        // 本当に止めるとテストプロセスまで止まるので、止める処理だけ差し替える。
+        application.stopProcess = {}
+        let loop = Task { try await application.run() }
+
+        let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drew, "最初の描画が終わらない")
+        let drawsBefore = component.drawCount
+
+        application.suspend()
+
+        // 描き直されるまで、キーのバイトを書いてはいけない。キーで描き直されたのかどうかが分からなくなる。
+        let redrew = await waitUntil(timeout: 5) { component.drawCount > drawsBefore }
+        XCTAssertTrue(redrew, "再開した後に画面が描き直されていない")
 
         writeByte(pty.master, UInt8(ascii: "q"))
         try await waitForLoop(loop)

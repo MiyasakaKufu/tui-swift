@@ -7,8 +7,13 @@ enum LoopEvent<Message: Sendable>: Sendable {
     case inputs([InputEvent])
     /// 外部から送られたイベント。
     case message(Message)
-    /// `InputEvent` を伴わずに `poll(2)` の待ちが解けたことを伝える合図。
+    /// `InputEvent` を伴わずにループを起こす合図。
     ///
+    /// `poll(2)` の待ちが解けたときと、ループの外から `Application` の状態を変えたときに送る。
     /// シグナルのフラグとウィンドウサイズを読み直す機会を、イベントが無くても作る。
     case wake
+    /// 自己パイプが無いときに、`poll(2)` の待ちを一定の間隔で切り上げたことを伝える合図。
+    ///
+    /// `.wake` と違い、シグナルのフラグとウィンドウサイズを読み直す機会だけを作る。
+    case idle
 }
