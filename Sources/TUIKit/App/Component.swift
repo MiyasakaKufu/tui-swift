@@ -37,7 +37,7 @@ public protocol Component: AnyObject {
     /// - Note: 送られた順に呼ばれる。`handle(_:)` へ渡る `InputEvent` との前後も保たれる。
     func receive(_ message: Message) -> EventResult
 
-    /// 起動時にイベントループが走らせる作業。
+    /// 起動時にイベントループが走らせる `Effect`。
     ///
     /// 通信やファイル読み込みのように、待つあいだ画面を止めたくない処理をここで組み立てる。
     /// 実行するのはイベントループで、結果は `receive(_:)` へ渡る。

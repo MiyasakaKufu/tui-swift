@@ -40,7 +40,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertEqual(component.messages, [.arrived])
     }
 
-    /// 終わりの決まっていない作業は、値を何度でも届けられる。
+    /// 終わりの決まっていない処理は、値を何度でも届けられる。
     func testStreamEffectDeliversManyMessages() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -259,11 +259,11 @@ private final class MessageRecordingComponent: Component {
     private let quitsAfter: Int
     private let effect: Effect<TestMessage>
 
-    /// 受け取る件数と起動時の作業を決めて作る。
+    /// 受け取る件数と起動時の `Effect` を決めて作る。
     ///
     /// - Parameters:
     ///   - quitsAfter: 記録がこの数に達したら終了する。`0` なら自分からは終了しない。
-    ///   - startupEffect: 起動時にイベントループへ走らせる作業。
+    ///   - startupEffect: 起動時にイベントループへ走らせる `Effect`。
     init(quitsAfter: Int = 0, startupEffect: Effect<TestMessage> = .none) {
         self.quitsAfter = quitsAfter
         self.effect = startupEffect
