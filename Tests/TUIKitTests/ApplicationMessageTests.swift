@@ -15,7 +15,7 @@ final class ApplicationMessageTests: XCTestCase {
 
     private var captured = ""
 
-    /// 起動時の作業が返した値で、`frameInterval` なしでも画面が更新される。
+    /// 起動時の処理が返した値で、`frameInterval` なしでも画面が更新される。
     func testStartupEffectResultUpdatesScreenWithoutFrameInterval() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -30,9 +30,9 @@ final class ApplicationMessageTests: XCTestCase {
         let loop = Task { try await application.run() }
 
         // 画面が変わるまで、キーのバイトを書いてはいけない。
-        // 作業の結果だけで変わることを確かめているので、キーで起きたのかどうかが分からなくなる。
+        // 処理の結果だけで変わることを確かめているので、キーで起きたのかどうかが分からなくなる。
         let drew = await waitUntil(timeout: 5) { self.captured.contains(arrivedText) }
-        XCTAssertTrue(drew, "作業の結果が届いた後に画面が描き直されていない")
+        XCTAssertTrue(drew, "処理の結果が届いた後に画面が描き直されていない")
 
         writeByte(pty.master, UInt8(ascii: "q"))
         try await loop.value
@@ -67,7 +67,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertEqual(component.messages, [.arrived, .arrived, .arrived])
     }
 
-    /// ループが終わると、走っている作業が打ち切られる。
+    /// ループが終わると、走っている `Task` が打ち切られる。
     func testStartupEffectIsCancelledWhenLoopEnds() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -101,7 +101,7 @@ final class ApplicationMessageTests: XCTestCase {
             sawCancellation = true
             break
         }
-        XCTAssertTrue(sawCancellation, "ループが終わっても作業が打ち切られない")
+        XCTAssertTrue(sawCancellation, "ループが終わっても `Task` が打ち切られない")
     }
 
     /// 複数のスレッドから同時に送っても、すべてのイベントが届く。
@@ -203,11 +203,11 @@ final class ApplicationMessageTests: XCTestCase {
         )
     }
 
-    /// pty の出力を読み続け、`captured` へ足していく作業を始める。
+    /// pty の出力を読み続け、`captured` へ足していく `Task` を起こす。
     ///
     /// - Parameters:
     ///   - reader: 読み取り元。
-    /// - Returns: 読み続ける作業。テストの終わりに打ち切る。
+    /// - Returns: 読み続ける `Task`。テストの終わりに打ち切る。
     private func startCapturing(_ reader: OutputReader) -> Task<Void, Never> {
         Task {
             for await chunk in reader.stream {

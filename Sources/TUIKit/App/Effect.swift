@@ -2,16 +2,16 @@
 ///
 /// 値なので、実行と打ち切りはイベントループが持つ。
 ///
-/// - Note: 作業が値を届けるたびに画面が描き直される。
+/// - Note: 処理が値を届けるたびに画面が描き直される。
 ///   `ApplicationOptions.frameInterval` を設定していなくても届く。
 public struct Effect<Message: Sendable>: Sendable {
 
     private let makeTasks: @Sendable (MessageSender<Message>) -> [Task<Void, Never>]
 
-    /// 作業を始める処理を指定して作る。
+    /// `Task` を起こす処理を指定して作る。
     ///
     /// - Parameters:
-    ///   - makeTasks: 送り口を受け取って作業を始め、打ち切るための `Task` を返す処理。
+    ///   - makeTasks: 送り口を受け取って処理を走らせ、打ち切るための `Task` を返す処理。
     private init(makeTasks: @escaping @Sendable (MessageSender<Message>) -> [Task<Void, Never>]) {
         self.makeTasks = makeTasks
     }
@@ -56,7 +56,7 @@ public struct Effect<Message: Sendable>: Sendable {
         Effect { sender in effects.flatMap { $0.makeTasks(sender) } }
     }
 
-    /// 作業を始める。
+    /// `Task` を起こす。
     ///
     /// - Parameters:
     ///   - sender: 届け先の送り口。
