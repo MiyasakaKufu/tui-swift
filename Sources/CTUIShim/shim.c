@@ -1,6 +1,8 @@
 #include "include/ctui_shim.h"
 
+#include <errno.h>
 #include <string.h>
+#include <stdio.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -33,4 +35,48 @@ int ctui_install_signal_handler(int signal_number,
 
 int ctui_restore_signal_handler(int signal_number, const struct sigaction *previous) {
     return sigaction(signal_number, previous, 0);
+}
+
+static volatile sig_atomic_t ctui_window_resize_flag = 0;
+static volatile sig_atomic_t ctui_termination_flag = 0;
+static volatile sig_atomic_t ctui_suspend_flag = 0;
+static volatile sig_atomic_t ctui_continue_flag = 0;
+static volatile sig_atomic_t ctui_wakeup_read_descriptor = -1;
+static volatile sig_atomic_t ctui_wakeup_write_descriptor = -1;
+
+void ctui_signal_set_window_resize(void) { ctui_window_resize_flag = 1; }
+void ctui_signal_set_termination(void) { ctui_termination_flag = 1; }
+void ctui_signal_set_suspend(void) { ctui_suspend_flag = 1; }
+void ctui_signal_set_continue(void) { ctui_continue_flag = 1; }
+
+static int ctui_consume(volatile sig_atomic_t *flag) {
+    if (*flag == 0) { return 0; }
+    *flag = 0;
+    return 1;
+}
+
+int ctui_signal_consume_window_resize(void) { return ctui_consume(&ctui_window_resize_flag); }
+int ctui_signal_consume_termination(void) { return ctui_consume(&ctui_termination_flag); }
+int ctui_signal_consume_suspend(void) { return ctui_consume(&ctui_suspend_flag); }
+int ctui_signal_consume_continue(void) { return ctui_consume(&ctui_continue_flag); }
+
+void ctui_signal_set_wakeup_pipe(int read_end, int write_end) {
+    ctui_wakeup_read_descriptor = read_end;
+    ctui_wakeup_write_descriptor = write_end;
+}
+
+int ctui_signal_wakeup_read_descriptor(void) { return (int)ctui_wakeup_read_descriptor; }
+
+void ctui_signal_wake_up(void) {
+    int descriptor = (int)ctui_wakeup_write_descriptor;
+    if (descriptor < 0) { return; }
+
+    int saved_errno = errno;
+    unsigned char byte = 0;
+    (void)write(descriptor, &byte, 1);
+    errno = saved_errno;
+}
+
+void ctui_write_standard_error(const char *message) {
+    fputs(message, stderr);
 }

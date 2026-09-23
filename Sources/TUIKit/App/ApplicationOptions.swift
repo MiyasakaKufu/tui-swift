@@ -1,5 +1,5 @@
 /// `Application` の起動時の設定。
-public struct ApplicationOptions {
+public struct ApplicationOptions: Sendable {
     /// 代替画面バッファへ切り替える（終了時に元の画面が戻る）。
     public var usesAlternateScreen: Bool
     /// マウスイベントを受け取る範囲。
@@ -42,6 +42,11 @@ public struct ApplicationOptions {
     ///   この設定がなければ、端末を戻さないまま止まるか、そもそも止まらない。
     ///   Ctrl+Z を自前で扱うアプリだけ `false` にする。
     public var suspendsOnControlZ: Bool
+    /// 外部から送られたイベントを、処理されるまで積んでおける数の上限。
+    ///
+    /// - Note: 上限に達している間の `MessageSender.send(_:)` は、積まずに `false` を返す。
+    ///   古いイベントは捨てない。
+    public var messageQueueLimit: Int
 
     /// 設定を作る。
     ///
@@ -56,6 +61,7 @@ public struct ApplicationOptions {
     ///   - frameInterval: 入力がなくても再描画する間隔（秒）。`nil` なら入力があるまで待つ。
     ///   - quitsOnControlC: 処理されなかった Ctrl+C で終了するか。
     ///   - suspendsOnControlZ: 処理されなかった Ctrl+Z で一時停止するか。
+    ///   - messageQueueLimit: 外部から送られたイベントを積んでおける数の上限。
     public init(
         usesAlternateScreen: Bool = true,
         mouseTracking: MouseTracking = .disabled,
@@ -66,7 +72,8 @@ public struct ApplicationOptions {
         cursorShape: CursorShape? = nil,
         frameInterval: Double? = nil,
         quitsOnControlC: Bool = true,
-        suspendsOnControlZ: Bool = true
+        suspendsOnControlZ: Bool = true,
+        messageQueueLimit: Int = 1024
     ) {
         self.usesAlternateScreen = usesAlternateScreen
         self.mouseTracking = mouseTracking
@@ -78,6 +85,7 @@ public struct ApplicationOptions {
         self.frameInterval = frameInterval
         self.quitsOnControlC = quitsOnControlC
         self.suspendsOnControlZ = suspendsOnControlZ
+        self.messageQueueLimit = messageQueueLimit
     }
 
     /// すべて既定値の設定。

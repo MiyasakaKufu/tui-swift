@@ -9,10 +9,11 @@ import Glibc
 #endif
 
 /// 制御コードが途中で分かれて届いたときの `InputReader` の振る舞いを確かめる。
+@MainActor
 final class InputReaderTests: XCTestCase {
 
     /// 途中までの制御コードは確定させず、続きが届いてから 1 つのイベントにする。
-    func testSequenceDelayedMidwayIsNotTurnedIntoEscape() throws {
+    func testSequenceDelayedMidwayIsNotTurnedIntoEscape() async throws {
         let input = try PipePair()
         defer { input.close() }
         let reader = InputReader(descriptor: input.readEnd)
@@ -27,7 +28,7 @@ final class InputReaderTests: XCTestCase {
     }
 
     /// 起こされただけのときも、途中までの制御コードは確定させない。
-    func testWakeupDoesNotFinishHalfSequence() throws {
+    func testWakeupDoesNotFinishHalfSequence() async throws {
         let input = try PipePair()
         defer { input.close() }
         let wakeup = try PipePair()
@@ -47,7 +48,7 @@ final class InputReaderTests: XCTestCase {
     }
 
     /// 単独で届いた ESC は Escape キーになる。
-    func testLoneEscapeBecomesEscapeKey() throws {
+    func testLoneEscapeBecomesEscapeKey() async throws {
         let input = try PipePair()
         defer { input.close() }
         let reader = InputReader(descriptor: input.readEnd)
@@ -57,7 +58,7 @@ final class InputReaderTests: XCTestCase {
     }
 
     /// `ESC [` だけが届いたまま時間が過ぎれば Alt+[ になる。
-    func testLoneBracketBecomesAltBracket() throws {
+    func testLoneBracketBecomesAltBracket() async throws {
         let input = try PipePair()
         defer { input.close() }
         let reader = InputReader(descriptor: input.readEnd)
@@ -70,7 +71,7 @@ final class InputReaderTests: XCTestCase {
     }
 
     /// 続きが届かなかった制御コードは、文字のキーに分解されない。
-    func testTimedOutHalfSequenceProducesNoKeys() throws {
+    func testTimedOutHalfSequenceProducesNoKeys() async throws {
         let input = try PipePair()
         defer { input.close() }
         let reader = InputReader(descriptor: input.readEnd)
@@ -80,7 +81,7 @@ final class InputReaderTests: XCTestCase {
     }
 
     /// 装置属性の応答が届いた時点で、待ち時間を使い切らずに戻る。
-    func testQueryRepliesReturnOnceDeviceAttributesArrive() throws {
+    func testQueryRepliesReturnOnceDeviceAttributesArrive() async throws {
         let input = try PipePair()
         defer { input.close() }
         let reader = InputReader(descriptor: input.readEnd)
@@ -95,7 +96,7 @@ final class InputReaderTests: XCTestCase {
     }
 
     /// 応答しない端末では、待ち時間が過ぎたら応答なしとして戻る。
-    func testQueryRepliesGiveUpAfterTimeout() throws {
+    func testQueryRepliesGiveUpAfterTimeout() async throws {
         let input = try PipePair()
         defer { input.close() }
         let reader = InputReader(descriptor: input.readEnd)
@@ -104,7 +105,7 @@ final class InputReaderTests: XCTestCase {
     }
 
     /// 応答を待つ間に届いたキーは捨てず、次の待ちで返す。
-    func testKeysArrivingWhileWaitingForRepliesAreKept() throws {
+    func testKeysArrivingWhileWaitingForRepliesAreKept() async throws {
         let input = try PipePair()
         defer { input.close() }
         let reader = InputReader(descriptor: input.readEnd)
@@ -118,7 +119,7 @@ final class InputReaderTests: XCTestCase {
     }
 
     /// 入力が閉じていれば、待ち時間を使い切らずに戻る。
-    func testClosedInputReturnsWithoutWaiting() throws {
+    func testClosedInputReturnsWithoutWaiting() async throws {
         let input = try PipePair()
         defer { input.close() }
         let reader = InputReader(descriptor: input.readEnd)

@@ -2,6 +2,7 @@ import XCTest
 @testable import TUIKit
 
 /// 1 セルずつ書き込む描画に全角文字を渡しても、行の表示幅がバッファの幅を超えないことを確かめる。
+@MainActor
 final class WideCharacterFillTests: XCTestCase {
 
     private func render(_ view: any View, width: Int, height: Int) -> Buffer {
@@ -26,25 +27,25 @@ final class WideCharacterFillTests: XCTestCase {
 
     // MARK: - 再現
 
-    func testWideCharacterInFillFitsBuffer() {
+    func testWideCharacterInFillFitsBuffer() async {
         let buffer = render(Fill("あ"), width: 5, height: 2)
         assertRowsFit(buffer)
         XCTAssertEqual(buffer.text(ofRow: 0), "ああ ")
     }
 
-    func testWideCharacterInDividerFitsBuffer() {
+    func testWideCharacterInDividerFitsBuffer() async {
         let buffer = render(Divider(character: "＝"), width: 5, height: 1)
         assertRowsFit(buffer)
         XCTAssertEqual(buffer.text(ofRow: 0), "＝＝ ")
     }
 
-    func testWideCharacterInProgressBarFitsBuffer() {
+    func testWideCharacterInProgressBarFitsBuffer() async {
         let buffer = render(ProgressBar(value: 1, filledCharacter: "🟩"), width: 6, height: 1)
         assertRowsFit(buffer)
         XCTAssertEqual(buffer.text(ofRow: 0), "🟩🟩🟩")
     }
 
-    func testWideCharacterInBorderStyleFitsBuffer() {
+    func testWideCharacterInBorderStyleFitsBuffer() async {
         let wide = BorderStyle(
             topLeft: "┌", top: "＝", topRight: "┐",
             left: "｜", right: "｜",
@@ -56,7 +57,7 @@ final class WideCharacterFillTests: XCTestCase {
 
     // MARK: - 奇数幅
 
-    func testFillWithWideCharacterPadsOddWidth() {
+    func testFillWithWideCharacterPadsOddWidth() async {
         var buffer = Buffer(size: Size(width: 7, height: 1))
         buffer.fill(buffer.bounds, repeating: "あ")
         XCTAssertEqual(buffer.text(ofRow: 0), "あああ ")
@@ -65,7 +66,7 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertTrue(buffer[1, 0].isContinuation)
     }
 
-    func testFillWithWideCharacterInOddOffsetRegion() {
+    func testFillWithWideCharacterInOddOffsetRegion() async {
         var buffer = Buffer(size: Size(width: 6, height: 1))
         buffer.fill(Rect(x: 1, y: 0, width: 4, height: 1), repeating: "あ")
         XCTAssertEqual(buffer.text(ofRow: 0), " ああ ")
@@ -73,13 +74,13 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertTrue(buffer[2, 0].isContinuation)
     }
 
-    func testFillWithWideCharacterInSingleColumnBecomesSpace() {
+    func testFillWithWideCharacterInSingleColumnBecomesSpace() async {
         var buffer = Buffer(size: Size(width: 1, height: 1))
         buffer.fill(buffer.bounds, repeating: "あ")
         XCTAssertEqual(buffer.text(ofRow: 0), " ")
     }
 
-    func testProgressBarWithWideCharactersPadsOddSegments() {
+    func testProgressBarWithWideCharactersPadsOddSegments() async {
         // 幅 9 の 37.5% は 3 桁。全角文字は 1 個しか置けないので、残りの 1 桁は空白になる。
         let buffer = render(
             ProgressBar(value: 3, total: 8, filledCharacter: "＊", emptyCharacter: "・"),
@@ -90,7 +91,7 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), "＊ ・・・")
     }
 
-    func testDividerWithZeroWidthCharacterBecomesSpaces() {
+    func testDividerWithZeroWidthCharacterBecomesSpaces() async {
         let buffer = render(Divider(character: "\u{0301}"), width: 3, height: 1)
         assertRowsFit(buffer)
         XCTAssertEqual(buffer.text(ofRow: 0), "   ")
@@ -98,7 +99,7 @@ final class WideCharacterFillTests: XCTestCase {
 
     // MARK: - 重ね書き
 
-    func testOverwritingWideCharacterHeadBlanksContinuation() {
+    func testOverwritingWideCharacterHeadBlanksContinuation() async {
         var buffer = Buffer(size: Size(width: 4, height: 1))
         buffer.write("あい", at: Point(x: 0, y: 0))
         buffer[0, 0] = Cell(character: "X")
@@ -109,7 +110,7 @@ final class WideCharacterFillTests: XCTestCase {
     }
 
     /// `TextField` は全角文字のセルへカーソルを重ねるとき、同じ文字を書き直す。
-    func testOverwritingWideCharacterHeadWithWideCharacterKeepsContinuation() {
+    func testOverwritingWideCharacterHeadWithWideCharacterKeepsContinuation() async {
         var buffer = Buffer(size: Size(width: 4, height: 1))
         buffer.write("あい", at: Point(x: 0, y: 0))
         buffer[0, 0] = Cell(character: "あ", style: Style(attributes: .reverse))
@@ -119,7 +120,7 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), "あい")
     }
 
-    func testOverwritingWideCharacterContinuationBlanksHead() {
+    func testOverwritingWideCharacterContinuationBlanksHead() async {
         var buffer = Buffer(size: Size(width: 4, height: 1))
         buffer.write("あい", at: Point(x: 0, y: 0))
         buffer[1, 0] = Cell(character: "X")
@@ -128,7 +129,7 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), " Xい")
     }
 
-    func testFillOverlappingWideCharactersKeepsColumns() {
+    func testFillOverlappingWideCharactersKeepsColumns() async {
         var buffer = Buffer(size: Size(width: 6, height: 1))
         buffer.write("あいう", at: Point(x: 0, y: 0))
         buffer.fill(Rect(x: 1, y: 0, width: 3, height: 1), with: Cell(character: "#"))
@@ -137,7 +138,7 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), " ###う")
     }
 
-    func testBlankedHalfKeepsStyle() {
+    func testBlankedHalfKeepsStyle() async {
         var buffer = Buffer(size: Size(width: 4, height: 1))
         let style = Style(background: .blue)
         buffer.write("あ", at: Point(x: 0, y: 0), style: style)
@@ -146,7 +147,7 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertEqual(buffer[1, 0].style, style)
     }
 
-    func testWritingWideCharacterOverWideCharacterKeepsColumns() {
+    func testWritingWideCharacterOverWideCharacterKeepsColumns() async {
         var buffer = Buffer(size: Size(width: 6, height: 1))
         buffer.write("あいう", at: Point(x: 0, y: 0))
         buffer.write("か", at: Point(x: 1, y: 0))
@@ -157,7 +158,7 @@ final class WideCharacterFillTests: XCTestCase {
 
     // MARK: - BorderStyle の検証
 
-    func testBorderStyleReplacesWideCharactersWithDefaults() {
+    func testBorderStyleReplacesWideCharactersWithDefaults() async {
         let style = BorderStyle(
             topLeft: "＋", top: "＝", topRight: "＋",
             left: "｜", right: "｜",
@@ -173,7 +174,7 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertEqual(style.bottomRight, "┘")
     }
 
-    func testBorderStyleKeepsSingleWidthCharacters() {
+    func testBorderStyleKeepsSingleWidthCharacters() async {
         XCTAssertEqual(BorderStyle.ascii.topLeft, "+")
         XCTAssertEqual(BorderStyle.ascii.top, "-")
         XCTAssertEqual(BorderStyle.ascii.left, "|")

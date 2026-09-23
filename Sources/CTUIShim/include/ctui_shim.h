@@ -40,3 +40,57 @@ int ctui_install_signal_handler(int signal_number,
 int ctui_restore_signal_handler(int signal_number, const struct sigaction *previous);
 
 #endif /* CTUI_SHIM_H */
+
+// シグナルハンドラから触る状態を Swift のグローバル変数に置くと、並行性検査が
+// 「nonisolated global shared mutable state」として毎参照を指摘する。印を付けても
+// 非同期シグナル安全という制約は変わらないので、状態ごと C 側へ置く。
+
+/// ウィンドウサイズ変更の合図を立てる。
+void ctui_signal_set_window_resize(void);
+/// 終了の合図を立てる。
+void ctui_signal_set_termination(void);
+/// 一時停止の合図を立てる。
+void ctui_signal_set_suspend(void);
+/// 再開の合図を立てる。
+void ctui_signal_set_continue(void);
+
+/// ウィンドウサイズ変更の合図を取り出して下ろす。
+///
+/// - Returns: 立っていれば 1、立っていなければ 0。
+int ctui_signal_consume_window_resize(void);
+/// 終了の合図を取り出して下ろす。
+///
+/// - Returns: 立っていれば 1、立っていなければ 0。
+int ctui_signal_consume_termination(void);
+/// 一時停止の合図を取り出して下ろす。
+///
+/// - Returns: 立っていれば 1、立っていなければ 0。
+int ctui_signal_consume_suspend(void);
+/// 再開の合図を取り出して下ろす。
+///
+/// - Returns: 立っていれば 1、立っていなければ 0。
+int ctui_signal_consume_continue(void);
+
+/// 起こすための自己パイプの両端を覚える。
+///
+/// - Parameters:
+///   - read_end: 読み取り側のファイル記述子。
+///   - write_end: 書き込み側のファイル記述子。
+void ctui_signal_set_wakeup_pipe(int read_end, int write_end);
+
+/// 起こすための自己パイプの読み取り側。
+///
+/// - Returns: 覚えていれば記述子、覚えていなければ -1。
+int ctui_signal_wakeup_read_descriptor(void);
+
+/// イベント待ちを起こす。
+///
+/// - Note: シグナルハンドラから呼べる。`write(2)` は非同期シグナル安全な関数の一覧にあるが
+///   `errno` を書き換えるため、退避して戻す。
+void ctui_signal_wake_up(void);
+
+/// 標準エラー出力へ書き出す。
+///
+/// - Parameters:
+///   - message: 書き出す文字列。ヌル終端。
+void ctui_write_standard_error(const char *message);

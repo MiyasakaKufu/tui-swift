@@ -1,9 +1,10 @@
 import XCTest
 @testable import TUIKit
 
+@MainActor
 final class RendererTests: XCTestCase {
 
-    func testFirstRenderClearsScreen() {
+    func testFirstRenderClearsScreen() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 3, height: 1))
@@ -16,7 +17,7 @@ final class RendererTests: XCTestCase {
         XCTAssertEqual(output.flushCount, 1)
     }
 
-    func testSecondRenderOnlyEmitsChangedCells() {
+    func testSecondRenderOnlyEmitsChangedCells() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 5, height: 1))
@@ -33,7 +34,7 @@ final class RendererTests: XCTestCase {
         XCTAssertFalse(output.contents.contains("abc"))
     }
 
-    func testUnchangedBufferEmitsNoCellOutput() {
+    func testUnchangedBufferEmitsNoCellOutput() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 4, height: 1))
@@ -47,7 +48,7 @@ final class RendererTests: XCTestCase {
         XCTAssertFalse(output.contents.contains(ANSI.moveCursor(row: 1, column: 1)))
     }
 
-    func testInvalidateForcesFullRedraw() {
+    func testInvalidateForcesFullRedraw() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 4, height: 1))
@@ -62,7 +63,7 @@ final class RendererTests: XCTestCase {
         XCTAssertTrue(output.contents.contains("abcd"))
     }
 
-    func testSizeChangeForcesFullRedraw() {
+    func testSizeChangeForcesFullRedraw() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 2, height: 1))
@@ -75,7 +76,7 @@ final class RendererTests: XCTestCase {
         XCTAssertTrue(output.contents.contains(ANSI.clearScreen))
     }
 
-    func testCursorIsShownWhenPositionGiven() {
+    func testCursorIsShownWhenPositionGiven() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         let buffer = Buffer(size: Size(width: 3, height: 1))
@@ -89,7 +90,7 @@ final class RendererTests: XCTestCase {
         )
     }
 
-    func testCursorStaysHiddenWithoutPosition() {
+    func testCursorStaysHiddenWithoutPosition() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         let buffer = Buffer(size: Size(width: 3, height: 1))
@@ -100,7 +101,7 @@ final class RendererTests: XCTestCase {
         XCTAssertFalse(output.contents.contains(ANSI.showCursor))
     }
 
-    func testFrameIsWrappedInSynchronizedUpdate() {
+    func testFrameIsWrappedInSynchronizedUpdate() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 3, height: 1))
@@ -112,7 +113,7 @@ final class RendererTests: XCTestCase {
         XCTAssertTrue(output.contents.hasSuffix(ANSI.endSynchronizedUpdate))
     }
 
-    func testDifferentialFrameIsWrappedInSynchronizedUpdate() {
+    func testDifferentialFrameIsWrappedInSynchronizedUpdate() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 3, height: 1))
@@ -127,7 +128,7 @@ final class RendererTests: XCTestCase {
         XCTAssertTrue(output.contents.hasSuffix(ANSI.endSynchronizedUpdate))
     }
 
-    func testSynchronizedUpdateIsWrittenAsOneFlush() {
+    func testSynchronizedUpdateIsWrittenAsOneFlush() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 3, height: 1))
@@ -139,7 +140,7 @@ final class RendererTests: XCTestCase {
         XCTAssertEqual(output.flushCount, 1)
     }
 
-    func testStyleChangeEmitsSGR() {
+    func testStyleChangeEmitsSGR() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 2, height: 1))
@@ -149,7 +150,7 @@ final class RendererTests: XCTestCase {
         XCTAssertTrue(output.contents.contains("\u{1B}[31m"))
     }
 
-    func testWideCharacterIsNotSplitAcrossUpdates() {
+    func testWideCharacterIsNotSplitAcrossUpdates() async {
         let output = StringOutput()
         let renderer = Renderer(output: output)
         var buffer = Buffer(size: Size(width: 4, height: 1))

@@ -1,29 +1,30 @@
 import XCTest
 @testable import TUIKit
 
+@MainActor
 final class BufferTests: XCTestCase {
 
-    func testWriteASCII() {
+    func testWriteASCII() async {
         var buffer = Buffer(size: Size(width: 5, height: 1))
         buffer.write("abc", at: Point(x: 0, y: 0))
         XCTAssertEqual(buffer.text(ofRow: 0), "abc  ")
     }
 
     /// タブの展開は文字の層（`TabExpansion`）の仕事で、セルの層では行わない。
-    func testWriteDoesNotExpandTabs() {
+    func testWriteDoesNotExpandTabs() async {
         var buffer = Buffer(size: Size(width: 5, height: 1))
         let advanced = buffer.write("a\tb", at: Point(x: 0, y: 0))
         XCTAssertEqual(buffer.text(ofRow: 0), "ab   ")
         XCTAssertEqual(advanced, 2)
     }
 
-    func testWriteClipsAtRightEdge() {
+    func testWriteClipsAtRightEdge() async {
         var buffer = Buffer(size: Size(width: 3, height: 1))
         buffer.write("abcdef", at: Point(x: 0, y: 0))
         XCTAssertEqual(buffer.text(ofRow: 0), "abc")
     }
 
-    func testWideCharacterOccupiesTwoCells() {
+    func testWideCharacterOccupiesTwoCells() async {
         var buffer = Buffer(size: Size(width: 6, height: 1))
         buffer.write("あい", at: Point(x: 0, y: 0))
         XCTAssertEqual(buffer[0, 0].character, "あ")
@@ -33,7 +34,7 @@ final class BufferTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), "あい  ")
     }
 
-    func testWideCharacterAtRightEdgeBecomesSpace() {
+    func testWideCharacterAtRightEdgeBecomesSpace() async {
         var buffer = Buffer(size: Size(width: 3, height: 1))
         buffer.write("あああ", at: Point(x: 0, y: 0))
         XCTAssertEqual(buffer[0, 0].character, "あ")
@@ -41,50 +42,50 @@ final class BufferTests: XCTestCase {
         XCTAssertFalse(buffer[2, 0].isContinuation)
     }
 
-    func testWriteRespectsClipRect() {
+    func testWriteRespectsClipRect() async {
         var buffer = Buffer(size: Size(width: 8, height: 1))
         let clip = Rect(x: 2, y: 0, width: 3, height: 1)
         buffer.write("abcdefgh", at: Point(x: 0, y: 0), clippedTo: clip)
         XCTAssertEqual(buffer.text(ofRow: 0), "  cde   ")
     }
 
-    func testWriteOutOfBoundsIsIgnored() {
+    func testWriteOutOfBoundsIsIgnored() async {
         var buffer = Buffer(size: Size(width: 4, height: 1))
         buffer.write("abc", at: Point(x: 0, y: 5))
         XCTAssertEqual(buffer.text(ofRow: 0), "    ")
     }
 
-    func testFillRect() {
+    func testFillRect() async {
         var buffer = Buffer(size: Size(width: 4, height: 2))
         buffer.fill(Rect(x: 1, y: 0, width: 2, height: 2), with: Cell(character: "#"))
         XCTAssertEqual(buffer.debugText(), " ## \n ## ")
     }
 
-    func testSubscriptOutOfRangeReturnsEmptyCell() {
+    func testSubscriptOutOfRangeReturnsEmptyCell() async {
         let buffer = Buffer(size: Size(width: 2, height: 2))
         XCTAssertEqual(buffer[10, 10], Cell.empty)
     }
 
-    func testResizeClearsContents() {
+    func testResizeClearsContents() async {
         var buffer = Buffer(size: Size(width: 2, height: 1))
         buffer.write("ab", at: .zero)
         buffer.resize(to: Size(width: 3, height: 1))
         XCTAssertEqual(buffer.text(ofRow: 0), "   ")
     }
 
-    func testWriteStopsAtCRLF() {
+    func testWriteStopsAtCRLF() async {
         var buffer = Buffer(size: Size(width: 5, height: 1))
         buffer.write("ab\r\ncd", at: Point(x: 0, y: 0))
         XCTAssertEqual(buffer.text(ofRow: 0), "ab   ")
     }
 
-    func testWriteStopsAtLoneCarriageReturn() {
+    func testWriteStopsAtLoneCarriageReturn() async {
         var buffer = Buffer(size: Size(width: 5, height: 1))
         buffer.write("ab\rcd", at: Point(x: 0, y: 0))
         XCTAssertEqual(buffer.text(ofRow: 0), "ab   ")
     }
 
-    func testWriteLinesWithAlignment() {
+    func testWriteLinesWithAlignment() async {
         var buffer = Buffer(size: Size(width: 7, height: 2))
         let bounds = buffer.bounds
         buffer.write(lines: ["ab", "c"], in: bounds, alignment: .center)

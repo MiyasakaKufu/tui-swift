@@ -1,6 +1,7 @@
 import XCTest
 @testable import TUIKit
 
+@MainActor
 final class WidgetTests: XCTestCase {
 
     private func render(_ view: any View, width: Int, height: Int) -> String {
@@ -12,17 +13,17 @@ final class WidgetTests: XCTestCase {
 
     // MARK: - ProgressBar
 
-    func testProgressBarFillsHalf() {
+    func testProgressBarFillsHalf() async {
         let bar = ProgressBar(value: 0.5)
         XCTAssertEqual(render(bar, width: 10, height: 1), "█████░░░░░")
     }
 
-    func testProgressBarClampsAboveTotal() {
+    func testProgressBarClampsAboveTotal() async {
         let bar = ProgressBar(value: 5, total: 1)
         XCTAssertEqual(render(bar, width: 4, height: 1), "████")
     }
 
-    func testProgressBarWithPercentage() {
+    func testProgressBarWithPercentage() async {
         let bar = ProgressBar(value: 0.5, showsPercentage: true)
         XCTAssertEqual(render(bar, width: 10, height: 1), "███░░░ 50%")
     }
@@ -42,14 +43,14 @@ final class WidgetTests: XCTestCase {
         return state
     }
 
-    func testListStateScrollsToKeepSelectionVisible() {
+    func testListStateScrollsToKeepSelectionVisible() async {
         let state = listState(itemCount: 10, visibleRows: 3)
         for _ in 0..<4 { state.moveDown() }
         XCTAssertEqual(state.selectedIndex, 4)
         XCTAssertEqual(state.scrollOffset, 2)
     }
 
-    func testListStateStopsAtBounds() {
+    func testListStateStopsAtBounds() async {
         let state = listState(itemCount: 3, visibleRows: 3)
         state.moveUp()
         XCTAssertEqual(state.selectedIndex, 0)
@@ -57,7 +58,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.selectedIndex, 2)
     }
 
-    func testListStateHandlesArrowKeys() {
+    func testListStateHandlesArrowKeys() async {
         let state = listState(itemCount: 3, visibleRows: 3)
         XCTAssertTrue(state.handle(.key(KeyEvent(.down))))
         XCTAssertEqual(state.selectedIndex, 1)
@@ -67,7 +68,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// ホイールは選択ではなく表示位置を動かす。
-    func testListStateScrollsViewportWithWheel() {
+    func testListStateScrollsViewportWithWheel() async {
         let state = listState(itemCount: 20, visibleRows: 5)
         let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
         XCTAssertTrue(state.handle(.mouse(down)))
@@ -81,7 +82,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// 表示位置は項目の範囲に収まり、端を超えない。
-    func testListStateWheelStopsAtBounds() {
+    func testListStateWheelStopsAtBounds() async {
         let state = listState(itemCount: 8, visibleRows: 5)
         let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
         for _ in 0..<10 { XCTAssertTrue(state.handle(.mouse(down))) }
@@ -93,7 +94,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// リストの外（隣のペインなど）で起きたホイールは処理しない。
-    func testListStateIgnoresWheelOutsideRenderedRect() {
+    func testListStateIgnoresWheelOutsideRenderedRect() async {
         let state = ListState(itemCount: 20)
         state.renderedRect = Rect(x: 2, y: 1, width: 5, height: 4)
 
@@ -109,7 +110,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// 一度も描画していない状態では、どこで起きたホイールも処理しない。
-    func testListStateIgnoresWheelBeforeFirstRender() {
+    func testListStateIgnoresWheelBeforeFirstRender() async {
         let state = ListState(itemCount: 20)
         let event = MouseEvent(position: .zero, button: .none, action: .scrollDown)
         XCTAssertFalse(state.handle(.mouse(event)))
@@ -117,7 +118,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// 選択を動かすと、表示位置は選択を追いかけて戻る。
-    func testListStateSelectionScrollsBackAfterWheel() {
+    func testListStateSelectionScrollsBackAfterWheel() async {
         let state = listState(itemCount: 20, visibleRows: 5)
         let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
         for _ in 0..<5 { state.handle(.mouse(down)) }
@@ -129,7 +130,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// 縦方向のリストは横スクロールを扱わない（親に委ねる）。
-    func testListStateDoesNotHandleHorizontalScroll() {
+    func testListStateDoesNotHandleHorizontalScroll() async {
         let state = listState(itemCount: 5, visibleRows: 5)
         for action in [MouseAction.scrollLeft, .scrollRight] {
             let event = MouseEvent(position: .zero, button: .none, action: action)
@@ -141,7 +142,7 @@ final class WidgetTests: XCTestCase {
 
     /// トラックパッドで斜めに動かすと横スクロールのコードが混ざる。
     /// 縦のノッチ数ぶんだけ表示位置が動き、横スクロールは無視されること。
-    func testListStateIgnoresHorizontalWheelInDiagonalStream() {
+    func testListStateIgnoresHorizontalWheelInDiagonalStream() async {
         let state = listState(itemCount: 30, visibleRows: 5)
 
         var parser = InputParser()
@@ -160,7 +161,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.selectedIndex, 0)
     }
 
-    func testListStateSelectsClickedItem() {
+    func testListStateSelectsClickedItem() async {
         let state = listState(itemCount: 10, visibleRows: 4)
         let press = MouseEvent(position: Point(x: 3, y: 2), button: .left, action: .press)
         XCTAssertTrue(state.handle(.mouse(press)))
@@ -169,7 +170,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// 矩形が原点から離れていても、その中での行の位置で項目が決まる。
-    func testListStateSelectsClickedItemInOffsetRect() {
+    func testListStateSelectsClickedItemInOffsetRect() async {
         let state = ListState(itemCount: 10)
         state.renderedRect = Rect(x: 2, y: 1, width: 5, height: 4)
         let press = MouseEvent(position: Point(x: 2, y: 3), button: .left, action: .press)
@@ -177,7 +178,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.selectedIndex, 2)
     }
 
-    func testListStateSelectsClickedItemAfterWheelScroll() {
+    func testListStateSelectsClickedItemAfterWheelScroll() async {
         let state = listState(itemCount: 20, visibleRows: 5)
         let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
         for _ in 0..<3 { XCTAssertTrue(state.handle(.mouse(down))) }
@@ -189,7 +190,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.scrollOffset, 6, "クリックで表示位置が動かないこと")
     }
 
-    func testListStateIgnoresClickOnRowWithoutItem() {
+    func testListStateIgnoresClickOnRowWithoutItem() async {
         let state = listState(itemCount: 2, visibleRows: 5)
         state.select(1)
         for y in 2..<5 {
@@ -199,7 +200,7 @@ final class WidgetTests: XCTestCase {
         }
     }
 
-    func testListStateIgnoresClickOutsideRenderedRect() {
+    func testListStateIgnoresClickOutsideRenderedRect() async {
         let state = ListState(itemCount: 20)
         state.renderedRect = Rect(x: 2, y: 1, width: 5, height: 4)
 
@@ -210,7 +211,7 @@ final class WidgetTests: XCTestCase {
         }
     }
 
-    func testListStateSelectsOnlyWithLeftButton() {
+    func testListStateSelectsOnlyWithLeftButton() async {
         let state = listState(itemCount: 10, visibleRows: 4)
         for button in [MouseButton.middle, .right, .backward, .forward, .none] {
             let press = MouseEvent(position: Point(x: 0, y: 2), button: button, action: .press)
@@ -219,7 +220,7 @@ final class WidgetTests: XCTestCase {
         }
     }
 
-    func testListStateIgnoresReleaseAndDragAndMove() {
+    func testListStateIgnoresReleaseAndDragAndMove() async {
         let state = listState(itemCount: 10, visibleRows: 4)
         for action in [MouseAction.release, .drag, .move] {
             let event = MouseEvent(position: Point(x: 0, y: 2), button: .left, action: action)
@@ -229,20 +230,20 @@ final class WidgetTests: XCTestCase {
     }
 
     /// 一度も描画していない状態では、どこで起きた押下も処理しない。
-    func testListStateIgnoresClickBeforeFirstRender() {
+    func testListStateIgnoresClickBeforeFirstRender() async {
         let state = ListState(itemCount: 20)
         let press = MouseEvent(position: .zero, button: .left, action: .press)
         XCTAssertFalse(state.handle(.mouse(press)))
         XCTAssertEqual(state.selectedIndex, 0)
     }
 
-    func testListViewRendersSelectionMarker() {
+    func testListViewRendersSelectionMarker() async {
         let state = ListState()
         let list = ListView(items: ["a", "b", "c"], state: state)
         XCTAssertEqual(render(list, width: 5, height: 2), "> a  \n  b  ")
     }
 
-    func testListViewScrollsWithState() {
+    func testListViewScrollsWithState() async {
         let state = ListState()
         let list = ListView(items: ["a", "b", "c"], state: state)
         state.select(2)
@@ -250,7 +251,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// 描画は選択を追いかけ直さないので、ホイールで動かした表示位置が残る。
-    func testListViewKeepsWheelScrollAcrossRenders() {
+    func testListViewKeepsWheelScrollAcrossRenders() async {
         let items = ["a", "b", "c", "d"]
         let state = ListState()
         _ = render(ListView(items: items, state: state), width: 5, height: 2)
@@ -267,7 +268,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// 表示できる行数が変わったときは、選択が見える位置へ戻る。
-    func testListViewScrollsToSelectionWhenHeightChanges() {
+    func testListViewScrollsToSelectionWhenHeightChanges() async {
         let items = ["a", "b", "c", "d"]
         let state = ListState()
         let list = ListView(items: items, state: state)
@@ -282,7 +283,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// クリックで選ばれる項目は、その行に描かれている項目と一致する。
-    func testListViewMarksClickedRowAfterWheelScroll() {
+    func testListViewMarksClickedRowAfterWheelScroll() async {
         let items = ["a", "b", "c", "d"]
         let state = ListState()
         _ = render(ListView(items: items, state: state), width: 5, height: 2)
@@ -298,7 +299,7 @@ final class WidgetTests: XCTestCase {
 
     // MARK: - TextFieldState
 
-    func testTextFieldInsertAndDelete() {
+    func testTextFieldInsertAndDelete() async {
         let state = TextFieldState()
         state.insert("a")
         state.insert("b")
@@ -312,7 +313,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursor, 1)
     }
 
-    func testTextFieldDeleteForward() {
+    func testTextFieldDeleteForward() async {
         let state = TextFieldState(text: "abc")
         state.moveToStart()
         state.deleteForward()
@@ -320,7 +321,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursor, 0)
     }
 
-    func testTextFieldCursorStaysInRange() {
+    func testTextFieldCursorStaysInRange() async {
         let state = TextFieldState(text: "ab")
         state.moveToStart()
         state.moveLeft()
@@ -330,7 +331,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursor, 2)
     }
 
-    func testTextFieldCursorColumnUsesDisplayWidth() {
+    func testTextFieldCursorColumnUsesDisplayWidth() async {
         let state = TextFieldState(text: "あい")
         state.moveToStart()
         state.moveRight()
@@ -338,7 +339,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursorColumn, 2)
     }
 
-    func testTextFieldControlShortcuts() {
+    func testTextFieldControlShortcuts() async {
         let state = TextFieldState(text: "hello")
         XCTAssertTrue(state.handle(.key(KeyEvent(.character("a"), modifiers: .control))))
         XCTAssertEqual(state.cursor, 0)
@@ -348,13 +349,13 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.text, "")
     }
 
-    func testTextFieldHandlesPaste() {
+    func testTextFieldHandlesPaste() async {
         let state = TextFieldState()
         XCTAssertTrue(state.handle(.paste("xyz")))
         XCTAssertEqual(state.text, "xyz")
     }
 
-    func testTextFieldPasteTurnsNewlinesIntoSpace() {
+    func testTextFieldPasteTurnsNewlinesIntoSpace() async {
         let state = TextFieldState()
         state.handle(.paste("a\rb"))
         XCTAssertEqual(state.text, "a b")
@@ -370,21 +371,21 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(lf.text, "a b")
     }
 
-    func testTextFieldPasteTurnsTabIntoSpace() {
+    func testTextFieldPasteTurnsTabIntoSpace() async {
         let state = TextFieldState()
         state.handle(.paste("a\tb"))
         XCTAssertEqual(state.text, "a b")
         XCTAssertEqual(state.cursor, 3)
     }
 
-    func testTextFieldPasteDropsOtherControlCharacters() {
+    func testTextFieldPasteDropsOtherControlCharacters() async {
         let state = TextFieldState()
         state.handle(.paste("a\u{07}b\u{1B}c\u{7F}d\u{9B}e"))
         XCTAssertEqual(state.text, "abcde")
         XCTAssertEqual(state.cursor, 5)
     }
 
-    func testTextFieldSanitizedTextKeepsCursorMovable() {
+    func testTextFieldSanitizedTextKeepsCursorMovable() async {
         let state = TextFieldState()
         state.handle(.paste("a\r\nb"))
         state.moveToStart()
@@ -394,7 +395,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursorColumn, 2)
     }
 
-    func testTextFieldInsertSanitizesControlCharacters() {
+    func testTextFieldInsertSanitizesControlCharacters() async {
         let state = TextFieldState()
         state.insert("a")
         state.insert("\n")
@@ -404,7 +405,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursor, 3)
     }
 
-    func testTextFieldInitialTextAndSetTextAreSanitized() {
+    func testTextFieldInitialTextAndSetTextAreSanitized() async {
         let state = TextFieldState(text: "a\tb")
         XCTAssertEqual(state.text, "a b")
         XCTAssertEqual(state.cursor, 3)
@@ -415,7 +416,7 @@ final class WidgetTests: XCTestCase {
     }
 
     /// プレースホルダも入力文字と同じ規則で整える（タブは空白 1 個）。
-    func testTextFieldPlaceholderIsSanitized() {
+    func testTextFieldPlaceholderIsSanitized() async {
         let field = TextField(state: TextFieldState(), placeholder: "a\tb", showsCursor: false)
         XCTAssertEqual(render(field, width: 5, height: 1), "a b  ")
     }
@@ -444,7 +445,7 @@ final class WidgetTests: XCTestCase {
         }
     }
 
-    func testTypedFlagEmojiIsDeletedAsOneCharacter() {
+    func testTypedFlagEmojiIsDeletedAsOneCharacter() async {
         let state = TextFieldState()
         typeText(flagEmoji, into: state)
         XCTAssertEqual(state.text, flagEmoji)
@@ -455,7 +456,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursor, 0)
     }
 
-    func testTypedZWJEmojiIsDeletedAsOneCharacter() {
+    func testTypedZWJEmojiIsDeletedAsOneCharacter() async {
         let state = TextFieldState()
         typeText(familyEmoji, into: state)
         XCTAssertEqual(state.text, familyEmoji)
@@ -466,7 +467,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.text, "")
     }
 
-    func testTypedSkinToneEmojiIsDeletedAsOneCharacter() {
+    func testTypedSkinToneEmojiIsDeletedAsOneCharacter() async {
         let state = TextFieldState()
         typeText(thumbsUpEmoji, into: state)
         XCTAssertEqual(state.text, thumbsUpEmoji)
@@ -476,7 +477,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.text, "")
     }
 
-    func testCursorDoesNotEnterTypedEmoji() {
+    func testCursorDoesNotEnterTypedEmoji() async {
         let state = TextFieldState()
         typeText("a" + flagEmoji + "b", into: state)
         XCTAssertEqual(state.cursor, 3)
@@ -489,7 +490,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursor, 1)
     }
 
-    func testTypedEmojiIsInsertedBeforeExistingText() {
+    func testTypedEmojiIsInsertedBeforeExistingText() async {
         let state = TextFieldState(text: "あ")
         state.moveToStart()
         typeText(flagEmoji, into: state)
@@ -497,7 +498,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.cursor, 1)
     }
 
-    func testPastedEmojiIsOneCharacter() {
+    func testPastedEmojiIsOneCharacter() async {
         let state = TextFieldState()
         XCTAssertTrue(state.handle(.paste(flagEmoji + thumbsUpEmoji)))
         XCTAssertEqual(state.cursor, 2)
@@ -506,20 +507,20 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.text, flagEmoji)
     }
 
-    func testTextFieldRendersPlaceholder() {
+    func testTextFieldRendersPlaceholder() async {
         let state = TextFieldState()
         let field = TextField(state: state, placeholder: "name", showsCursor: false)
         XCTAssertEqual(render(field, width: 6, height: 1), "name  ")
     }
 
-    func testTextFieldScrollsWhenCursorPassesEdge() {
+    func testTextFieldScrollsWhenCursorPassesEdge() async {
         let state = TextFieldState(text: "abcdef")
         let field = TextField(state: state, showsCursor: false)
         XCTAssertEqual(field.scrollOffset(forWidth: 4), 3)
         XCTAssertEqual(render(field, width: 4, height: 1), "def ")
     }
 
-    func testScrolledTextFieldDoesNotShowHalfOfWideCharacter() {
+    func testScrolledTextFieldDoesNotShowHalfOfWideCharacter() async {
         let state = TextFieldState(text: "あいう")
         let field = TextField(state: state, showsCursor: false)
         // 必要なスクロール量は 3 桁だが、「い」の途中で切れないよう 4 桁へ切り上げる。
@@ -527,14 +528,14 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(render(field, width: 4, height: 1), "う  ")
     }
 
-    func testTextFieldScrollsToCharacterBoundaryWithMixedWidths() {
+    func testTextFieldScrollsToCharacterBoundaryWithMixedWidths() async {
         let state = TextFieldState(text: "aあbい")
         let field = TextField(state: state, showsCursor: false)
         XCTAssertEqual(field.scrollOffset(forWidth: 4), 3)
         XCTAssertEqual(render(field, width: 4, height: 1), "bい ")
     }
 
-    func testTextFieldScrollOffsetAlwaysLandsOnCharacterBoundary() {
+    func testTextFieldScrollOffsetAlwaysLandsOnCharacterBoundary() async {
         let state = TextFieldState()
         let field = TextField(state: state, showsCursor: false)
         for character in "aあiい漢x字" {
@@ -556,7 +557,7 @@ final class WidgetTests: XCTestCase {
         }
     }
 
-    func testEmptyTextFieldShowsCursorOverPlaceholder() {
+    func testEmptyTextFieldShowsCursorOverPlaceholder() async {
         let field = TextField(state: TextFieldState(), placeholder: "入力")
         var buffer = Buffer(size: Size(width: 10, height: 1))
         let bounds = buffer.bounds
@@ -566,7 +567,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(buffer.debugText(), "入力      ")
     }
 
-    func testEmptyTextFieldWithoutPlaceholderShowsCursor() {
+    func testEmptyTextFieldWithoutPlaceholderShowsCursor() async {
         let field = TextField(state: TextFieldState())
         var buffer = Buffer(size: Size(width: 4, height: 1))
         let bounds = buffer.bounds
@@ -575,7 +576,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertTrue(buffer[0, 0].style.attributes.contains(.reverse))
     }
 
-    func testPlaceholderHasNoCursorWhenCursorHidden() {
+    func testPlaceholderHasNoCursorWhenCursorHidden() async {
         let field = TextField(state: TextFieldState(), placeholder: "name", showsCursor: false)
         var buffer = Buffer(size: Size(width: 6, height: 1))
         let bounds = buffer.bounds
@@ -596,11 +597,11 @@ final class WidgetTests: XCTestCase {
         return field.state.renderedCursorPoint
     }
 
-    func testTextFieldReportsNoCursorPositionBeforeRender() {
+    func testTextFieldReportsNoCursorPositionBeforeRender() async {
         XCTAssertNil(TextFieldState(text: "ab").renderedCursorPoint)
     }
 
-    func testTextFieldReportsCursorPositionInScreenCoordinates() {
+    func testTextFieldReportsCursorPositionInScreenCoordinates() async {
         let state = TextFieldState(text: "あい")
         let field = TextField(state: state)
         let rect = Rect(x: 2, y: 1, width: 6, height: 1)
@@ -608,7 +609,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 6, y: 1))
     }
 
-    func testScrolledTextFieldReportsCursorPositionInsideRect() {
+    func testScrolledTextFieldReportsCursorPositionInsideRect() async {
         let state = TextFieldState(text: "abcdef")
         let field = TextField(state: state)
         let rect = Rect(x: 1, y: 0, width: 4, height: 1)
@@ -617,7 +618,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 4, y: 0))
     }
 
-    func testEmptyTextFieldReportsCursorPositionAtPlaceholderStart() {
+    func testEmptyTextFieldReportsCursorPositionAtPlaceholderStart() async {
         let state = TextFieldState()
         let field = TextField(state: state, placeholder: "ここに入力")
         let rect = Rect(x: 3, y: 2, width: 5, height: 1)
@@ -625,7 +626,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 3, y: 2))
     }
 
-    func testTextFieldReportsCursorPositionWithHiddenCursor() {
+    func testTextFieldReportsCursorPositionWithHiddenCursor() async {
         let state = TextFieldState(text: "ab")
         let field = TextField(state: state, showsCursor: false)
         let rect = Rect(x: 0, y: 0, width: 5, height: 1)
@@ -633,7 +634,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 2, y: 0))
     }
 
-    func testTextFieldCursorPositionFollowsCursorMovement() {
+    func testTextFieldCursorPositionFollowsCursorMovement() async {
         let state = TextFieldState(text: "abc")
         let field = TextField(state: state, showsCursor: false)
         let rect = Rect(x: 4, y: 3, width: 5, height: 1)
@@ -645,7 +646,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(renderedCursorPoint(of: field, in: rect), Point(x: 5, y: 3))
     }
 
-    func testTextFieldForgetsCursorPositionWhenItHasNoRoom() {
+    func testTextFieldForgetsCursorPositionWhenItHasNoRoom() async {
         let state = TextFieldState(text: "ab")
         let field = TextField(state: state)
 
