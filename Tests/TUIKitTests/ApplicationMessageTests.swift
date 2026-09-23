@@ -394,7 +394,7 @@ private final class PseudoTerminal {
     }
 }
 
-/// pty の master 側に溜まる出力を読み続け、読んだものを列へ流す。
+/// pty の master 側に溜まる出力を読み続け、読んだものを `AsyncStream` へ流す。
 ///
 /// - Note: 読んだ内容を自分では持たない。持つと箱がスレッドを跨ぐため。
 private final class OutputReader {

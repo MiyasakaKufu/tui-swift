@@ -22,7 +22,7 @@ enum CrashRestorer {
         + ANSI.disableBracketedPaste
         + ANSI.disableFocusReporting
         + ANSI.exitAlternateScreen
-        // `Terminal.deactivate()` のように、設定したときだけ送る形にはできない。この列は
+        // `Terminal.deactivate()` のように、設定したときだけ送る形にはできない。この制御コードは
         // 仕掛けるときに組み立てるので、後から設定されたかどうかを織り込めない。設定して
         // いなければ、形は既定のままでタイトルのスタックは空なので、送っても何も起きない。
         + ANSI.setCursorShape(.default)
@@ -31,7 +31,7 @@ enum CrashRestorer {
         + ANSI.showCursor
 
     /// クラッシュしたときとプロセスが終わるときに、termios を戻し、
-    /// 打ち消す列を書き出すよう仕掛ける。
+    /// 打ち消す制御コードを書き出すよう仕掛ける。
     ///
     /// - Parameters:
     ///   - input: 端末属性を戻すファイル記述子。
@@ -131,10 +131,10 @@ private func prepareRestoreSequence() {
     restoreSequenceLength = bytes.count
 }
 
-/// プロセスが終わるときに termios を戻し、打ち消す列を書き出すよう仕掛ける。
+/// プロセスが終わるときに termios を戻し、打ち消す制御コードを書き出すよう仕掛ける。
 private func installExitHandler() {
     // この guard を外すと、arm() を呼ぶたびにハンドラが積まれる。
-    // 終了時に同じ列が、その回数だけ tty へ書き出される。
+    // 終了時に同じ制御コードが、その回数だけ tty へ書き出される。
     guard !isExitHandlerInstalled else { return }
     isExitHandlerInstalled = true
     atexit { CrashRestorer.restoreTerminal() }

@@ -203,8 +203,8 @@ public final class Application<Root: Component> {
 
         // `startReadingInput()` が起こしたスレッドの終了を待たずに戻ってはいけない。
         // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
-        // 列を閉じてから起こす順序も変えてはいけない。
-        // 逆にすると閉じる前の列へ yield し、`poll(2)` へ戻って次にバイトが届くまで終わらない。
+        // `LoopEvent` の `AsyncStream` を閉じてから起こす順序も変えてはいけない。
+        // 逆にすると閉じる前の `AsyncStream` へ yield し、`poll(2)` へ戻って次にバイトが届くまで終わらない。
         continuation.finish()
         SignalWatcher.wakeUp()
         for await _ in inputStopped {}
@@ -212,11 +212,11 @@ public final class Application<Root: Component> {
         terminal.setCursorVisible(true)
     }
 
-    /// tty からバイト列を読み、組み立てた `InputEvent` を列へ流す専用スレッドを起こす。
+    /// tty からバイト列を読み、組み立てた `InputEvent` を `LoopEvent` の `AsyncStream` へ流す専用スレッドを起こす。
     ///
     /// - Note: `poll(2)` はアクタの上に置けない。
     ///   アクタを止めると、外部から送られたイベントが実行の機会を得られないため。
-    /// - Returns: スレッドが終わったときに終了する列。
+    /// - Returns: スレッドが終わったときに終了する `AsyncStream`。
     private func startReadingInput() -> AsyncStream<Void> {
         let (stopped, stoppedContinuation) = AsyncStream<Void>.makeStream()
         let descriptor = terminal.inputDescriptor
