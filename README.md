@@ -217,8 +217,8 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 
 ## 動作環境
 
-- Swift 5.9 以降
-- macOS 13 以降、または Linux
+- Swift 6.0 以降
+- macOS 15 以降、または Linux
 - ANSI エスケープシーケンスを解釈する端末
 
 ## テスト

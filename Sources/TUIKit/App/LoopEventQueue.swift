@@ -1,4 +1,4 @@
-import Foundation
+import Synchronization
 
 /// イベントループへ届いた `LoopEvent` を溜めておき、ループが次に一巡するときにまとめて渡すキュー。
 ///
@@ -6,19 +6,26 @@ import Foundation
 ///
 /// - Invariant: 溜まっている `.wake` と `.idle` は、それぞれ多くとも 1 つ。
 ///   `.inputs` と `.message` は、入れた順にすべて残る。
-final class LoopEventQueue<Message: Sendable>: @unchecked Sendable {
+final class LoopEventQueue<Message: Sendable>: Sendable {
+
+    /// `Mutex` で守る、溜まっている `LoopEvent` と閉じたかどうか。
+    private struct State {
+        // `.inputs` と `.message` の数に上限を付けてはいけない。溢れた分を捨てることになり、
+        // `MessageSender` で送られた値で埋まると、後から届いたキーが捨てられて終われなくなる。
+        var pending: [LoopEvent<Message>] = []
+        var hasPendingWake = false
+        var hasPendingIdle = false
+        var isClosed = false
+    }
 
     /// 何かが入ったことをループへ知らせる `AsyncStream`。要素そのものは運ばない。
     let arrivals: AsyncStream<Void>
 
     private let arrivalContinuation: AsyncStream<Void>.Continuation
-    private let lock = NSLock()
-    // `.inputs` と `.message` の数に上限を付けてはいけない。溢れた分を捨てることになり、
-    // `MessageSender` で送られた値で埋まると、後から届いたキーが捨てられて終われなくなる。
-    private var pending: [LoopEvent<Message>] = []
-    private var hasPendingWake = false
-    private var hasPendingIdle = false
-    private var isClosed = false
+    // `actor` にしたり `@MainActor` に隔離したりしてはいけない。入力スレッドと `MessageSender.send(_:)` は
+    // 同期の文脈から入れるので `Task` を介して渡すことになり、`Task` 同士の実行順が保証されないため、
+    // 入れた順が崩れる。
+    private let state = Mutex(State())
 
     /// 空のキューを作る。
     init() {
@@ -36,22 +43,21 @@ final class LoopEventQueue<Message: Sendable>: @unchecked Sendable {
     /// - Returns: 受け付けたなら `true`。`close()` の後なら `false`。
     @discardableResult
     func post(_ event: LoopEvent<Message>) -> Bool {
-        lock.lock()
-        guard !isClosed else {
-            lock.unlock()
-            return false
+        let accepted: Bool = state.withLock { state in
+            guard !state.isClosed else { return false }
+            switch event {
+            case .wake:
+                if !state.hasPendingWake { state.pending.append(event) }
+                state.hasPendingWake = true
+            case .idle:
+                if !state.hasPendingIdle { state.pending.append(event) }
+                state.hasPendingIdle = true
+            case .inputs, .message:
+                state.pending.append(event)
+            }
+            return true
         }
-        switch event {
-        case .wake:
-            if !hasPendingWake { pending.append(event) }
-            hasPendingWake = true
-        case .idle:
-            if !hasPendingIdle { pending.append(event) }
-            hasPendingIdle = true
-        case .inputs, .message:
-            pending.append(event)
-        }
-        lock.unlock()
+        guard accepted else { return false }
 
         // 溜める前に知らせてはいけない。ループが知らせを受けて `take()` した後に溜まると、
         // 次の知らせが来るまで取り出されない。
@@ -63,20 +69,18 @@ final class LoopEventQueue<Message: Sendable>: @unchecked Sendable {
     ///
     /// - Returns: 取り出した `LoopEvent`。何も溜まっていなければ空。
     func take() -> [LoopEvent<Message>] {
-        lock.lock()
-        defer { lock.unlock() }
-        let events = pending
-        pending = []
-        hasPendingWake = false
-        hasPendingIdle = false
-        return events
+        state.withLock { state in
+            let events = state.pending
+            state.pending = []
+            state.hasPendingWake = false
+            state.hasPendingIdle = false
+            return events
+        }
     }
 
     /// 以後の `post(_:)` を断り、`arrivals` を終える。
     func close() {
-        lock.lock()
-        isClosed = true
-        lock.unlock()
+        state.withLock { $0.isClosed = true }
         arrivalContinuation.finish()
     }
 }
