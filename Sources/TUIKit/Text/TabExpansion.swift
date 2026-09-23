@@ -12,11 +12,14 @@ public enum TabExpansion {
     ///   - text: 展開する文字列。改行を含む場合、桁の積算は行ごとに 0 へ戻る。
     ///   - tabSize: タブストップの間隔。0 以下ならタブを取り除く。
     ///   - startColumn: 1 行目の開始桁。行の途中から展開する場合に指定する。
+    ///   - ambiguous: 桁を数えるときの曖昧幅の文字の扱い。省略すると
+    ///     `DisplayWidth.defaultAmbiguousWidth` に従う。
     /// - Returns: タブを含まない文字列。
     public static func expand(
         _ text: String,
         tabSize: Int = TabExpansion.defaultSize,
-        startColumn: Int = 0
+        startColumn: Int = 0,
+        ambiguous: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> String {
         guard text.contains("\t") else { return text }
 
@@ -35,7 +38,7 @@ public enum TabExpansion {
                 column = 0
             } else {
                 result.append(character)
-                column += DisplayWidth.width(of: character)
+                column += DisplayWidth.width(of: character, ambiguous: ambiguous)
             }
         }
         return result

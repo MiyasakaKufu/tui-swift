@@ -8,7 +8,7 @@ import Glibc
 ///
 /// 東アジアの全角文字と絵文字は 2 桁、結合文字や制御文字は 0 桁として扱う。
 /// East Asian Width が Ambiguous の文字（罫線素片、`…`、`█`、矢印など）は
-/// 端末の設定によって 1 桁にも 2 桁にも表示されるため、`ambiguousWidth` で切り替える。
+/// 端末の設定によって 1 桁にも 2 桁にも表示されるため、各関数の `ambiguous` で切り替える。
 public enum DisplayWidth {
 
     /// East Asian Width が Ambiguous の文字を何桁として扱うか。
@@ -24,11 +24,12 @@ public enum DisplayWidth {
     /// go-runewidth や tcell が見るものと同じ `RUNEWIDTH_EASTASIAN`。
     public static let ambiguousWidthEnvironmentVariable = "RUNEWIDTH_EASTASIAN"
 
-    /// 曖昧幅の文字を何桁として扱うか。
+    /// 曖昧幅の扱いを指定しなかったときの既定値。
     ///
-    /// - Note: 初期値は最初に参照した時点で `resolveAmbiguousWidth()` から一度だけ決まる。
-    ///   あとから環境変数を変えても反映されないため、切り替えるにはこのプロパティへ代入する。
-    public static var ambiguousWidth: AmbiguousWidth = resolveAmbiguousWidth()
+    /// - Note: 最初に参照した時点で `resolveAmbiguousWidth()` から一度だけ決まる。
+    ///   あとから環境変数を変えても反映されない。アプリごとに変えるには
+    ///   `ApplicationOptions.ambiguousWidth` を、呼び出しごとに変えるには各関数の `ambiguous` を指定する。
+    public static let defaultAmbiguousWidth: AmbiguousWidth = resolveAmbiguousWidth()
 
     // MARK: - 設定の解決
 
@@ -136,11 +137,11 @@ public enum DisplayWidth {
     ///
     /// - Parameters:
     ///   - character: 幅を求める文字。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `ambiguousWidth` に従う。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `defaultAmbiguousWidth` に従う。
     /// - Returns: 桁数。全角文字と絵文字は 2、結合文字と制御文字は 0。
     public static func width(
         of character: Character,
-        ambiguous: AmbiguousWidth = DisplayWidth.ambiguousWidth
+        ambiguous: AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> Int {
         guard let first = character.unicodeScalars.first else { return 0 }
 
@@ -161,11 +162,11 @@ public enum DisplayWidth {
     ///
     /// - Parameters:
     ///   - string: 幅を求める文字列。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `ambiguousWidth` に従う。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `defaultAmbiguousWidth` に従う。
     /// - Returns: 各文字の桁数の合計。
     public static func width(
         of string: String,
-        ambiguous: AmbiguousWidth = DisplayWidth.ambiguousWidth
+        ambiguous: AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> Int {
         var total = 0
         for character in string {
@@ -180,7 +181,7 @@ public enum DisplayWidth {
     ///   - string: 切り詰める文字列。
     ///   - limit: 許容する表示幅。0 以下なら空文字列を返す。
     ///   - ellipsis: 切り詰めたときに末尾へ付ける文字列。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `ambiguousWidth` に従う。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `defaultAmbiguousWidth` に従う。
     /// - Returns: 表示幅が `limit` 以下の文字列。切り詰めが起きなければ `string` そのまま。
     /// - Note: `ellipsis` 自身の幅も `limit` に含める。
     ///   `ellipsis` だけで `limit` に達する場合は付けずに切り詰める。
@@ -188,7 +189,7 @@ public enum DisplayWidth {
         _ string: String,
         to limit: Int,
         ellipsis: String = "…",
-        ambiguous: AmbiguousWidth = DisplayWidth.ambiguousWidth
+        ambiguous: AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> String {
         if limit <= 0 { return "" }
         if width(of: string, ambiguous: ambiguous) <= limit { return string }
@@ -207,13 +208,13 @@ public enum DisplayWidth {
     /// - Parameters:
     ///   - string: 切り出す元の文字列。
     ///   - limit: 許容する表示幅。0 以下なら空の `Substring` を返す。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `ambiguousWidth` に従う。
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `defaultAmbiguousWidth` に従う。
     /// - Returns: 表示幅が `limit` 以下になる最長の接頭辞。
     /// - Postcondition: 全角文字を途中で割らない。
     public static func prefix(
         of string: String,
         width limit: Int,
-        ambiguous: AmbiguousWidth = DisplayWidth.ambiguousWidth
+        ambiguous: AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> Substring {
         if limit <= 0 { return string.prefix(0) }
         var used = 0

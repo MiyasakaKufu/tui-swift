@@ -7,27 +7,16 @@ import Glibc
 import XCTest
 @testable import TUIKit
 
-/// 退避した曖昧幅の設定。
-private var savedAmbiguousWidth: DisplayWidth.AmbiguousWidth = .narrow
-
 @MainActor
 final class AmbiguousWidthTests: XCTestCase {
 
-    // 退避先をクラスの中へ戻すと、setUp / tearDown から触れなくなる。
-    // どちらも非隔離の宣言を override するので隔離を付けられず、隔離された記憶域を読み書きできない。
-    override func setUp() {
-        super.setUp()
-        savedAmbiguousWidth = DisplayWidth.ambiguousWidth
-        DisplayWidth.ambiguousWidth = .narrow
-    }
-
-    override func tearDown() {
-        DisplayWidth.ambiguousWidth = savedAmbiguousWidth
-        super.tearDown()
-    }
-
-    private func render(_ view: any View, width: Int, height: Int) -> String {
-        var buffer = Buffer(size: Size(width: width, height: height))
+    private func render(
+        _ view: any View,
+        width: Int,
+        height: Int,
+        ambiguous: DisplayWidth.AmbiguousWidth
+    ) -> String {
+        var buffer = Buffer(size: Size(width: width, height: height), ambiguousWidth: ambiguous)
         let bounds = buffer.bounds
         view.renderAsRoot(into: &buffer, rect: bounds)
         return buffer.debugText()
@@ -35,29 +24,21 @@ final class AmbiguousWidthTests: XCTestCase {
 
     // MARK: - 幅の計算
 
-    func testAmbiguousCharactersAreNarrowByDefault() async {
-        XCTAssertEqual(DisplayWidth.width(of: "─"), 1)
-        XCTAssertEqual(DisplayWidth.width(of: "╭"), 1)
-        XCTAssertEqual(DisplayWidth.width(of: "…"), 1)
-        XCTAssertEqual(DisplayWidth.width(of: "█"), 1)
-        XCTAssertEqual(DisplayWidth.width(of: "↑"), 1)
+    func testAmbiguousCharactersAreNarrowWhenNarrow() async {
+        for character: Character in ["─", "╭", "…", "█", "↑"] {
+            XCTAssertEqual(DisplayWidth.width(of: character, ambiguous: .narrow), 1)
+        }
     }
 
-    func testAmbiguousCharactersAreWideWhenConfigured() async {
-        DisplayWidth.ambiguousWidth = .wide
-        XCTAssertEqual(DisplayWidth.width(of: "─"), 2)
-        XCTAssertEqual(DisplayWidth.width(of: "╭"), 2)
-        XCTAssertEqual(DisplayWidth.width(of: "…"), 2)
-        XCTAssertEqual(DisplayWidth.width(of: "█"), 2)
-        XCTAssertEqual(DisplayWidth.width(of: "↑"), 2)
+    func testAmbiguousCharactersAreWideWhenWide() async {
+        for character: Character in ["─", "╭", "…", "█", "↑"] {
+            XCTAssertEqual(DisplayWidth.width(of: character, ambiguous: .wide), 2)
+        }
     }
 
-    func testPerCallSettingOverridesTheGlobalOne() async {
-        DisplayWidth.ambiguousWidth = .narrow
-        XCTAssertEqual(DisplayWidth.width(of: "─", ambiguous: .wide), 2)
-
-        DisplayWidth.ambiguousWidth = .wide
-        XCTAssertEqual(DisplayWidth.width(of: "─", ambiguous: .narrow), 1)
+    func testOmittedSettingFollowsTheDefault() async {
+        let expected = DisplayWidth.width(of: "─", ambiguous: DisplayWidth.defaultAmbiguousWidth)
+        XCTAssertEqual(DisplayWidth.width(of: "─"), expected)
     }
 
     func testStringWidthFollowsTheSetting() async {
@@ -144,31 +125,65 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(DisplayWidth.resolveAmbiguousWidth(), .narrow)
     }
 
+    func testApplicationOptionsDefaultsToTheResolvedSetting() async {
+        XCTAssertEqual(ApplicationOptions().ambiguousWidth, DisplayWidth.defaultAmbiguousWidth)
+        XCTAssertEqual(ApplicationOptions(ambiguousWidth: .wide).ambiguousWidth, .wide)
+    }
+
     // MARK: - 描画側の切り替え
 
-    func testBorderStyleReportsWhetherItFitsInSingleColumn() async {
-        XCTAssertTrue(BorderStyle.rounded.fitsInSingleColumn)
-        XCTAssertTrue(BorderStyle.ascii.fitsInSingleColumn)
+    func testChildContextsCarryTheSetting() async {
+        let root = RenderContext(screen: Rect(x: 0, y: 0, width: 1, height: 1), ambiguousWidth: .wide)
+        XCTAssertEqual(root.child(0).child(1).ambiguousWidth, .wide)
+    }
 
-        DisplayWidth.ambiguousWidth = .wide
-        XCTAssertFalse(BorderStyle.rounded.fitsInSingleColumn)
-        XCTAssertTrue(BorderStyle.ascii.fitsInSingleColumn)
+    func testBufferPlacesAmbiguousCharactersBySetting() async {
+        var narrow = Buffer(size: Size(width: 4, height: 1), ambiguousWidth: .narrow)
+        XCTAssertEqual(narrow.write("→ab", at: Point(x: 0, y: 0)), 3)
+        XCTAssertEqual(narrow.debugText(), "→ab ")
+
+        var wide = Buffer(size: Size(width: 4, height: 1), ambiguousWidth: .wide)
+        XCTAssertEqual(wide.write("→ab", at: Point(x: 0, y: 0)), 4)
+        XCTAssertTrue(wide[1, 0].isContinuation)
+        XCTAssertEqual(wide.debugText(), "→ab")
+    }
+
+    func testTextWrapsBySetting() async {
+        let view = Text("ab…cd", wrap: .character)
+        XCTAssertEqual(render(view, width: 3, height: 2, ambiguous: .narrow), "ab…\ncd ")
+        XCTAssertEqual(render(view, width: 3, height: 2, ambiguous: .wide), "ab \n…c")
+    }
+
+    func testBorderStyleReportsWhetherItFitsInSingleColumn() async {
+        XCTAssertTrue(BorderStyle.rounded.fitsInSingleColumn(ambiguous: .narrow))
+        XCTAssertTrue(BorderStyle.ascii.fitsInSingleColumn(ambiguous: .narrow))
+
+        XCTAssertFalse(BorderStyle.rounded.fitsInSingleColumn(ambiguous: .wide))
+        XCTAssertTrue(BorderStyle.ascii.fitsInSingleColumn(ambiguous: .wide))
+    }
+
+    /// 枠線の文字組みは、作ったときの曖昧幅の既定値に左右されない。
+    func testBorderStyleKeepsAmbiguousCharacters() async {
+        let style = BorderStyle(
+            topLeft: "╔", top: "═", topRight: "╗",
+            left: "║", right: "║",
+            bottomLeft: "╚", bottom: "═", bottomRight: "╝"
+        )
+        XCTAssertEqual(style.topLeft, "╔")
+        XCTAssertEqual(style.top, "═")
     }
 
     func testBorderFallsBackToASCIIWhenAmbiguousIsWide() async {
         let view = Text("ab").border(.rounded)
-        XCTAssertEqual(render(view, width: 4, height: 3), "╭──╮\n│ab│\n╰──╯")
-
-        DisplayWidth.ambiguousWidth = .wide
-        XCTAssertEqual(render(view, width: 4, height: 3), "+--+\n|ab|\n+--+")
+        XCTAssertEqual(render(view, width: 4, height: 3, ambiguous: .narrow), "╭──╮\n│ab│\n╰──╯")
+        XCTAssertEqual(render(view, width: 4, height: 3, ambiguous: .wide), "+--+\n|ab|\n+--+")
     }
 
     /// 曖昧幅が 2 桁のとき、埋まる側（Ambiguous の `█`）だけが 2 桁になり、
     /// 残りの側（Neutral の `░`）は 1 桁のまま行の幅が保たれる。
     func testProgressBarKeepsRowWidthWhenAmbiguousIsWide() async {
-        XCTAssertEqual(render(ProgressBar(value: 0.5), width: 10, height: 1), "█████░░░░░")
-
-        DisplayWidth.ambiguousWidth = .wide
-        XCTAssertEqual(render(ProgressBar(value: 0.5), width: 10, height: 1), "██ ░░░░░")
+        let bar = ProgressBar(value: 0.5)
+        XCTAssertEqual(render(bar, width: 10, height: 1, ambiguous: .narrow), "█████░░░░░")
+        XCTAssertEqual(render(bar, width: 10, height: 1, ambiguous: .wide), "██ ░░░░░")
     }
 }

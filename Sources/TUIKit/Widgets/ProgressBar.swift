@@ -68,7 +68,7 @@ public struct ProgressBar: View {
         var suffix = ""
         if showsPercentage {
             suffix = " " + String(Int((progress * 100).rounded())) + "%"
-            barWidth = max(0, rect.width - DisplayWidth.width(of: suffix))
+            barWidth = max(0, rect.width - DisplayWidth.width(of: suffix, ambiguous: context.ambiguousWidth))
         }
 
         let filled = Int((Double(barWidth) * progress).rounded())

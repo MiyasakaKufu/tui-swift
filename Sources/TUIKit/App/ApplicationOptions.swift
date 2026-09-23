@@ -42,6 +42,11 @@ public struct ApplicationOptions: Sendable {
     ///   この設定がなければ、端末を戻さないまま止まるか、そもそも止まらない。
     ///   Ctrl+Z を自前で扱うアプリだけ `false` にする。
     public var suspendsOnControlZ: Bool
+    /// East Asian Width が Ambiguous の文字を何桁として扱うか。
+    ///
+    /// - Note: 端末の設定と食い違うと、罫線素片や `…` を含む行の桁がずれる。
+    ///   既定値は `DisplayWidth.defaultAmbiguousWidth`（環境変数 `RUNEWIDTH_EASTASIAN` から決まる）。
+    public var ambiguousWidth: DisplayWidth.AmbiguousWidth
 
     /// 設定を作る。
     ///
@@ -56,6 +61,7 @@ public struct ApplicationOptions: Sendable {
     ///   - frameInterval: 入力がなくても再描画する間隔（秒）。`nil` なら入力があるまで待つ。
     ///   - quitsOnControlC: 処理されなかった Ctrl+C で終了するか。
     ///   - suspendsOnControlZ: 処理されなかった Ctrl+Z で一時停止するか。
+    ///   - ambiguousWidth: East Asian Width が Ambiguous の文字を何桁として扱うか。
     public init(
         usesAlternateScreen: Bool = true,
         mouseTracking: MouseTracking = .disabled,
@@ -66,7 +72,8 @@ public struct ApplicationOptions: Sendable {
         cursorShape: CursorShape? = nil,
         frameInterval: Double? = nil,
         quitsOnControlC: Bool = true,
-        suspendsOnControlZ: Bool = true
+        suspendsOnControlZ: Bool = true,
+        ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) {
         self.usesAlternateScreen = usesAlternateScreen
         self.mouseTracking = mouseTracking
@@ -78,6 +85,7 @@ public struct ApplicationOptions: Sendable {
         self.frameInterval = frameInterval
         self.quitsOnControlC = quitsOnControlC
         self.suspendsOnControlZ = suspendsOnControlZ
+        self.ambiguousWidth = ambiguousWidth
     }
 
     /// すべて既定値の設定。

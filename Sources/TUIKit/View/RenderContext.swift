@@ -41,12 +41,25 @@ public struct RenderContext {
     /// `ScreenOverlayView` は、親から渡された矩形ではなくこの矩形を基準に重ねるビューを置く。
     public let screen: Rect
 
+    /// East Asian Width が Ambiguous の文字を何桁として扱うか。
+    ///
+    /// - Note: `DisplayWidth` の各関数は、`ambiguous` を省くと `DisplayWidth.defaultAmbiguousWidth`
+    ///   で測る。文字列の幅を測るときはこの値を渡す。渡さないと、アプリが指定した扱いと測った幅が
+    ///   食い違い、その行の桁がずれる。
+    public let ambiguousWidth: DisplayWidth.AmbiguousWidth
+
     /// ルートのビューに渡す文脈を作る。
     ///
     /// - Parameters:
     ///   - screen: 画面全体の矩形。描画先のバッファ全体を渡す。
-    public init(screen: Rect) {
-        self.init(path: .root, screen: screen)
+    ///   - ambiguousWidth: 曖昧幅の文字の扱い。
+    /// - Precondition: `ambiguousWidth` が描画先のバッファの `ambiguousWidth` と同じ。
+    ///   違うと、ビューが測った幅とバッファに置かれるセルの桁が食い違う。
+    public init(
+        screen: Rect,
+        ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
+    ) {
+        self.init(path: .root, screen: screen, ambiguousWidth: ambiguousWidth)
     }
 
     /// 経路を指定して文脈を作る。
@@ -54,9 +67,11 @@ public struct RenderContext {
     /// - Parameters:
     ///   - path: 文脈を渡すビューの経路。
     ///   - screen: 画面全体の矩形。
-    private init(path: ViewPath, screen: Rect) {
+    ///   - ambiguousWidth: 曖昧幅の文字の扱い。
+    private init(path: ViewPath, screen: Rect, ambiguousWidth: DisplayWidth.AmbiguousWidth) {
         self.path = path
         self.screen = screen
+        self.ambiguousWidth = ambiguousWidth
     }
 
     /// 子のビューへ渡す文脈を返す。
@@ -65,7 +80,7 @@ public struct RenderContext {
     ///   - index: 親の中での子の番号。
     /// - Returns: 経路に `index` を足した文脈。
     func child(_ index: Int) -> RenderContext {
-        RenderContext(path: path.appending(index), screen: screen)
+        RenderContext(path: path.appending(index), screen: screen, ambiguousWidth: ambiguousWidth)
     }
 
     /// 子のビューが希望するサイズを返す。

@@ -30,8 +30,8 @@ public struct BorderStyle: Hashable, Sendable {
     ///   - bottomLeft: 左下の角に置く文字。
     ///   - bottom: 下辺に並べる文字。
     ///   - bottomRight: 右下の角に置く文字。
-    /// - Postcondition: 表示幅が 1 桁でない文字（全角文字や絵文字）は、その位置の既定の文字
-    ///   （`single` と同じ細い実線）へ置き換わる。
+    /// - Postcondition: 曖昧幅を 1 桁と数えても 1 桁にならない文字（全角文字や絵文字）は、
+    ///   その位置の既定の文字（`single` と同じ細い実線）へ置き換わる。
     public init(
         topLeft: Character,
         top: Character,
@@ -52,19 +52,24 @@ public struct BorderStyle: Hashable, Sendable {
         self.bottomRight = Self.singleWidth(bottomRight, fallback: "┘")
     }
 
+    // `.narrow` を既定の曖昧幅に変えてはいけない。同じ引数から環境によって違う文字組みができる。
+    // 曖昧幅が 2 桁のときの置き換え先（罫線素片）も 2 桁なので、置き換えても桁は揃わない。
     private static func singleWidth(_ character: Character, fallback: Character) -> Character {
-        DisplayWidth.width(of: character) == 1 ? character : fallback
+        DisplayWidth.width(of: character, ambiguous: .narrow) == 1 ? character : fallback
     }
 
-    /// 8 方向の文字がすべて 1 桁に収まるか。
+    /// 8 方向の文字がすべて 1 桁に収まるかを調べる。
     ///
-    /// - Note: 罫線素片は East Asian Width が Ambiguous なので、
-    ///   `DisplayWidth.ambiguousWidth` が `.wide` のときは 2 桁になる。
-    ///   このとき `init` の置き換え先（`single` と同じ罫線素片）も 2 桁なので、
-    ///   置き換えても 1 桁には収まらない。
-    public var fitsInSingleColumn: Bool {
+    /// - Parameters:
+    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    /// - Returns: すべて 1 桁なら `true`。
+    /// - Note: 罫線素片は East Asian Width が Ambiguous なので、`ambiguous` が `.wide` のときは
+    ///   2 桁になる。`ascii` 以外の組み込みの文字組みは、どれも 1 桁に収まらない。
+    public func fitsInSingleColumn(
+        ambiguous: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
+    ) -> Bool {
         [topLeft, top, topRight, left, right, bottomLeft, bottom, bottomRight]
-            .allSatisfy { DisplayWidth.width(of: $0) == 1 }
+            .allSatisfy { DisplayWidth.width(of: $0, ambiguous: ambiguous) == 1 }
     }
 
     /// 細い実線。

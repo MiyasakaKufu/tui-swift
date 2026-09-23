@@ -98,7 +98,9 @@ public struct BorderView<Content: View>: View {
         let desired = context.sizeThatFits(of: content, index: 0, proposal: inner)
         var width = desired.width + 2
         if let titleText = title {
-            width = max(width, DisplayWidth.width(of: TabExpansion.expand(titleText)) + 4)
+            let ambiguous = context.ambiguousWidth
+            let expanded = TabExpansion.expand(titleText, ambiguous: ambiguous)
+            width = max(width, DisplayWidth.width(of: expanded, ambiguous: ambiguous) + 4)
         }
         return Size(
             width: min(width, proposal.width),
@@ -114,18 +116,20 @@ public struct BorderView<Content: View>: View {
     ///   - context: ライブラリから渡される文脈。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width >= 2, rect.height >= 2 else { return }
-        drawFrame(into: &buffer, rect: rect)
+        drawFrame(into: &buffer, rect: rect, ambiguous: context.ambiguousWidth)
         let inner = rect.inset(by: 1)
         if !inner.isEmpty {
             context.render(content, index: 0, into: &buffer, rect: inner)
         }
     }
 
-    /// 実際に枠として描く文字の組み合わせ。
+    /// 実際に枠として描く文字の組み合わせを返す。
     ///
-    /// `borderStyle` が 1 桁に収まらないときは `.ascii` になる。
-    var effectiveBorderStyle: BorderStyle {
-        borderStyle.fitsInSingleColumn ? borderStyle : .ascii
+    /// - Parameters:
+    ///   - ambiguous: 曖昧幅の文字の扱い。
+    /// - Returns: `borderStyle` が 1 桁に収まれば `borderStyle`、収まらなければ `.ascii`。
+    func effectiveBorderStyle(ambiguous: DisplayWidth.AmbiguousWidth) -> BorderStyle {
+        borderStyle.fitsInSingleColumn(ambiguous: ambiguous) ? borderStyle : .ascii
     }
 
     /// 枠線と見出しを描く。
@@ -133,8 +137,9 @@ public struct BorderView<Content: View>: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 枠線を含めた矩形。
-    private func drawFrame(into buffer: inout Buffer, rect: Rect) {
-        let border = effectiveBorderStyle
+    ///   - ambiguous: 曖昧幅の文字の扱い。
+    private func drawFrame(into buffer: inout Buffer, rect: Rect, ambiguous: DisplayWidth.AmbiguousWidth) {
+        let border = effectiveBorderStyle(ambiguous: ambiguous)
         let top = rect.minY
         let bottom = rect.maxY - 1
         let left = rect.minX
@@ -161,8 +166,8 @@ public struct BorderView<Content: View>: View {
         if let titleText = title, rect.width > 4 {
             let available = rect.width - 4
             // 幅で切り詰める前に展開しないと、タブの分だけ桁数の計算がずれる。
-            let expanded = TabExpansion.expand(" " + titleText + " ")
-            let trimmed = DisplayWidth.truncate(expanded, to: available + 2)
+            let expanded = TabExpansion.expand(" " + titleText + " ", ambiguous: ambiguous)
+            let trimmed = DisplayWidth.truncate(expanded, to: available + 2, ambiguous: ambiguous)
             buffer.write(
                 trimmed,
                 at: Point(x: left + 1, y: top),

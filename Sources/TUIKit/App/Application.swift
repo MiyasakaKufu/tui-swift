@@ -23,7 +23,7 @@ public final class Application<Root: Component> {
     /// - Note: `TerminalApp` のアプリからは届かない。
     nonisolated public let sender: MessageSender<Root.Message>
 
-    private var buffer = Buffer(size: .zero)
+    private var buffer: Buffer
     /// 最後に `.resize` として通知したサイズ。
     private var reportedSize = Size.zero
     /// 最後にフレームを数えた時刻。
@@ -52,6 +52,7 @@ public final class Application<Root: Component> {
         let terminal = terminal ?? Terminal()
         self.root = root
         self.options = options
+        self.buffer = Buffer(size: .zero, ambiguousWidth: options.ambiguousWidth)
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
@@ -354,7 +355,8 @@ public final class Application<Root: Component> {
 
         let view = root.body
         let bounds = buffer.bounds
-        view.render(into: &buffer, rect: bounds, context: RenderContext(screen: bounds))
+        let context = RenderContext(screen: bounds, ambiguousWidth: options.ambiguousWidth)
+        view.render(into: &buffer, rect: bounds, context: context)
         renderer.render(buffer, cursor: root.cursorPosition)
     }
 }

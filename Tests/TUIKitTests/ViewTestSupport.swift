@@ -8,7 +8,7 @@ extension View {
     ///   - buffer: 描画先のバッファ。画面全体として扱う。
     ///   - rect: 描画する矩形。
     func renderAsRoot(into buffer: inout Buffer, rect: Rect) {
-        let context = RenderContext(screen: buffer.bounds)
+        let context = RenderContext(screen: buffer.bounds, ambiguousWidth: buffer.ambiguousWidth)
         render(into: &buffer, rect: rect, context: context)
     }
 
