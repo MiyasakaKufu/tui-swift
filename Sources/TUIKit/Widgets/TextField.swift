@@ -1,12 +1,41 @@
 /// 1 行のテキスト入力の状態。
 ///
+/// 内容（値）とカーソル位置（表示状態）を扱う。内容は自分で持つか、`TextField(text:state:)` に
+/// 渡した `Binding` を通してアプリが持つ値を読み書きする。カーソル位置はどちらの場合もここに置く。
+///
 /// - Invariant: 内容もカーソル位置も書記素クラスタ（`Character`）単位で、
 ///   国旗や ZWJ で結合した絵文字も 1 文字として数える。
 @MainActor
 public final class TextFieldState {
-    private var characters: [Character]
+    private var ownedCharacters: [Character]
+    private var textBinding: Binding<String>?
+    private var storedCursor: Int
+
+    /// 編集の対象になる文字の並び。
+    private var characters: [Character] {
+        get {
+            guard let textBinding else { return ownedCharacters }
+            return TextFieldState.sanitizedCharacters(of: textBinding.wrappedValue)
+        }
+        set {
+            guard let textBinding else {
+                ownedCharacters = newValue
+                return
+            }
+            let text = String(newValue)
+            // 比べずに書き戻したくなるが、先頭での Ctrl+U のように何も変えない編集でも
+            // アプリの値が代入され、代入を契機に処理を走らせるアプリでそれが空振りで走る。
+            guard text != textBinding.wrappedValue else { return }
+            textBinding.wrappedValue = text
+        }
+    }
+
     /// カーソルの文字インデックス（0 〜 文字数）。
-    public private(set) var cursor: Int
+    ///
+    /// - Note: `Binding` の先の値がアプリの側でカーソル位置より短くなると、カーソルは末尾に来る。
+    public var cursor: Int {
+        min(storedCursor, characters.count)
+    }
 
     /// 直前の描画でカーソルを置いた画面上の位置。まだ描画していなければ `nil`。
     ///
@@ -21,8 +50,16 @@ public final class TextFieldState {
     ///   - text: 初期の文字列。1 行に置けない文字は取り除かれる。
     /// - Postcondition: カーソルは末尾に来る。
     public init(text: String = "") {
-        self.characters = TextFieldState.sanitizedCharacters(of: text)
-        self.cursor = characters.count
+        self.ownedCharacters = TextFieldState.sanitizedCharacters(of: text)
+        self.storedCursor = ownedCharacters.count
+    }
+
+    /// 内容の読み書きを `text` へ向ける。
+    ///
+    /// - Parameters:
+    ///   - text: アプリが持つ内容を読み書きする口。
+    func bind(_ text: Binding<String>) {
+        textBinding = text
     }
 
     /// 現在の文字列。
@@ -45,7 +82,7 @@ public final class TextFieldState {
     /// - Postcondition: カーソルは末尾に来る。
     public func setText(_ text: String) {
         characters = TextFieldState.sanitizedCharacters(of: text)
-        cursor = characters.count
+        storedCursor = characters.count
     }
 
     /// カーソル位置へ 1 文字を挿入する。
@@ -144,10 +181,12 @@ public final class TextFieldState {
     /// - Postcondition: 内容は書記素クラスタで区切り直され、カーソルは `text` の末尾に来る。
     ///   `text` が前後と 1 つのクラスタに結合した場合は、そのクラスタの後ろに来る。
     private func replace(_ range: Range<Int>, with text: String) {
-        let head = String(characters[..<range.lowerBound]) + text
-        let tail = String(characters[range.upperBound...])
-        characters = Array(head + tail)
-        cursor = TextFieldState.characterIndex(in: characters, afterUTF8Length: head.utf8.count)
+        let current = characters
+        let head = String(current[..<range.lowerBound]) + text
+        let tail = String(current[range.upperBound...])
+        let replaced = Array(head + tail)
+        characters = replaced
+        storedCursor = TextFieldState.characterIndex(in: replaced, afterUTF8Length: head.utf8.count)
     }
 
     /// 先頭から UTF-8 で `length` バイトの位置にあたる文字インデックス。
@@ -169,22 +208,22 @@ public final class TextFieldState {
 
     /// カーソルを 1 文字左へ動かす。
     public func moveLeft() {
-        cursor = max(0, cursor - 1)
+        storedCursor = max(0, cursor - 1)
     }
 
     /// カーソルを 1 文字右へ動かす。
     public func moveRight() {
-        cursor = min(characters.count, cursor + 1)
+        storedCursor = min(characters.count, cursor + 1)
     }
 
     /// カーソルを先頭へ動かす。
     public func moveToStart() {
-        cursor = 0
+        storedCursor = 0
     }
 
     /// カーソルを末尾へ動かす。
     public func moveToEnd() {
-        cursor = characters.count
+        storedCursor = characters.count
     }
 
     /// 文字入力・カーソル移動・削除・貼り付けを処理する。
@@ -253,7 +292,7 @@ public final class TextFieldState {
 
 /// 1 行のテキスト入力欄。
 public struct TextField: View {
-    /// 内容とカーソル位置を持つ状態。
+    /// カーソル位置を持つ状態。`Binding` を渡さずに作った場合は内容も持つ。
     public var state: TextFieldState
     /// 空のときに表示する文字列。
     public var placeholder: String
@@ -264,7 +303,36 @@ public struct TextField: View {
     /// カーソル位置を反転表示する（アプリ側で端末カーソルを出す場合は `false`）。
     public var showsCursor: Bool
 
-    /// 状態と見た目を指定して入力欄を作る。
+    /// アプリが持つ文字列を編集する入力欄を作る。
+    ///
+    /// - Parameters:
+    ///   - text: 編集する文字列を読み書きする口。
+    ///   - state: カーソル位置を持つ状態。内容は持たず、`text` を読み書きする。
+    ///   - placeholder: 空のときに表示する文字列。
+    ///   - style: 文字のスタイル。
+    ///   - placeholderStyle: プレースホルダのスタイル。
+    ///   - showsCursor: カーソル位置を反転表示するか。
+    /// - Postcondition: `state` は以後、内容を `text` から読み、編集の結果を `text` へ書き戻す。
+    ///   書き戻すのは `state.handle(_:)` などの編集の中だけで、描画では書き戻さない。
+    public init(
+        text: Binding<String>,
+        state: TextFieldState,
+        placeholder: String = "",
+        style: Style = .plain,
+        placeholderStyle: Style = Style(foreground: .brightBlack),
+        showsCursor: Bool = true
+    ) {
+        state.bind(text)
+        self.init(
+            state: state,
+            placeholder: placeholder,
+            style: style,
+            placeholderStyle: placeholderStyle,
+            showsCursor: showsCursor
+        )
+    }
+
+    /// 内容も持つ状態と見た目を指定して入力欄を作る。
     ///
     /// - Parameters:
     ///   - state: 内容とカーソル位置を持つ状態。

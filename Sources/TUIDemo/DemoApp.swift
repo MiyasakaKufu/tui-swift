@@ -26,6 +26,8 @@ final class DemoApp: TerminalApp {
         "ビューの重ね描きとダイアログ",
     ]
 
+    private var selection = 0
+    private var name = ""
     private let listState = ListState()
     private let inputState = TextFieldState()
     private var progress = 0.35
@@ -38,7 +40,7 @@ final class DemoApp: TerminalApp {
         VStack(spacing: 0) {
             header()
             HStack(spacing: 1) {
-                ListView(items: items, state: listState)
+                ListView(items: items, selection: Binding(self, \.selection), state: listState)
                     .padding(horizontal: 1)
                     .border(.rounded, title: "機能一覧")
                     .flexible(horizontal: 2, vertical: 1)
@@ -78,9 +80,7 @@ final class DemoApp: TerminalApp {
     }
 
     private func detail() -> some View {
-        let selected = items.indices.contains(listState.selectedIndex)
-            ? items[listState.selectedIndex]
-            : "-"
+        let selected = items.indices.contains(selection) ? items[selection] : "-"
 
         return VStack(spacing: 1) {
             Text("選択中: \(selected)", wrap: .word).bold()
@@ -94,7 +94,9 @@ final class DemoApp: TerminalApp {
 
             VStack(spacing: 0) {
                 Text(isEditing ? "入力中（Tab で戻る）" : "Tab で入力に切り替え").dim()
+                Text("入力した文字数: \(name.count)").dim()
                 TextField(
+                    text: Binding(self, \.name),
                     state: inputState,
                     placeholder: "ここに入力…",
                     showsCursor: !isEditing

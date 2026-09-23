@@ -1,8 +1,24 @@
-/// 選択位置とスクロール位置を保持するリストの状態。
+/// 選択位置とスクロール位置を扱うリストの状態。
+///
+/// 選択位置（値）は自分で持つか、`ListView(items:selection:state:)` に渡した `Binding` を通して
+/// アプリが持つ値を読み書きする。スクロール位置（表示状態）はどちらの場合もここに置く。
 @MainActor
 public final class ListState {
+    private var ownedSelection: Int = 0
+    private var selectionBinding: Binding<Int>?
+
     /// 選択している項目の位置。
-    public private(set) var selectedIndex: Int = 0
+    ///
+    /// - Note: `Binding` の先の値が項目の範囲を外れていれば、端へ丸めた値を返す。
+    ///   丸めた値は書き戻さない。書き戻すのは選択を動かす操作をしたときだけ。
+    public var selectedIndex: Int {
+        let raw = selectionBinding?.wrappedValue ?? ownedSelection
+        guard itemCount > 0 else { return 0 }
+        return min(max(0, raw), itemCount - 1)
+    }
+
+    /// 直前の描画で使った選択位置。描画時に `ListView` が更新する。
+    var renderedSelection: Int?
     /// 表示の先頭にある項目の位置。
     public private(set) var scrollOffset: Int = 0
     /// 直前の描画で使った矩形。描画時に `ListView` が更新する。
@@ -32,12 +48,36 @@ public final class ListState {
         self.itemCount = itemCount
     }
 
+    /// 選択位置の読み書きを `selection` へ向ける。
+    ///
+    /// - Parameters:
+    ///   - selection: アプリが持つ選択位置を読み書きする口。
+    func bind(_ selection: Binding<Int>) {
+        selectionBinding = selection
+    }
+
+    /// 選択位置を書き換える。
+    ///
+    /// - Parameters:
+    ///   - index: 新しい選択位置。範囲外の値は端へ丸められる。
+    private func setSelection(_ index: Int) {
+        let clamped = itemCount > 0 ? min(max(0, index), itemCount - 1) : 0
+        guard let selectionBinding else {
+            ownedSelection = clamped
+            return
+        }
+        // 比べずに書き戻したくなるが、端で ↑ を押したときのように選択が動かない操作でも
+        // アプリの値が代入され、代入を契機に処理を走らせるアプリでそれが空振りで走る。
+        guard selectionBinding.wrappedValue != clamped else { return }
+        selectionBinding.wrappedValue = clamped
+    }
+
     /// 指定した位置を選択する。
     ///
     /// - Parameters:
     ///   - index: 選択する位置。範囲外の値は端へ丸められる。
     public func select(_ index: Int) {
-        selectedIndex = index
+        setSelection(index)
         scrollToSelection()
     }
 
@@ -46,7 +86,7 @@ public final class ListState {
     /// - Parameters:
     ///   - amount: 動かす行数。
     public func moveUp(by amount: Int = 1) {
-        selectedIndex -= amount
+        setSelection(selectedIndex - amount)
         scrollToSelection()
     }
 
@@ -55,19 +95,19 @@ public final class ListState {
     /// - Parameters:
     ///   - amount: 動かす行数。
     public func moveDown(by amount: Int = 1) {
-        selectedIndex += amount
+        setSelection(selectedIndex + amount)
         scrollToSelection()
     }
 
     /// 先頭の項目を選択する。
     public func moveToStart() {
-        selectedIndex = 0
+        setSelection(0)
         scrollToSelection()
     }
 
     /// 末尾の項目を選択する。
     public func moveToEnd() {
-        selectedIndex = itemCount - 1
+        setSelection(itemCount - 1)
         scrollToSelection()
     }
 
@@ -171,15 +211,13 @@ public final class ListState {
 
     /// 選択位置が表示範囲に入るよう表示位置を動かす。
     ///
-    /// - Postcondition: `selectedIndex` は 0 以上 `itemCount` 未満、
-    ///   `scrollOffset` は `selectedIndex` が表示範囲に入る値になる。
+    /// - Postcondition: `scrollOffset` は `selectedIndex` が表示範囲に入る値になる。
+    ///   選択位置は書き換えない。
     func scrollToSelection() {
         if itemCount <= 0 {
-            selectedIndex = 0
             scrollOffset = 0
             return
         }
-        selectedIndex = min(max(0, selectedIndex), itemCount - 1)
 
         if visibleRows > 0 {
             if selectedIndex < scrollOffset {
@@ -207,7 +245,7 @@ public final class ListState {
 public struct ListView: View {
     /// 各行に表示する文字列。
     public var items: [String]
-    /// 選択位置とスクロール位置を持つ状態。
+    /// スクロール位置を持つ状態。`Binding` を渡さずに作った場合は選択位置も持つ。
     public var state: ListState
     /// 非選択行のスタイル。
     public var style: Style
@@ -218,7 +256,40 @@ public struct ListView: View {
     /// 非選択行の先頭に入れる字下げ。既定では `selectionMarker` と同じ幅の空白。
     public var marginMarker: String?
 
-    /// 項目と状態を指定してリストを作る。
+    /// アプリが持つ選択位置を動かすリストを作る。
+    ///
+    /// - Parameters:
+    ///   - items: 各行に表示する文字列。
+    ///   - selection: 選択位置を読み書きする口。
+    ///   - state: スクロール位置を持つ状態。選択位置は持たず、`selection` を読み書きする。
+    ///   - style: 非選択行のスタイル。
+    ///   - selectedStyle: 選択行のスタイル。
+    ///   - selectionMarker: 選択行の先頭に付ける印。
+    ///   - marginMarker: 非選択行の先頭に入れる字下げ。`nil` なら印と同じ幅の空白。
+    /// - Postcondition: `state.itemCount` が `items` の個数に更新される。`state` は以後、
+    ///   選択位置を `selection` から読み、選択を動かす操作の結果を `selection` へ書き戻す。
+    ///   書き戻すのは `state.handle(_:)` などの操作の中だけで、描画では書き戻さない。
+    public init(
+        items: [String],
+        selection: Binding<Int>,
+        state: ListState,
+        style: Style = .plain,
+        selectedStyle: Style = Style(attributes: .reverse),
+        selectionMarker: String = "> ",
+        marginMarker: String? = nil
+    ) {
+        state.bind(selection)
+        self.init(
+            items: items,
+            state: state,
+            style: style,
+            selectedStyle: selectedStyle,
+            selectionMarker: selectionMarker,
+            marginMarker: marginMarker
+        )
+    }
+
+    /// 選択位置も持つ状態と項目を指定してリストを作る。
     ///
     /// - Parameters:
     ///   - items: 各行に表示する文字列。
@@ -270,14 +341,20 @@ public struct ListView: View {
     ///   - rect: 描画する矩形。
     ///   - context: ライブラリから渡される文脈。
     /// - Postcondition: `state.renderedRect` が `rect` に更新され、
-    ///   スクロール位置が項目の範囲へ収められる。
+    ///   スクロール位置が項目の範囲へ収められる。直前の描画から選択位置が変わっていれば、
+    ///   選択が表示範囲に入るようスクロールする。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
 
         // 描画のたびに選択へ戻すと、ホイールで動かした表示位置が元に戻る。
         let rowsChanged = state.visibleRows != rect.height
+        // 選択を動かす操作がスクロールも済ませるので、ここでは選択の変化を見なくてよいと
+        // 考えたくなるが、アプリが `Binding` の先の値を直接変えると操作を通らず、
+        // 選択が表示範囲の外に残る。
+        let selectionChanged = state.renderedSelection != state.selectedIndex
         state.renderedRect = rect
-        if rowsChanged {
+        state.renderedSelection = state.selectedIndex
+        if rowsChanged || selectionChanged {
             state.scrollToSelection()
         } else {
             state.clampScroll()
