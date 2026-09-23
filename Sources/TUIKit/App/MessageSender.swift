@@ -1,17 +1,20 @@
 /// 別スレッドや `Task` から、`Component.Message` の値をイベントループへ届ける送り口。
 ///
-/// どのスレッド・どの `Task` からでも送れる。送られた値は `Component.receive(_:)` へ渡され、
+/// どのスレッド・どの `Task` からでも送れる。送られた値は、送った順に `Component.receive(_:)` へ渡され、
 /// 続けて画面が描き直される。`ApplicationOptions.frameInterval` を設定していなくても届く。
+///
+/// - Note: ループが処理するより速く送ると、溜まった値をすべて `receive(_:)` へ渡してから、
+///   まとめて 1 回だけ描き直す。値 1 つごとには描き直さない。
 public struct MessageSender<Message: Sendable>: Sendable {
 
-    private let continuation: AsyncStream<LoopEvent<Message>>.Continuation
+    private let mailbox: LoopMailbox<Message>
 
-    /// 値を流す先を指定して送り口を作る。
+    /// 値を入れる先を指定して送り口を作る。
     ///
     /// - Parameters:
-    ///   - continuation: 送られた値を流す先。
-    init(continuation: AsyncStream<LoopEvent<Message>>.Continuation) {
-        self.continuation = continuation
+    ///   - mailbox: 送られた値を入れる先。
+    init(mailbox: LoopMailbox<Message>) {
+        self.mailbox = mailbox
     }
 
     /// 値をイベントループへ送る。
@@ -21,7 +24,6 @@ public struct MessageSender<Message: Sendable>: Sendable {
     /// - Returns: 送ったなら `true`。ループが終わっているなら `false`。
     @discardableResult
     public func send(_ message: Message) -> Bool {
-        if case .enqueued = continuation.yield(.message(message)) { return true }
-        return false
+        mailbox.post(.message(message))
     }
 }
