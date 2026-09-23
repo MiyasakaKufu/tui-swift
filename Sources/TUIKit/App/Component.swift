@@ -34,7 +34,8 @@ public protocol Component: AnyObject {
     /// - Parameters:
     ///   - message: `MessageSender.send(_:)` で送られたイベント。
     /// - Returns: 処理の結果。`.quit` を返すとアプリケーションが終了する。
-    /// - Note: 送られた順に呼ばれる。`handle(_:)` へ渡る `InputEvent` との前後も保たれる。
+    /// - Note: 送られた順に呼ばれる。`handle(_:)` との前後は、ライブラリが tty からキーを読んだ時点で決まる。
+    ///   キーが tty に届いた時点ではないので、届いてから読むまでの間に送られたイベントは、そのキーより先に渡る。
     func receive(_ message: Message) -> EventResult
 
     /// 起動時にイベントループが走らせる `Effect`。

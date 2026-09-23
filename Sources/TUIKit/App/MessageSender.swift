@@ -18,9 +18,7 @@ public struct MessageSender<Message: Sendable>: Sendable {
     ///
     /// - Parameters:
     ///   - message: 送るイベント。
-    /// - Returns: 送ったなら `true`。
-    ///   積んでおける数の上限に達していて捨てたか、ループが終わっているなら `false`。
-    /// - Note: 上限は `ApplicationOptions.messageQueueLimit` で決める。
+    /// - Returns: 送ったなら `true`。ループが終わっているなら `false`。
     @discardableResult
     public func send(_ message: Message) -> Bool {
         if case .enqueued = continuation.yield(.message(message)) { return true }

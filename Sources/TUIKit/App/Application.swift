@@ -56,12 +56,9 @@ public final class Application<Root: Component> {
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
 
-        // 古いほうを捨ててはいけない。
-        // すでに積んだと答えたイベントを、後から無かったことにするため。
-        // `bufferingOldest` は溢れたときに新しいほうを落とす。
-        let (stream, continuation) = AsyncStream<LoopEvent<Root.Message>>.makeStream(
-            bufferingPolicy: .bufferingOldest(options.messageQueueLimit)
-        )
+        // 上限を付けてはいけない。満杯の `AsyncStream` は送る側を待たせられず、要素を捨てる。
+        // 外部から送られたイベントで埋まると、後から届いたキーが捨てられて終われなくなる。
+        let (stream, continuation) = AsyncStream<LoopEvent<Root.Message>>.makeStream()
         self.stream = stream
         self.continuation = continuation
         self.sender = MessageSender(continuation: continuation)
@@ -167,8 +164,10 @@ public final class Application<Root: Component> {
 
         loop: for await event in stream {
             switch event {
-            case .input(let input):
-                if !deliver(input) { break loop }
+            case .inputs(let inputs):
+                for input in inputs {
+                    if !deliver(input) { break loop }
+                }
             case .message(let message):
                 if root.receive(message) == .quit { break loop }
             case .wake:
@@ -237,16 +236,10 @@ public final class Application<Root: Component> {
             while true {
                 let events = reader.wait(timeout: timeout)
 
-                var terminated = false
-                for event in events {
-                    if case .terminated = continuation.yield(.input(event)) {
-                        terminated = true
-                        break
-                    }
-                }
-                if terminated { break }
-
-                if case .terminated = continuation.yield(.wake) { break }
+                // `InputEvent` を 1 つずつ yield してはいけない。
+                // ループは要素 1 つごとに描き直すので、描画が `InputEvent` の数だけ走る。
+                let event: LoopEvent<Root.Message> = events.isEmpty ? .wake : .inputs(events)
+                if case .terminated = continuation.yield(event) { break }
             }
 
             stoppedContinuation.finish()

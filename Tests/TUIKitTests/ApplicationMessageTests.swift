@@ -213,19 +213,57 @@ final class ApplicationMessageTests: XCTestCase {
         try await loop.value
     }
 
-    /// 上限に達した後の送信は捨てられる。
-    func testSenderReportsFullQueue() async throws {
+    /// ループが動いている間の送信は受け付け、終わった後の送信は受け付けない。
+    func testSenderReportsWhetherLoopAcceptsMessages() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
 
-        let application = Application(
-            root: MessageRecordingComponent(),
-            options: ApplicationOptions(messageQueueLimit: 1),
-            terminal: pty.terminal()
-        )
+        let reader = OutputReader(descriptor: pty.master)
+        let capture = startCapturing(reader)
+        defer { capture.cancel() }
 
-        XCTAssertTrue(application.sender.send(.first))
-        XCTAssertFalse(application.sender.send(.second), "上限を超えて積まれている")
+        let component = MessageRecordingComponent()
+        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        let sender = application.sender
+        let loop = Task { try await application.run() }
+
+        let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drew, "最初の描画が終わらない")
+        XCTAssertTrue(sender.send(.first), "動いているループが受け付けない")
+
+        writeByte(pty.master, UInt8(ascii: "q"))
+        try await loop.value
+
+        XCTAssertFalse(sender.send(.second), "終わったループが受け付けている")
+    }
+
+    /// 1 回でまとめて届いたキーは、1 回だけ描き直す。
+    func testKeysReadTogetherAreDrawnOnce() async throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let reader = OutputReader(descriptor: pty.master)
+        let capture = startCapturing(reader)
+        defer { capture.cancel() }
+
+        let component = MessageRecordingComponent()
+        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        let loop = Task { try await application.run() }
+
+        let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drew, "最初の描画が終わらない")
+        let drawsBefore = component.drawCount
+
+        // 1 回の `write(2)` で書く。分けると別々の回に読まれ、まとめて届いたことにならない。
+        writeBytes(pty.master, Array("abc".utf8))
+        let reached = await waitUntil(timeout: 5) { component.records.count == 3 }
+        XCTAssertTrue(reached, "キーが届かない: \(component.records)")
+        XCTAssertEqual(component.drawCount - drawsBefore, 1)
+
+        writeByte(pty.master, UInt8(ascii: "q"))
+        try await loop.value
     }
 
     // MARK: - 補助
@@ -291,6 +329,8 @@ private final class MessageRecordingComponent: Component {
     private(set) var records: [String] = []
     /// 最初の描画が終わったら `true`。
     private(set) var hasDrawnOnce = false
+    /// `body` が評価された回数。1 回の描画で 1 回評価される。
+    private(set) var drawCount = 0
 
     private let quitsAfter: Int
     private let effect: Effect<TestMessage>
@@ -307,6 +347,7 @@ private final class MessageRecordingComponent: Component {
 
     var body: some View {
         hasDrawnOnce = true
+        drawCount += 1
         return Text(messages.isEmpty ? waitingText : arrivedText)
     }
 
@@ -445,6 +486,16 @@ private func closeDescriptor(_ descriptor: Int32) {
 /// - Returns: 成功なら `0`。
 private func setTerminalSize(_ descriptor: Int32, _ size: Size) -> Int32 {
     ctui_test_set_terminal_size(descriptor, Int32(size.width), Int32(size.height))
+}
+
+/// 記述子へ、まとめて 1 回で書く。
+///
+/// - Parameters:
+///   - descriptor: 書き込む先のファイル記述子。
+///   - bytes: 書き込むバイト列。
+private func writeBytes(_ descriptor: Int32, _ bytes: [UInt8]) {
+    var buffer = bytes
+    _ = write(descriptor, &buffer, buffer.count)
 }
 
 /// 記述子へ 1 バイト書く。
