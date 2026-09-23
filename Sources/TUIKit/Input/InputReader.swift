@@ -107,8 +107,7 @@ public final class InputReader {
                 // 読めたバイト数を見ずに待ち直すと、入力が閉じた後は待ちの中で回り続ける。
                 if !events.isEmpty || byteCount == 0 { return events }
 
-                // 起こされた合図を食べた回は、確定しなくても返す。
-                // ここで待ち直すと、ペースト中は `pendingWaitDuration` が nil なので
+                // 起こされた回に待ち直してはいけない。ペースト中は `pendingWaitDuration` が nil なので
                 // 続きが届くまで戻らず、起こした側は戻ったつもりで待ち続ける。
                 if readiness.contains(.wakeup) { return [] }
             } else if readiness.contains(.wakeup) {

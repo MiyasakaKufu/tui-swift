@@ -9,13 +9,14 @@ import XCTest
 import CTUITestSupport
 @testable import TUIKit
 
-/// 外部から届いたイベントがイベントループへ渡るかを、疑似端末（pty）の上で確かめる。
+/// `MessageSender` で送った値と、ループの外から呼んだ `stop()`・`suspend()` がループへ渡るかを、
+/// 疑似端末（pty）の上で確かめる。
 @MainActor
 final class ApplicationMessageTests: XCTestCase {
 
     private var captured = ""
 
-    /// 別スレッドから送ったイベントで、`frameInterval` なしでも画面が更新される。
+    /// 別スレッドから送った値で、`frameInterval` なしでも画面が更新される。
     func testMessageFromAnotherThreadUpdatesScreenWithoutFrameInterval() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -30,16 +31,17 @@ final class ApplicationMessageTests: XCTestCase {
         let sender = application.sender
         let loop = Task { try await application.run() }
 
-        // 最初の描画より前に送ると、送ったことで描き直されたのか確かめられない。
+        // 最初の描画より前に送ってはいけない。`run()` が始まる前に送ることになり、ループは待たずに
+        // 溜まった値を受け取るので、待っているループを起こせるのかを確かめられない。
         let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
 
         Thread.detachNewThread { sender.send(.arrived) }
 
         // 画面が変わるまで、キーのバイトを書いてはいけない。
-        // 送ったイベントだけで変わることを確かめているので、キーで起きたのかどうかが分からなくなる。
+        // 送った値だけで変わることを確かめているので、キーで起きたのかどうかが分からなくなる。
         let drew = await waitUntil(timeout: 5) { self.captured.contains(arrivedText) }
-        XCTAssertTrue(drew, "送ったイベントが届いた後に画面が描き直されていない")
+        XCTAssertTrue(drew, "送った値が届いた後に画面が描き直されていない")
 
         writeByte(pty.master, UInt8(ascii: "q"))
         try await waitForLoop(loop)
@@ -47,7 +49,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertEqual(component.messages, [.arrived])
     }
 
-    /// 複数のスレッドから同時に送っても、すべてのイベントが届く。
+    /// 複数のスレッドから同時に送っても、すべての値が届く。
     func testMessagesFromManyThreadsAllArrive() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -81,7 +83,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertEqual(component.messages.count, total)
     }
 
-    /// キー入力と外部イベントの順序が保たれる。
+    /// キーと、`MessageSender` で送った値の順序が保たれる。
     func testInputAndMessagesKeepOrder() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -107,7 +109,7 @@ final class ApplicationMessageTests: XCTestCase {
         sender.send(.first)
         writeByte(pty.master, UInt8(ascii: "a"))
         let gotBoth = await waitUntil(timeout: 5) { component.records.count >= 2 }
-        XCTAssertTrue(gotBoth, "イベントとキーが届かない")
+        XCTAssertTrue(gotBoth, "送った値とキーが届かない")
 
         // キーが届くのを待たずに送ってはいけない。キーより先に積まれて、逆向きを確かめられなくなる。
         writeByte(pty.master, UInt8(ascii: "b"))
@@ -209,6 +211,59 @@ final class ApplicationMessageTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
+    /// ループの外から呼んだ `stop()` で、キーを待たずにループが終わる。
+    func testStopFromOutsideLoopEndsLoopWithoutKeys() async throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let reader = OutputReader(descriptor: pty.master)
+        let capture = startCapturing(reader)
+        defer { capture.cancel() }
+
+        let component = MessageRecordingComponent()
+        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        let loop = Task { try await application.run() }
+
+        // 最初の描画より前に呼んではいけない。`run()` が始まる前に呼ぶことになり、`run()` が
+        // `isRunning` を立て直すので、ループが終わらない。
+        let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drew, "最初の描画が終わらない")
+
+        application.stop()
+        try await waitForLoop(loop)
+    }
+
+    /// ループの外から呼んだ `suspend()` で、キーを待たずに再開後の画面を描き直す。
+    func testSuspendFromOutsideLoopRedrawsWithoutKeys() async throws {
+        let pty = try PseudoTerminal()
+        defer { pty.close() }
+        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
+
+        let reader = OutputReader(descriptor: pty.master)
+        let capture = startCapturing(reader)
+        defer { capture.cancel() }
+
+        let component = MessageRecordingComponent()
+        let application = Application(root: component, options: testOptions, terminal: pty.terminal())
+        // 本当に止めるとテストプロセスまで止まるので、止める処理だけ差し替える。
+        application.stopProcess = {}
+        let loop = Task { try await application.run() }
+
+        let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
+        XCTAssertTrue(drew, "最初の描画が終わらない")
+        let drawsBefore = component.drawCount
+
+        application.suspend()
+
+        // 描き直されるまで、キーのバイトを書いてはいけない。キーで描き直されたのかどうかが分からなくなる。
+        let redrew = await waitUntil(timeout: 5) { component.drawCount > drawsBefore }
+        XCTAssertTrue(redrew, "再開した後に画面が描き直されていない")
+
+        writeByte(pty.master, UInt8(ascii: "q"))
+        try await waitForLoop(loop)
+    }
+
     // MARK: - 補助
 
     /// 問い合わせを送らず、代替画面へも切り替えない設定。
@@ -220,7 +275,7 @@ final class ApplicationMessageTests: XCTestCase {
         )
     }
 
-    /// pty の出力を読み続け、`captured` へ足していく `Task` を起こす。
+    /// pty の出力を読み続け、`captured` へ足していく `Task` を作る。
     ///
     /// - Parameters:
     ///   - reader: 読み取り元。
@@ -250,25 +305,25 @@ final class ApplicationMessageTests: XCTestCase {
     }
 }
 
-/// テストから送るイベント。
+/// テストから送る値。
 private enum TestMessage: Hashable, Sendable {
     case arrived
     case first
     case second
 }
 
-/// イベントが届く前に画面へ出ている文字列。
+/// 値が届く前に画面へ出ている文字列。
 private let waitingText = "WAITING"
 
-/// イベントが届いた後に画面へ出る文字列。
+/// 値が届いた後に画面へ出る文字列。
 private let arrivedText = "ARRIVED"
 
-/// 届いたイベントとキーを記録し、決めた数だけ届いたら終了するコンポーネント。
+/// 届いた値とキーを記録し、決めた数だけ届いたら終了するコンポーネント。
 private final class MessageRecordingComponent: Component {
 
-    /// 受け取ったイベントを届いた順に並べたもの。
+    /// 受け取った値を届いた順に並べたもの。
     private(set) var messages: [TestMessage] = []
-    /// 受け取ったイベントとキーを、届いた順に文字列で並べたもの。
+    /// 受け取った値とキーを、届いた順に文字列で並べたもの。
     private(set) var records: [String] = []
     /// 最初の描画が終わったら `true`。
     private(set) var hasDrawnOnce = false
@@ -316,11 +371,11 @@ private final class MessageRecordingComponent: Component {
         return records.count == quitsAfter ? .quit : .handled
     }
 
-    /// イベントを記録用の名前に直す。
+    /// 値を記録用の名前に直す。
     ///
     /// - Parameters:
-    ///   - message: 名前を付けるイベント。
-    /// - Returns: イベントの名前。
+    ///   - message: 名前を付ける値。
+    /// - Returns: 値の名前。
     private func label(of message: TestMessage) -> String {
         switch message {
         case .arrived: return "arrived"
@@ -374,11 +429,11 @@ private final class PseudoTerminal {
 }
 
 /// pty の master 側に溜まる出力を読み続け、読んだものを `AsyncStream` へ流す。
-///
-/// - Note: 読んだ内容を自分では持たない。持つと箱がスレッドを跨ぐため。
 private final class OutputReader {
 
-    /// 読んだバイト列が流れてくる列。
+    // 読んだ内容をこのクラスに持たせてはいけない。読むスレッドとテストの両方から触ることになり、
+    // データ競合になる。
+    /// 読んだバイト列が届く `AsyncStream`。
     let stream: AsyncStream<[UInt8]>
 
     /// 読み取り元を指定して読み始める。

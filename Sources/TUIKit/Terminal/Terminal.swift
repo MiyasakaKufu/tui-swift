@@ -99,6 +99,9 @@ public final class Terminal: TerminalOutput {
     ///   プロセスが終わるときになる。その前に別の `Terminal` が raw モードへ入るか、
     ///   `disableRawMode()`（`restore()` からも呼ばれる）を呼ぶと戻らない。
     ///   戻す先は 1 組しか覚えておけないため。捨てる前に `restore()` を呼ぶこと。
+    ///   入出力のファイル記述子を閉じる前にも `restore()` を呼ぶこと。呼ばずに閉じると、
+    ///   プロセスが終わるときに、同じ番号を割り当てられた別のファイルへ制御コードを書き込み、
+    ///   termios を設定しようとする。
     public func enableRawMode() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
         guard !isRawModeActive else { return }

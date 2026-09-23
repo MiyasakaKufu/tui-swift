@@ -14,9 +14,9 @@ public protocol Component: AnyObject {
     /// `body` が返すビューの型。適合側が `some View` で書けば推論される。
     associatedtype Body: View
 
-    /// 外部から送るイベントの型。`receive(_:)` を書けば推論される。
+    /// `MessageSender.send(_:)` で送る値の型。`receive(_:)` を書けば推論される。
     ///
-    /// 既定は `Never`。外部からイベントを送らないなら決めなくてよい。
+    /// 既定は `Never`。`MessageSender` を使わないなら決めなくてよい。
     associatedtype Message: Sendable = Never
 
     /// 現在の状態から画面を組み立てる。
@@ -29,13 +29,13 @@ public protocol Component: AnyObject {
     /// - Returns: 処理の結果。`.quit` を返すとアプリケーションが終了する。
     func handle(_ event: InputEvent) -> EventResult
 
-    /// 外部から送られたイベントを処理する。
+    /// 別スレッドや `Task` から `MessageSender.send(_:)` で送られた値を処理する。
     ///
     /// - Parameters:
-    ///   - message: `MessageSender.send(_:)` で送られたイベント。
+    ///   - message: 送られた値。
     /// - Returns: 処理の結果。`.quit` を返すとアプリケーションが終了する。
     /// - Note: 送られた順に呼ばれる。`handle(_:)` との前後は、ライブラリが tty からキーを読んだ時点で決まる。
-    ///   キーが tty に届いた時点ではないので、届いてから読むまでの間に送られたイベントは、そのキーより先に渡る。
+    ///   キーが tty に届いた時点ではないので、届いてから読むまでの間に送られた値は、そのキーより先に渡る。
     func receive(_ message: Message) -> EventResult
 
     /// 端末カーソルを表示したい位置。`nil` ならカーソルを隠す。
@@ -59,10 +59,10 @@ extension Component {
     ///   が既定で有効なため Ctrl+C で終了できる。
     public func handle(_ event: InputEvent) -> EventResult { .ignored }
 
-    /// 外部からイベントを送らないアプリは受け取らなくてよい。
+    /// `MessageSender` を使わないアプリは受け取らなくてよい。
     ///
     /// - Parameters:
-    ///   - message: 送られたイベント。
+    ///   - message: 送られた値。
     /// - Returns: 常に `.ignored`。
     public func receive(_ message: Message) -> EventResult { .ignored }
 

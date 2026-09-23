@@ -39,9 +39,9 @@ int ctui_install_signal_handler(int signal_number,
 /// - Returns: 成功なら 0、失敗なら -1。
 int ctui_restore_signal_handler(int signal_number, const struct sigaction *previous);
 
-// シグナルハンドラから触る状態を Swift のグローバル変数に置くと、並行性検査が
-// 「nonisolated global shared mutable state」として毎参照を指摘する。印を付けても
-// 非同期シグナル安全という制約は変わらないので、状態ごと C 側へ置く。
+// シグナルハンドラから触る状態を Swift のグローバル変数へ移してはいけない。ハンドラが書いてよい
+// 静的な変数は `volatile sig_atomic_t` かロックフリーなアトミック型に限られ、Swift の変数はどちらでもない。
+// `nonisolated(unsafe)` は並行性検査を黙らせるだけで型は変わらず、`Atomic` は macOS 15 からしか使えない。
 
 /// ウィンドウサイズ変更の合図を立てる。
 void ctui_signal_set_window_resize(void);
@@ -69,19 +69,19 @@ int ctui_signal_consume_suspend(void);
 /// - Returns: 立っていれば 1、立っていなければ 0。
 int ctui_signal_consume_continue(void);
 
-/// 起こすための自己パイプの両端を覚える。
+/// `poll(2)` の待ちを起こすための自己パイプの両端を覚える。
 ///
 /// - Parameters:
 ///   - read_end: 読み取り側のファイル記述子。
 ///   - write_end: 書き込み側のファイル記述子。
 void ctui_signal_set_wakeup_pipe(int read_end, int write_end);
 
-/// 起こすための自己パイプの読み取り側。
+/// `poll(2)` の待ちを起こすための自己パイプの読み取り側。
 ///
 /// - Returns: 覚えていれば記述子、覚えていなければ -1。
 int ctui_signal_wakeup_read_descriptor(void);
 
-/// イベント待ちを起こす。
+/// 自己パイプの読み取り側を待っている `poll(2)` を起こす。
 ///
 /// シグナルハンドラから呼べる。使うのは非同期シグナル安全な `write(2)` だけ。
 ///

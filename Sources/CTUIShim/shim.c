@@ -75,7 +75,8 @@ void ctui_signal_wake_up(void) {
     // 読んだつもりで `write(2)` の結果を読む。
     int saved_errno = errno;
     unsigned char byte = 0;
-    // 書けなくても書き直さない。起こす合図は 1 バイトあれば足りる。
+    // 書けなかったときに書き直してはいけない。書けないのはパイプが満杯のときで、読む側が止まって
+    // いれば空かないので、シグナルハンドラから戻らなくなる。満杯なら起こす合図はすでに届いている。
     (void)write(descriptor, &byte, 1);
     errno = saved_errno;
 }

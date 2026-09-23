@@ -13,7 +13,7 @@ import Glibc
 /// シグナルがイベントループへ届くかを、疑似端末（pty）の上で確かめる。
 final class ApplicationSignalTests: XCTestCase {
 
-    /// イベント待ちに入る直前の SIGWINCH でも、入力なしで再描画される。
+    /// ループが次の `LoopEvent` を待つ直前の SIGWINCH でも、入力なしで再描画される。
     @MainActor
     func testResizeJustBeforeWaitingTriggersRedraw() async throws {
         let pty = try PseudoTerminal()
@@ -21,7 +21,7 @@ final class ApplicationSignalTests: XCTestCase {
 
         XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 20, 5), 0, "初期サイズを設定できない")
 
-        // `body` はサイズを確認した後・イベント待ちに入る前に呼ばれる。
+        // `body` はサイズを確認した後・次の `LoopEvent` を待つ前に呼ばれる。
         // ここでリサイズすることで、シグナルが届くタイミングを狙って揃えられる。
         let probe = ResizeProbe {
             XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 30, 8), 0, "サイズを変更できない")
@@ -39,7 +39,7 @@ final class ApplicationSignalTests: XCTestCase {
         )
     }
 
-    /// イベント待ちに入る直前の SIGTERM でも、入力なしでループが終わる。
+    /// ループが次の `LoopEvent` を待つ直前の SIGTERM でも、入力なしでループが終わる。
     @MainActor
     func testTerminationJustBeforeWaitingEndsLoop() async throws {
         let pty = try PseudoTerminal()
@@ -69,13 +69,13 @@ final class ApplicationSignalTests: XCTestCase {
         raise(SIGINT)
 
         XCTAssertTrue(SignalWatcher.consumeTermination(), "SIGINT が終了として扱われていない")
-        XCTAssertTrue(isReadable(descriptor), "SIGINT でイベント待ちが起こされない")
+        XCTAssertTrue(isReadable(descriptor), "SIGINT で `poll(2)` の待ちが起こされない")
         discard(descriptor)
 
         raise(SIGQUIT)
 
         XCTAssertTrue(SignalWatcher.consumeTermination(), "SIGQUIT が終了として扱われていない")
-        XCTAssertTrue(isReadable(descriptor), "SIGQUIT でイベント待ちが起こされない")
+        XCTAssertTrue(isReadable(descriptor), "SIGQUIT で `poll(2)` の待ちが起こされない")
         discard(descriptor)
     }
 
@@ -92,17 +92,17 @@ final class ApplicationSignalTests: XCTestCase {
         raise(SIGTSTP)
 
         XCTAssertTrue(SignalWatcher.consumeSuspend(), "SIGTSTP が一時停止として扱われていない")
-        XCTAssertTrue(isReadable(descriptor), "SIGTSTP でイベント待ちが起こされない")
+        XCTAssertTrue(isReadable(descriptor), "SIGTSTP で `poll(2)` の待ちが起こされない")
         discard(descriptor)
 
         raise(SIGCONT)
 
         XCTAssertTrue(SignalWatcher.consumeContinue(), "SIGCONT が再開として扱われていない")
-        XCTAssertTrue(isReadable(descriptor), "SIGCONT でイベント待ちが起こされない")
+        XCTAssertTrue(isReadable(descriptor), "SIGCONT で `poll(2)` の待ちが起こされない")
         discard(descriptor)
     }
 
-    /// シグナルハンドラが、起こすためのパイプへ書き込む。
+    /// シグナルハンドラが、`poll(2)` の待ちを起こすためのパイプへ書き込む。
     func testSignalWritesToWakeupDescriptor() throws {
         SignalWatcher.install()
         let descriptor = try XCTUnwrap(SignalWatcher.wakeupDescriptor)
@@ -135,7 +135,7 @@ final class ApplicationSignalTests: XCTestCase {
 
     // MARK: - 補助
 
-    /// イベントループを回す `Task` を起こす。
+    /// イベントループを回す `Task` を作る。
     ///
     /// - Parameters:
     ///   - root: ループに渡すコンポーネント。

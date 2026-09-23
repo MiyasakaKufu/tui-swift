@@ -6,29 +6,29 @@ import Glibc
 
 import CTUIShim
 
-/// イベント待ちを起こす。
-private func wakeUpEventLoop() {
+/// 自己パイプの読み取り側を待っている `poll(2)` を起こす。
+private func wakeUpPoll() {
     ctui_signal_wake_up()
 }
 
 private func handleWindowResizeSignal(_ signalNumber: Int32) {
     ctui_signal_set_window_resize()
-    wakeUpEventLoop()
+    wakeUpPoll()
 }
 
 private func handleTerminationSignal(_ signalNumber: Int32) {
     ctui_signal_set_termination()
-    wakeUpEventLoop()
+    wakeUpPoll()
 }
 
 private func handleSuspendSignal(_ signalNumber: Int32) {
     ctui_signal_set_suspend()
-    wakeUpEventLoop()
+    wakeUpPoll()
 }
 
 private func handleContinueSignal(_ signalNumber: Int32) {
     ctui_signal_set_continue()
-    wakeUpEventLoop()
+    wakeUpPoll()
 }
 
 /// ウィンドウサイズ変更・終了・一時停止のシグナルの監視。
@@ -68,13 +68,11 @@ public enum SignalWatcher {
         #endif
     }
 
-    /// イベント待ちを起こす。
-    ///
-    /// シグナル以外の理由でイベントループを進めたいときに呼ぶ。
+    /// 自己パイプの読み取り側を待っている `poll(2)` を、シグナル無しで起こす。
     ///
     /// - Note: `install()` を呼ぶ前は何も起こらない。
     static func wakeUp() {
-        wakeUpEventLoop()
+        wakeUpPoll()
     }
 
     /// シグナルが届いたことを知らせるパイプの読み取り側。
