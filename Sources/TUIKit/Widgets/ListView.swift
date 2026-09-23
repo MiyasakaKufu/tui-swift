@@ -154,7 +154,7 @@ public final class ListState {
         return true
     }
 
-    // 座標から項目を求める式を公開したくなるが、`render(into:rect:)` が行の並べ方を
+    // 座標から項目を求める式を公開したくなるが、`render(into:rect:context:)` が行の並べ方を
     // 変えたときに、式を写したアプリの側が黙って壊れる。
     /// 矩形の中で起きた押下として、その位置の項目を選択する。
     ///
@@ -252,8 +252,9 @@ public struct ListView: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 最も長い項目の幅に印の幅を足した幅と、項目数から決まるサイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size {
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let width = items.reduce(0) { max($0, DisplayWidth.width(of: $1)) }
             + DisplayWidth.width(of: selectionMarker)
         return Size(
@@ -267,9 +268,10 @@ public struct ListView: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
+    ///   - context: ライブラリから渡される文脈。
     /// - Postcondition: `state.renderedRect` が `rect` に更新され、
     ///   スクロール位置が項目の範囲へ収められる。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
 
         // 描画のたびに選択へ戻すと、ホイールで動かした表示位置が元に戻る。

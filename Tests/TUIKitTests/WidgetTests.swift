@@ -7,7 +7,7 @@ final class WidgetTests: XCTestCase {
     private func render(_ view: any View, width: Int, height: Int) -> String {
         var buffer = Buffer(size: Size(width: width, height: height))
         let bounds = buffer.bounds
-        view.render(into: &buffer, rect: bounds)
+        view.renderAsRoot(into: &buffer, rect: bounds)
         return buffer.debugText()
     }
 
@@ -561,7 +561,7 @@ final class WidgetTests: XCTestCase {
         let field = TextField(state: TextFieldState(), placeholder: "入力")
         var buffer = Buffer(size: Size(width: 10, height: 1))
         let bounds = buffer.bounds
-        field.render(into: &buffer, rect: bounds)
+        field.renderAsRoot(into: &buffer, rect: bounds)
 
         XCTAssertTrue(buffer[0, 0].style.attributes.contains(.reverse))
         XCTAssertEqual(buffer.debugText(), "入力      ")
@@ -571,7 +571,7 @@ final class WidgetTests: XCTestCase {
         let field = TextField(state: TextFieldState())
         var buffer = Buffer(size: Size(width: 4, height: 1))
         let bounds = buffer.bounds
-        field.render(into: &buffer, rect: bounds)
+        field.renderAsRoot(into: &buffer, rect: bounds)
 
         XCTAssertTrue(buffer[0, 0].style.attributes.contains(.reverse))
     }
@@ -580,7 +580,7 @@ final class WidgetTests: XCTestCase {
         let field = TextField(state: TextFieldState(), placeholder: "name", showsCursor: false)
         var buffer = Buffer(size: Size(width: 6, height: 1))
         let bounds = buffer.bounds
-        field.render(into: &buffer, rect: bounds)
+        field.renderAsRoot(into: &buffer, rect: bounds)
 
         XCTAssertFalse(buffer[0, 0].style.attributes.contains(.reverse))
     }
@@ -593,7 +593,7 @@ final class WidgetTests: XCTestCase {
         screen: Size = Size(width: 12, height: 4)
     ) -> Point? {
         var buffer = Buffer(size: screen)
-        field.render(into: &buffer, rect: rect)
+        field.renderAsRoot(into: &buffer, rect: rect)
         return field.state.renderedCursorPoint
     }
 

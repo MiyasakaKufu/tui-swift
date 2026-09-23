@@ -36,24 +36,29 @@ public struct LayoutTraits: Hashable, Sendable {
 }
 
 /// 画面へ描画できるもの。
+///
+/// 子を持つビューは、子の `sizeThatFits(_:context:)` と `render(into:rect:context:)` を直接呼ばず、
+/// 受け取った `RenderContext` の同名のメソッドを通して呼ぶ。
 @MainActor
 public protocol View {
     /// `proposal` の範囲で希望するサイズを返す。
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 希望するサイズ。
     /// - Note: 返す値は `proposal` を超えてもよいが、その場合はレイアウト側で切り詰められる。
-    func sizeThatFits(_ proposal: Size) -> Size
+    func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size
 
     /// `rect` の領域へ描画する。
     ///
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    /// - Postcondition: `rect` の外のセルは書き換えない。画面全体を基準に重ねる
+    ///   - context: ライブラリから渡される文脈。
+    /// - Postcondition: `rect` の外のセルは書き換えない。`context.screen` を基準に重ねる
     ///   `ScreenOverlayView` だけが、この約束から外れる。
-    func render(into buffer: inout Buffer, rect: Rect)
+    func render(into buffer: inout Buffer, rect: Rect, context: RenderContext)
 
     /// 余白の分配に関する性質。
     var layoutTraits: LayoutTraits { get }
@@ -73,15 +78,17 @@ public struct EmptyView: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 常に `.zero`。
-    public func sizeThatFits(_ proposal: Size) -> Size { .zero }
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { .zero }
 
     /// 何も描画しない。
     ///
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {}
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
 }
 
 /// 領域全体を 1 文字で塗りつぶすビュー。
@@ -108,15 +115,17 @@ public struct Fill: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: `proposal` と同じサイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size { proposal }
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { proposal }
 
     /// 領域全体を `character` で埋める。
     ///
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         buffer.fill(rect, repeating: character, style: style)
     }
 }
@@ -141,8 +150,9 @@ public struct Spacer: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 幅・高さがともに `minLength` のサイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size {
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         Size(width: minLength, height: minLength)
     }
 
@@ -151,7 +161,8 @@ public struct Spacer: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {}
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
 }
 
 /// 1 本の罫線。
@@ -187,8 +198,9 @@ public struct Divider: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 希望するサイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size {
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         switch axis {
         case .horizontal: return Size(width: proposal.width, height: 1)
         case .vertical: return Size(width: 1, height: proposal.height)
@@ -200,7 +212,8 @@ public struct Divider: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         buffer.fill(rect, repeating: character, style: style)
     }
 }

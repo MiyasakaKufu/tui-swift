@@ -22,13 +22,14 @@ public struct PaddingView<Content: View>: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 内容の希望サイズに余白を足したサイズ。`proposal` は超えない。
-    public func sizeThatFits(_ proposal: Size) -> Size {
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let inner = Size(
             width: proposal.width - insets.horizontal,
             height: proposal.height - insets.vertical
         )
-        let desired = content.sizeThatFits(inner)
+        let desired = context.sizeThatFits(of: content, index: 0, proposal: inner)
         return Size(
             width: min(desired.width + insets.horizontal, proposal.width),
             height: min(desired.height + insets.vertical, proposal.height)
@@ -40,10 +41,11 @@ public struct PaddingView<Content: View>: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 余白を含めた矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         let inner = rect.inset(by: insets)
         guard !inner.isEmpty else { return }
-        content.render(into: &buffer, rect: inner)
+        context.render(content, index: 0, into: &buffer, rect: inner)
     }
 }
 
@@ -89,10 +91,11 @@ public struct BorderView<Content: View>: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 内容の希望サイズに枠線を足したサイズ。見出しがあれば、それが収まる幅まで広げる。
-    public func sizeThatFits(_ proposal: Size) -> Size {
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let inner = Size(width: proposal.width - 2, height: proposal.height - 2)
-        let desired = content.sizeThatFits(inner)
+        let desired = context.sizeThatFits(of: content, index: 0, proposal: inner)
         var width = desired.width + 2
         if let titleText = title {
             width = max(width, DisplayWidth.width(of: TabExpansion.expand(titleText)) + 4)
@@ -108,12 +111,13 @@ public struct BorderView<Content: View>: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 枠線を含めた矩形。幅・高さが 2 未満なら何も描かない。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width >= 2, rect.height >= 2 else { return }
         drawFrame(into: &buffer, rect: rect)
         let inner = rect.inset(by: 1)
         if !inner.isEmpty {
-            content.render(into: &buffer, rect: inner)
+            context.render(content, index: 0, into: &buffer, rect: inner)
         }
     }
 
@@ -193,9 +197,10 @@ public struct BackgroundView<Content: View>: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 内容の希望サイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size {
-        content.sizeThatFits(proposal)
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
+        context.sizeThatFits(of: content, index: 0, proposal: proposal)
     }
 
     /// 領域を塗ってから内容を描画する。
@@ -203,10 +208,11 @@ public struct BackgroundView<Content: View>: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         buffer.fill(rect, style: style)
-        content.render(into: &buffer, rect: rect)
+        context.render(content, index: 0, into: &buffer, rect: rect)
     }
 }
 
@@ -261,9 +267,10 @@ public struct FrameView<Content: View>: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 固定した方向はその値、固定していない方向は内容の希望サイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size {
-        let desired = content.sizeThatFits(proposal)
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
+        let desired = context.sizeThatFits(of: content, index: 0, proposal: proposal)
         return Size(
             width: min(width ?? desired.width, proposal.width),
             height: min(height ?? desired.height, proposal.height)
@@ -275,13 +282,15 @@ public struct FrameView<Content: View>: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         let contentWidth = min(width ?? rect.width, rect.width)
         let contentHeight = min(height ?? rect.height, rect.height)
         let x = rect.minX + horizontalAlignment.offset(content: contentWidth, available: rect.width)
         let y = rect.minY + verticalAlignment.offset(content: contentHeight, available: rect.height)
-        content.render(into: &buffer, rect: Rect(x: x, y: y, width: contentWidth, height: contentHeight))
+        let contentRect = Rect(x: x, y: y, width: contentWidth, height: contentHeight)
+        context.render(content, index: 0, into: &buffer, rect: contentRect)
     }
 }
 
@@ -309,9 +318,10 @@ public struct FlexibleView<Content: View>: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 内容の希望サイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size {
-        content.sizeThatFits(proposal)
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
+        context.sizeThatFits(of: content, index: 0, proposal: proposal)
     }
 
     /// 領域へ内容をそのまま描画する。
@@ -319,8 +329,9 @@ public struct FlexibleView<Content: View>: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
-        content.render(into: &buffer, rect: rect)
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
+        context.render(content, index: 0, into: &buffer, rect: rect)
     }
 }
 
@@ -352,20 +363,23 @@ public struct AlignedView<Content: View>: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: `proposal` と同じサイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size { proposal }
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { proposal }
 
     /// 領域の中で内容を寄せて描画する。
     ///
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
-        let desired = content.sizeThatFits(rect.size).clamped(to: rect.size)
+        let desired = context.sizeThatFits(of: content, index: 0, proposal: rect.size)
+            .clamped(to: rect.size)
         let x = rect.minX + horizontal.offset(content: desired.width, available: rect.width)
         let y = rect.minY + vertical.offset(content: desired.height, available: rect.height)
-        content.render(into: &buffer, rect: Rect(origin: Point(x: x, y: y), size: desired))
+        context.render(content, index: 0, into: &buffer, rect: Rect(origin: Point(x: x, y: y), size: desired))
     }
 }
 

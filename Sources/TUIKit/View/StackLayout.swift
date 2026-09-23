@@ -10,6 +10,7 @@ enum StackLayout {
     ///   - available: 主軸方向に使える長さ。
     ///   - crossAvailable: 交差軸方向に使える長さ。
     ///   - spacing: 子ビューの間隔。
+    ///   - context: 親が受け取った文脈。
     /// - Returns: `children` と同じ順序・同じ個数の、主軸方向のサイズ。
     /// - Postcondition: 間隔を含めた合計は `available` を超えない。
     static func mainAxisSizes(
@@ -17,7 +18,8 @@ enum StackLayout {
         axis: Axis,
         available: Int,
         crossAvailable: Int,
-        spacing: Int
+        spacing: Int,
+        context: RenderContext
     ) -> [Int] {
         guard !children.isEmpty else { return [] }
 
@@ -37,9 +39,13 @@ enum StackLayout {
 
         // 伸びるビューには主軸 0 を提案し、最小サイズだけを先に確保する。
         // 余りは後から重みに応じて配るので、先着順に領域を食い尽くすことがない。
-        var sizes = children.map { child -> Int in
+        var sizes = children.enumerated().map { (index, child) -> Int in
             let isFlexible = child.layoutTraits.flex(on: axis) > 0
-            let desired = child.sizeThatFits(isFlexible ? minimumProposal : proposal)
+            let desired = context.sizeThatFits(
+                of: child,
+                index: index,
+                proposal: isFlexible ? minimumProposal : proposal
+            )
             let value = (axis == .vertical) ? desired.height : desired.width
             return max(0, min(value, content))
         }
@@ -150,14 +156,19 @@ public struct VStack: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 間隔を含めた高さの合計と、最も広い子の幅から決まるサイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size {
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         guard !children.isEmpty else { return .zero }
         var width = 0
         var height = spacing * (children.count - 1)
         var remaining = max(0, proposal.height - height)
-        for child in children {
-            let desired = child.sizeThatFits(Size(width: proposal.width, height: remaining))
+        for (index, child) in children.enumerated() {
+            let desired = context.sizeThatFits(
+                of: child,
+                index: index,
+                proposal: Size(width: proposal.width, height: remaining)
+            )
             width = max(width, desired.width)
             let used = min(desired.height, remaining)
             height += used
@@ -171,14 +182,16 @@ public struct VStack: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。はみ出す子ビューは描画されない。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         let sizes = StackLayout.mainAxisSizes(
             children: children,
             axis: .vertical,
             available: rect.height,
             crossAvailable: rect.width,
-            spacing: spacing
+            spacing: spacing,
+            context: context
         )
 
         var y = rect.minY
@@ -186,12 +199,17 @@ public struct VStack: View {
             if y >= rect.maxY { break }
             let height = min(sizes[index], rect.maxY - y)
             if height > 0 {
-                let desired = child.sizeThatFits(Size(width: rect.width, height: height))
+                let desired = context.sizeThatFits(
+                    of: child,
+                    index: index,
+                    proposal: Size(width: rect.width, height: height)
+                )
                 let width = child.layoutTraits.horizontalFlex > 0
                     ? rect.width
                     : min(desired.width, rect.width)
                 let x = rect.minX + alignment.offset(content: width, available: rect.width)
-                child.render(into: &buffer, rect: Rect(x: x, y: y, width: width, height: height))
+                let childRect = Rect(x: x, y: y, width: width, height: height)
+                context.render(child, index: index, into: &buffer, rect: childRect)
             }
             y += sizes[index] + spacing
         }
@@ -247,14 +265,19 @@ public struct HStack: View {
     ///
     /// - Parameters:
     ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
     /// - Returns: 間隔を含めた幅の合計と、最も高い子の高さから決まるサイズ。
-    public func sizeThatFits(_ proposal: Size) -> Size {
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         guard !children.isEmpty else { return .zero }
         var height = 0
         var width = spacing * (children.count - 1)
         var remaining = max(0, proposal.width - width)
-        for child in children {
-            let desired = child.sizeThatFits(Size(width: remaining, height: proposal.height))
+        for (index, child) in children.enumerated() {
+            let desired = context.sizeThatFits(
+                of: child,
+                index: index,
+                proposal: Size(width: remaining, height: proposal.height)
+            )
             height = max(height, desired.height)
             let used = min(desired.width, remaining)
             width += used
@@ -268,14 +291,16 @@ public struct HStack: View {
     /// - Parameters:
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 描画する矩形。はみ出す子ビューは描画されない。
-    public func render(into buffer: inout Buffer, rect: Rect) {
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         let sizes = StackLayout.mainAxisSizes(
             children: children,
             axis: .horizontal,
             available: rect.width,
             crossAvailable: rect.height,
-            spacing: spacing
+            spacing: spacing,
+            context: context
         )
 
         var x = rect.minX
@@ -283,12 +308,17 @@ public struct HStack: View {
             if x >= rect.maxX { break }
             let width = min(sizes[index], rect.maxX - x)
             if width > 0 {
-                let desired = child.sizeThatFits(Size(width: width, height: rect.height))
+                let desired = context.sizeThatFits(
+                    of: child,
+                    index: index,
+                    proposal: Size(width: width, height: rect.height)
+                )
                 let height = child.layoutTraits.verticalFlex > 0
                     ? rect.height
                     : min(desired.height, rect.height)
                 let y = rect.minY + alignment.offset(content: height, available: rect.height)
-                child.render(into: &buffer, rect: Rect(x: x, y: y, width: width, height: height))
+                let childRect = Rect(x: x, y: y, width: width, height: height)
+                context.render(child, index: index, into: &buffer, rect: childRect)
             }
             x += sizes[index] + spacing
         }

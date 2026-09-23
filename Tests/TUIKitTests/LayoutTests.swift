@@ -7,7 +7,7 @@ final class LayoutTests: XCTestCase {
     private func render(_ view: any View, width: Int, height: Int) -> String {
         var buffer = Buffer(size: Size(width: width, height: height))
         let bounds = buffer.bounds
-        view.render(into: &buffer, rect: bounds)
+        view.renderAsRoot(into: &buffer, rect: bounds)
         return buffer.debugText()
     }
 
@@ -129,7 +129,7 @@ final class LayoutTests: XCTestCase {
             Text("abc")
             Text("de")
         }
-        let size = view.sizeThatFits(Size(width: 10, height: 10))
+        let size = view.sizeThatFitsAsRoot(Size(width: 10, height: 10))
         XCTAssertEqual(size, Size(width: 3, height: 3))
     }
 }

@@ -8,7 +8,7 @@ final class WideCharacterFillTests: XCTestCase {
     private func render(_ view: any View, width: Int, height: Int) -> Buffer {
         var buffer = Buffer(size: Size(width: width, height: height))
         let bounds = buffer.bounds
-        view.render(into: &buffer, rect: bounds)
+        view.renderAsRoot(into: &buffer, rect: bounds)
         return buffer
     }
 

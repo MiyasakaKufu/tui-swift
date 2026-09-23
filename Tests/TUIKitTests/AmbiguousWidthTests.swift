@@ -29,7 +29,7 @@ final class AmbiguousWidthTests: XCTestCase {
     private func render(_ view: any View, width: Int, height: Int) -> String {
         var buffer = Buffer(size: Size(width: width, height: height))
         let bounds = buffer.bounds
-        view.render(into: &buffer, rect: bounds)
+        view.renderAsRoot(into: &buffer, rect: bounds)
         return buffer.debugText()
     }
 

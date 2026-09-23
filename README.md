@@ -184,7 +184,8 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 ### 描画の流れ
 
 1. `Application` が `Component.body` を読んで `View` のツリーを組み立てる。
-2. ツリーを `Buffer`（`Cell` の二次元配列）へ描画する。
+2. ツリーを `Buffer`（`Cell` の二次元配列）へ描画する。親は子を直接呼ばず、
+   `RenderContext` を通して測り、描く。
 3. `Renderer` が前フレームの `Buffer` と比較し、変わったセルだけを書き出す。
 
 ビューは値型で状態を持たない。選択位置や入力内容のような状態は
@@ -192,7 +193,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 
 ### レイアウトの規則
 
-各ビューは `sizeThatFits(_:)` で希望サイズを返し、`layoutTraits` で
+各ビューは `sizeThatFits(_:context:)` で希望サイズを返し、`layoutTraits` で
 「余った領域を引き取る重み」を表す。スタックは次の順で領域を配る。
 
 1. 重み 0 のビューに希望サイズを割り当てる。

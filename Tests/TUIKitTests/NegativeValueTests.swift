@@ -29,7 +29,7 @@ final class NegativeValueTests: XCTestCase {
 
     func testNegativePaddingDoesNotDrawOutsideRect() async {
         var buffer = Buffer(size: Size(width: 5, height: 3))
-        Text("abc").padding(-1).render(into: &buffer, rect: Rect(x: 1, y: 1, width: 3, height: 1))
+        Text("abc").padding(-1).renderAsRoot(into: &buffer, rect: Rect(x: 1, y: 1, width: 3, height: 1))
 
         XCTAssertEqual(buffer.text(ofRow: 0), "     ")
         XCTAssertEqual(buffer.text(ofRow: 1), " abc ")
@@ -41,7 +41,7 @@ final class NegativeValueTests: XCTestCase {
         let state = ListState()
         ListView(items: ["a", "b"], state: state)
             .frame(height: -1)
-            .render(into: &buffer, rect: Rect(x: 0, y: 0, width: 8, height: 3))
+            .renderAsRoot(into: &buffer, rect: Rect(x: 0, y: 0, width: 8, height: 3))
 
         XCTAssertEqual(buffer.debugText(), ["        ", "        ", "        "].joined(separator: "\n"))
     }
@@ -50,7 +50,7 @@ final class NegativeValueTests: XCTestCase {
         var buffer = Buffer(size: Size(width: 5, height: 1))
         Text("abc")
             .frame(width: -3)
-            .render(into: &buffer, rect: Rect(x: 0, y: 0, width: 5, height: 1))
+            .renderAsRoot(into: &buffer, rect: Rect(x: 0, y: 0, width: 5, height: 1))
 
         XCTAssertEqual(buffer.text(ofRow: 0), "     ")
     }

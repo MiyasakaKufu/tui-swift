@@ -35,7 +35,7 @@ final class ComponentTests: XCTestCase {
 
     func testBodyRendersThroughStaticType() async {
         var buffer = Buffer(size: Size(width: 10, height: 1))
-        DisplayOnlyComponent().body.render(into: &buffer, rect: buffer.bounds)
+        DisplayOnlyComponent().body.renderAsRoot(into: &buffer, rect: buffer.bounds)
         XCTAssertEqual(buffer.text(ofRow: 0), "こんにちは")
     }
 
