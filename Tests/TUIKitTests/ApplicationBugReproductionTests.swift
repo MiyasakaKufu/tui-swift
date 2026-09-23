@@ -662,6 +662,7 @@ private final class OutputDrain {
     private let descriptor: Int32
     private let recordsOutput: Bool
     private let stopped = Latch()
+    private let finished = Latch()
     private let lock = NSLock()
     private var recorded: [UInt8] = []
 
@@ -673,7 +674,9 @@ private final class OutputDrain {
     func start() {
         let descriptor = self.descriptor
         let stopped = self.stopped
+        let finished = self.finished
         Thread { [weak self] in
+            defer { finished.set() }
             var bytes = [UInt8](repeating: 0, count: 4096)
             while !stopped.isSet {
                 var descriptors = pollfd(fd: descriptor, events: Int16(POLLIN), revents: 0)
@@ -687,6 +690,9 @@ private final class OutputDrain {
 
     func stop() {
         stopped.set()
+        // 読み取りの終わりを待たずに戻してはいけない。スレッドが `poll(2)` の中に残ったまま
+        // 記述子が閉じられ、次に開いた疑似端末が同じ番号を使うと、その出力を横取りする。
+        _ = finished.wait(timeout: 1)
     }
 
     /// 読んだ内容に部分列が現れるまで待つ。
