@@ -2,7 +2,7 @@
 ///
 /// エスケープシーケンスが途中までしか届いていない場合は内部に保持し、
 /// 続きが来たときに解釈する。
-public struct InputParser {
+public struct InputParser: Sendable {
     private var pending: [UInt8] = []
     private var isInPaste = false
     private var replies: [TerminalReply] = []

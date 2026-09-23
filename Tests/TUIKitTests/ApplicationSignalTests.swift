@@ -14,7 +14,8 @@ import Glibc
 final class ApplicationSignalTests: XCTestCase {
 
     /// イベント待ちに入る直前の SIGWINCH でも、入力なしで再描画される。
-    func testResizeJustBeforeWaitingTriggersRedraw() throws {
+    @MainActor
+    func testResizeJustBeforeWaitingTriggersRedraw() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
 
@@ -30,9 +31,8 @@ final class ApplicationSignalTests: XCTestCase {
         let run = runInBackground(root: probe, terminal: pty.terminal())
 
         // 入力を送ってはいけない。シグナルだけでループが動くことを確かめている。
-        wait(for: [probe.resized, run.finished], timeout: 5)
+        try await run.value
 
-        XCTAssertNil(run.error.value)
         XCTAssertEqual(
             probe.sizes,
             [Size(width: 20, height: 5), Size(width: 30, height: 8)]
@@ -40,7 +40,8 @@ final class ApplicationSignalTests: XCTestCase {
     }
 
     /// イベント待ちに入る直前の SIGTERM でも、入力なしでループが終わる。
-    func testTerminationJustBeforeWaitingEndsLoop() throws {
+    @MainActor
+    func testTerminationJustBeforeWaitingEndsLoop() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
 
@@ -53,9 +54,7 @@ final class ApplicationSignalTests: XCTestCase {
         let run = runInBackground(root: probe, terminal: pty.terminal())
 
         // 入力を送ってはいけない。シグナルだけでループが終わることを確かめている。
-        wait(for: [run.finished], timeout: 5)
-
-        XCTAssertNil(run.error.value)
+        try await run.value
     }
 
     /// 外から送られた SIGINT / SIGQUIT を終了シグナルとして受け取る。
@@ -142,28 +141,18 @@ final class ApplicationSignalTests: XCTestCase {
     ///   - root: ループに渡すコンポーネント。
     ///   - terminal: 入出力に使う端末。
     /// - Returns: ループの終了を待つための expectation と、`run()` が投げたエラーの入れ物。
+    @MainActor
     private func runInBackground<Root: Component>(
         root: Root,
         terminal: Terminal
-    ) -> (finished: XCTestExpectation, error: ResultBox<Error?>) {
+    ) -> Task<Void, Error> {
         let application = Application(
             root: root,
             options: ApplicationOptions(usesAlternateScreen: false, usesBracketedPaste: false),
             terminal: terminal
         )
-        let finished = XCTestExpectation(description: "イベントループが終わる")
-        let error = ResultBox<Error?>(nil)
-
-        Thread.detachNewThread {
-            do {
-                try application.run()
-            } catch let thrown {
-                error.value = thrown
-            }
-            finished.fulfill()
-        }
-
-        return (finished, error)
+        // 別スレッドでは回せない。`run()` はアクタの上に居るため、同じアクタの `Task` にする。
+        return Task { try await application.run() }
     }
 }
 
@@ -262,6 +251,7 @@ private final class PseudoTerminal {
     }
 
     /// スレーブ側を入出力に使う端末を作る。
+    @MainActor
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
     }

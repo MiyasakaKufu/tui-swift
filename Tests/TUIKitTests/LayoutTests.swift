@@ -1,6 +1,7 @@
 import XCTest
 @testable import TUIKit
 
+@MainActor
 final class LayoutTests: XCTestCase {
 
     private func render(_ view: any View, width: Int, height: Int) -> String {
@@ -10,19 +11,19 @@ final class LayoutTests: XCTestCase {
         return buffer.debugText()
     }
 
-    func testTabIsNotDroppedFromText() {
+    func testTabIsNotDroppedFromText() async {
         XCTAssertEqual(render(Text("a\tb"), width: 10, height: 1), "a   b     ")
     }
 
-    func testTabInsideLineAlignsToTabStop() {
+    func testTabInsideLineAlignsToTabStop() async {
         XCTAssertEqual(render(Text("ab\tc\td"), width: 12, height: 1), "ab  c   d   ")
     }
 
-    func testTextTabSizeIsConfigurable() {
+    func testTextTabSizeIsConfigurable() async {
         XCTAssertEqual(render(Text("a\tb").tabStops(every: 8), width: 10, height: 1), "a       b ")
     }
 
-    func testVStackStacksChildrenVertically() {
+    func testVStackStacksChildrenVertically() async {
         let view = VStack {
             Text("a")
             Text("b")
@@ -30,7 +31,7 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(render(view, width: 2, height: 3), "a \nb \n  ")
     }
 
-    func testVStackSpacing() {
+    func testVStackSpacing() async {
         let view = VStack(spacing: 1) {
             Text("a")
             Text("b")
@@ -38,7 +39,7 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(render(view, width: 1, height: 3), "a\n \nb")
     }
 
-    func testVStackSpacerPushesToEdges() {
+    func testVStackSpacerPushesToEdges() async {
         let view = VStack {
             Text("a")
             Spacer()
@@ -47,7 +48,7 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(render(view, width: 1, height: 4), "a\n \n \nb")
     }
 
-    func testHStackSpacerPushesToEdges() {
+    func testHStackSpacerPushesToEdges() async {
         let view = HStack {
             Text("a")
             Spacer()
@@ -56,7 +57,7 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(render(view, width: 5, height: 1), "a   b")
     }
 
-    func testVStackAlignment() {
+    func testVStackAlignment() async {
         let view = VStack(alignment: .trailing) {
             Text("ab")
             Text("c")
@@ -64,7 +65,7 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(render(view, width: 3, height: 2), " ab\n  c")
     }
 
-    func testStackClipsOverflow() {
+    func testStackClipsOverflow() async {
         let view = VStack {
             Text("a")
             Text("b")
@@ -73,37 +74,37 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(render(view, width: 1, height: 2), "a\nb")
     }
 
-    func testBorderDrawsFrameAroundContent() {
+    func testBorderDrawsFrameAroundContent() async {
         let view = Text("hi").border(.ascii)
         XCTAssertEqual(render(view, width: 6, height: 3), "+----+\n|hi  |\n+----+")
     }
 
-    func testBorderWithTitle() {
+    func testBorderWithTitle() async {
         let view = EmptyView().border(.ascii, title: "T")
         XCTAssertEqual(render(view, width: 8, height: 3), "+ T ---+\n|      |\n+------+")
     }
 
-    func testBorderTitleExpandsTabs() {
+    func testBorderTitleExpandsTabs() async {
         let view = EmptyView().border(.ascii, title: "a\tb")
         XCTAssertEqual(render(view, width: 10, height: 3), "+ a  b --+\n|        |\n+--------+")
     }
 
-    func testPaddingShiftsContent() {
+    func testPaddingShiftsContent() async {
         let view = Text("x").padding(1)
         XCTAssertEqual(render(view, width: 3, height: 3), "   \n x \n   ")
     }
 
-    func testFrameLimitsSize() {
+    func testFrameLimitsSize() async {
         let view = Fill("#").frame(width: 2, height: 1)
         XCTAssertEqual(render(view, width: 4, height: 2), "##  \n    ")
     }
 
-    func testAlignedCentersContent() {
+    func testAlignedCentersContent() async {
         let view = Text("x").aligned(horizontal: .center, vertical: .center)
         XCTAssertEqual(render(view, width: 3, height: 3), "   \n x \n   ")
     }
 
-    func testFlexibleWeightsSplitRemainingSpace() {
+    func testFlexibleWeightsSplitRemainingSpace() async {
         let view = HStack {
             Fill("a").flexible(horizontal: 1, vertical: 1)
             Fill("b").flexible(horizontal: 3, vertical: 1)
@@ -111,19 +112,19 @@ final class LayoutTests: XCTestCase {
         XCTAssertEqual(render(view, width: 8, height: 1), "aabbbbbb")
     }
 
-    func testDividerFillsWidth() {
+    func testDividerFillsWidth() async {
         let view = Divider(character: "-")
         XCTAssertEqual(render(view, width: 4, height: 1), "----")
     }
 
-    func testTextWrapsWithinStack() {
+    func testTextWrapsWithinStack() async {
         let view = VStack {
             Text("hello world", wrap: .word)
         }
         XCTAssertEqual(render(view, width: 5, height: 2), "hello\nworld")
     }
 
-    func testSizeThatFitsForVStack() {
+    func testSizeThatFitsForVStack() async {
         let view = VStack(spacing: 1) {
             Text("abc")
             Text("de")

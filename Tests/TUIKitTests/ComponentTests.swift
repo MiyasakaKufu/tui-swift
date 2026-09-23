@@ -20,25 +20,26 @@ private final class MinimalApp: TerminalApp {
     }
 }
 
+@MainActor
 final class ComponentTests: XCTestCase {
 
-    func testDefaultHandleIgnoresEvents() {
+    func testDefaultHandleIgnoresEvents() async {
         let component = DisplayOnlyComponent()
         XCTAssertEqual(component.handle(.key(KeyEvent(.up))), .ignored)
         XCTAssertEqual(component.handle(.resize(Size(width: 10, height: 4))), .ignored)
     }
 
-    func testDefaultCursorPositionIsNil() {
+    func testDefaultCursorPositionIsNil() async {
         XCTAssertNil(DisplayOnlyComponent().cursorPosition)
     }
 
-    func testBodyRendersThroughStaticType() {
+    func testBodyRendersThroughStaticType() async {
         var buffer = Buffer(size: Size(width: 10, height: 1))
         DisplayOnlyComponent().body.render(into: &buffer, rect: buffer.bounds)
         XCTAssertEqual(buffer.text(ofRow: 0), "こんにちは")
     }
 
-    func testDefaultOptions() {
+    func testDefaultOptions() async {
         let options = ApplicationOptions.default
         XCTAssertTrue(options.usesAlternateScreen)
         XCTAssertEqual(options.mouseTracking, .disabled)
@@ -48,7 +49,7 @@ final class ComponentTests: XCTestCase {
         XCTAssertTrue(options.suspendsOnControlZ)
     }
 
-    func testQuitsOnUnhandledControlC() {
+    func testQuitsOnUnhandledControlC() async {
         let options = ApplicationOptions.default
         XCTAssertTrue(options.quits(onUnhandled: .key(KeyEvent(.character("c"), modifiers: .control))))
         XCTAssertFalse(options.quits(onUnhandled: .key(KeyEvent(.character("c")))))
@@ -56,12 +57,12 @@ final class ComponentTests: XCTestCase {
         XCTAssertFalse(options.quits(onUnhandled: .resize(Size(width: 1, height: 1))))
     }
 
-    func testQuitsOnControlCCanBeDisabled() {
+    func testQuitsOnControlCCanBeDisabled() async {
         let options = ApplicationOptions(quitsOnControlC: false)
         XCTAssertFalse(options.quits(onUnhandled: .key(KeyEvent(.character("c"), modifiers: .control))))
     }
 
-    func testSuspendsOnUnhandledControlZ() {
+    func testSuspendsOnUnhandledControlZ() async {
         let options = ApplicationOptions.default
         XCTAssertTrue(options.suspends(onUnhandled: .key(KeyEvent(.character("z"), modifiers: .control))))
         XCTAssertFalse(options.suspends(onUnhandled: .key(KeyEvent(.character("z")))))
@@ -69,12 +70,12 @@ final class ComponentTests: XCTestCase {
         XCTAssertFalse(options.suspends(onUnhandled: .resize(Size(width: 1, height: 1))))
     }
 
-    func testSuspendsOnControlZCanBeDisabled() {
+    func testSuspendsOnControlZCanBeDisabled() async {
         let options = ApplicationOptions(suspendsOnControlZ: false)
         XCTAssertFalse(options.suspends(onUnhandled: .key(KeyEvent(.character("z"), modifiers: .control))))
     }
 
-    func testTerminalAppProvidesDefaultOptions() {
+    func testTerminalAppProvidesDefaultOptions() async {
         XCTAssertEqual(MinimalApp.options.mouseTracking, .buttons)
         XCTAssertTrue(DefaultOptionApp.options.quitsOnControlC)
         XCTAssertEqual(DefaultOptionApp.options.mouseTracking, .disabled)

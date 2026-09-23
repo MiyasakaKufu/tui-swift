@@ -24,7 +24,7 @@ public final class InputReader {
     /// - Precondition: 読み取り可能になったバイトは読み捨てるため、非ブロッキングであること。
     public var wakeupDescriptor: Int32?
 
-    /// 指定した記述子から読み出すリーダーを作る。
+    /// 指定した記述子から読み出す `InputReader` を作る。
     ///
     /// - Parameters:
     ///   - descriptor: 入力を読み取るファイル記述子。
@@ -32,6 +32,38 @@ public final class InputReader {
     public init(descriptor: Int32 = 0, wakeupDescriptor: Int32? = nil) {
         self.descriptor = descriptor
         self.wakeupDescriptor = wakeupDescriptor
+    }
+
+    /// 別の `InputReader` へ引き継ぐ、まだ返していない `InputEvent` と未解釈のバイト。
+    struct UnreadState: Sendable {
+        /// まだ返していないイベント。
+        var events: [InputEvent]
+        /// 未解釈のバイトを抱えたパーサ。
+        var parser: InputParser
+        /// 未解釈のバイトを最後に受け取った時刻。
+        var pendingSince: Double?
+    }
+
+    /// まだ返していない `InputEvent` と未解釈のバイトを取り出し、この `InputReader` を空にする。
+    ///
+    /// - Returns: 取り出した分。引き継ぎ先で `adopt(_:)` へ渡す。
+    func takeUnreadState() -> UnreadState {
+        let state = UnreadState(events: bufferedEvents, parser: parser, pendingSince: pendingSince)
+        bufferedEvents.removeAll()
+        parser = InputParser()
+        pendingSince = nil
+        return state
+    }
+
+    /// 取り出した分を引き継ぐ。
+    ///
+    /// - Parameters:
+    ///   - state: `takeUnreadState()` が返した分。
+    /// - Precondition: まだ何も読んでいない `InputReader` であること。
+    func adopt(_ state: UnreadState) {
+        bufferedEvents = state.events
+        parser = state.parser
+        pendingSince = state.pendingSince
     }
 
     /// 入力を待ち、届いたイベントを返す。
@@ -74,6 +106,11 @@ public final class InputReader {
                 // 閉じた記述子はいつでも読み取り可能になり、`read(2)` は 0 を返す。
                 // 読めたバイト数を見ずに待ち直すと、入力が閉じた後は待ちの中で回り続ける。
                 if !events.isEmpty || byteCount == 0 { return events }
+
+                // 起こされた合図を食べた回は、確定しなくても返す。
+                // ここで待ち直すと、ペースト中は `pendingWaitDuration` が nil なので
+                // 続きが届くまで戻らず、起こした側は戻ったつもりで待ち続ける。
+                if readiness.contains(.wakeup) { return [] }
             } else if readiness.contains(.wakeup) {
                 // 起こされただけのときに確定させてはいけない。届きかけの ESC が壊れる。
                 return []

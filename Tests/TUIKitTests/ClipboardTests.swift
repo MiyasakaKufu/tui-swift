@@ -7,44 +7,45 @@ import Darwin
 import Glibc
 #endif
 
+@MainActor
 final class ClipboardTests: XCTestCase {
 
-    func testSequenceCarriesTheTextAsBase64() {
+    func testSequenceCarriesTheTextAsBase64() async {
         XCTAssertEqual(ANSI.setClipboard("hi"), "\u{1B}]52;c;aGk=\u{07}")
         XCTAssertEqual(ANSI.setClipboard("あ"), "\u{1B}]52;c;44GC\u{07}")
     }
 
-    func testEmptyTextClearsTheClipboard() {
+    func testEmptyTextClearsTheClipboard() async {
         XCTAssertEqual(ANSI.setClipboard(""), "\u{1B}]52;c;\u{07}")
     }
 
-    func testSequenceHasNoControlCharactersBesidesItsOwn() throws {
+    func testSequenceHasNoControlCharactersBesidesItsOwn() async throws {
         let sequence = try XCTUnwrap(ANSI.setClipboard("\u{1B}[2J\u{07}\n改行"))
         let body = sequence.dropFirst(2).dropLast()
         XCTAssertFalse(body.unicodeScalars.contains { $0.value < 0x20 })
     }
 
-    func testTextAtTheLimitIsStillSent() {
+    func testTextAtTheLimitIsStillSent() async {
         XCTAssertEqual(ANSI.setClipboard("abc", limit: 4), "\u{1B}]52;c;YWJj\u{07}")
     }
 
-    func testTextOverTheLimitIsRefused() {
+    func testTextOverTheLimitIsRefused() async {
         XCTAssertNil(ANSI.setClipboard("abcd", limit: 4))
         XCTAssertNil(ANSI.setClipboard("", limit: -1))
     }
 
-    func testLimitCountsTheEncodedLength() {
+    func testLimitCountsTheEncodedLength() async {
         XCTAssertNil(ANSI.setClipboard("あ", limit: 3))
         XCTAssertNotNil(ANSI.setClipboard("あ", limit: 4))
     }
 
-    func testDefaultLimitAcceptsTextUpToItsLength() {
+    func testDefaultLimitAcceptsTextUpToItsLength() async {
         let bytes = ANSI.clipboardLimit / 4 * 3
         XCTAssertNotNil(ANSI.setClipboard(String(repeating: "a", count: bytes)))
         XCTAssertNil(ANSI.setClipboard(String(repeating: "a", count: bytes + 1)))
     }
 
-    func testTerminalSendsTheSequenceImmediately() throws {
+    func testTerminalSendsTheSequenceImmediately() async throws {
         var descriptors: [Int32] = [-1, -1]
         guard pipe(&descriptors) == 0 else { throw Failure.pipeUnavailable(errno: errno) }
         defer {
@@ -57,7 +58,7 @@ final class ClipboardTests: XCTestCase {
         XCTAssertEqual(readText(from: descriptors[0]), "\u{1B}]52;c;aGk=\u{07}")
     }
 
-    func testTerminalSendsNothingOverTheLimit() throws {
+    func testTerminalSendsNothingOverTheLimit() async throws {
         var descriptors: [Int32] = [-1, -1]
         guard pipe(&descriptors) == 0 else { throw Failure.pipeUnavailable(errno: errno) }
         defer {
