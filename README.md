@@ -178,7 +178,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | 描画 | `Buffer`, `Cell`, `Renderer`, `Style` | セル単位の画面バッファと差分出力 |
 | 文字 | `DisplayWidth`, `TextWrapping`, `TabExpansion` | 表示幅の計算、折り返し、タブの展開 |
 | ビュー | `View`, `VStack`, `HStack`, `ZStack`, `Text`, 各種修飾子 | レイアウトと描画 |
-| 部品 | `ListView`, `TextField`, `ProgressBar` | 状態を持つウィジェット |
+| 部品 | `ListView`, `TextField`, `ProgressBar`, `Binding` | 状態を持つウィジェットと、アプリの値を渡す口 |
 | 実行 | `TerminalApp`, `Application`, `Component` | エントリポイントとイベントループ |
 
 ### 描画の流れ
@@ -188,8 +188,31 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
    `RenderContext` を通して測り、描く。
 3. `Renderer` が前フレームの `Buffer` と比較し、変わったセルだけを書き出す。
 
-ビューは値型で状態を持たない。選択位置や入力内容のような状態は
-`ListState` / `TextFieldState` のようなクラスに置き、`Component` が保持する。
+ビューは値型で状態を持たない。状態は次の 2 つに分けて置く。
+
+| 種類 | 例 | 置き場所 |
+| --- | --- | --- |
+| 値 | 入力欄の内容、リストの選択位置 | アプリ（`Component` のプロパティ）。`Binding` で部品に渡す |
+| 表示状態 | カーソル位置、スクロール位置、直前に描いた矩形 | `TextFieldState` / `ListState`。`Component` が保持する |
+
+```swift
+private var name = ""
+private let inputState = TextFieldState()
+
+var body: some View {
+    TextField(text: Binding(self, \.name), state: inputState)
+}
+
+func handle(_ event: InputEvent) -> EventResult {
+    inputState.handle(event) ? .handled : .ignored   // 編集の結果が name に書き戻される
+}
+```
+
+`Binding` は読み出しと書き戻しの組を持つ値型で、`Binding(get:set:)` でも作れる。
+部品が書き戻すのはイベントの処理の中だけで、描画の中では書き戻さない。
+
+`Binding` を渡さない `TextField(state:)` / `ListView(items:state:)` も残している。
+こちらは値も状態のクラスが持ち、`inputState.text` や `listState.selectedIndex` で読む。
 
 ### レイアウトの規則
 
