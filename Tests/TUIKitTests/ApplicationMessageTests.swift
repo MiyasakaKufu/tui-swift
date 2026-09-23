@@ -29,8 +29,8 @@ final class ApplicationMessageTests: XCTestCase {
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
-        // 画面が変わるまで入力を送ってはいけない。作業の結果だけで変わることを確かめているので、
-        // 入力で起きたのかどうかが分からなくなる。
+        // 画面が変わるまで、キーのバイトを書いてはいけない。
+        // 作業の結果だけで変わることを確かめているので、キーで起きたのかどうかが分からなくなる。
         let drew = await waitUntil(timeout: 5) { self.captured.contains(arrivedText) }
         XCTAssertTrue(drew, "作業の結果が届いた後に画面が描き直されていない")
 
@@ -154,7 +154,7 @@ final class ApplicationMessageTests: XCTestCase {
         let loop = Task { try await application.run() }
 
         // 最初の描画を待たずに送ると届かない。
-        // raw モードへの切り替えが、入力待ちのバイト列を捨てる。
+        // raw モードへの切り替えが、まだ読まれていないバイト列を捨てる。
         let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
 

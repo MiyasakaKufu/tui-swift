@@ -34,7 +34,7 @@ public protocol Component: AnyObject {
     /// - Parameters:
     ///   - message: `MessageSender.send(_:)` で送られたイベント。
     /// - Returns: 処理の結果。`.quit` を返すとアプリケーションが終了する。
-    /// - Note: 送られた順に呼ばれる。端末の入力との前後も保たれる。
+    /// - Note: 送られた順に呼ばれる。`handle(_:)` へ渡る `InputEvent` との前後も保たれる。
     func receive(_ message: Message) -> EventResult
 
     /// 起動時にイベントループが走らせる作業。
