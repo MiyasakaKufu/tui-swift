@@ -38,90 +38,29 @@ final class DemoApp: TerminalApp {
 
     var body: some View {
         VStack(spacing: 0) {
-            header()
+            Header()
             HStack(spacing: 1) {
                 ListView(items: items, selection: Binding(self, \.selection), state: listState)
                     .padding(horizontal: 1)
                     .border(.rounded, title: "機能一覧")
                     .flexible(horizontal: 2, vertical: 1)
 
-                detail()
+                Detail(
+                    selected: items.indices.contains(selection) ? items[selection] : "-",
+                    terminalSize: terminalSize,
+                    lastEventDescription: lastEventDescription,
+                    progress: progress,
+                    isEditing: isEditing,
+                    name: Binding(self, \.name),
+                    inputState: inputState
+                )
                     .border(.rounded, title: "詳細")
                     .flexible(horizontal: 3, vertical: 1)
             }
             .flexible(horizontal: 1, vertical: 1)
-            footer()
+            Footer()
         }
-        .screenOverlay(dialog())
-    }
-
-    private func dialog() -> some View {
-        let textStyle = Style(foreground: .brightWhite, background: .blue)
-        return ZStack {
-            if isShowingDialog {
-                VStack(spacing: 1, alignment: .center) {
-                    Text("画面の中央に重ねたダイアログです。", style: textStyle, wrap: .word)
-                    Text("下に敷いた全角文字を覆っても、行の桁はずれません。", style: textStyle, wrap: .word)
-                    Text("Enter か Esc で閉じる", style: textStyle).dim()
-                }
-                .padding(horizontal: 2, vertical: 1)
-                .border(.double, style: Style(foreground: .yellow, background: .blue), title: "ダイアログ")
-                .background(style: Style(background: .blue))
-                .frame(width: 44, height: 9)
-            }
-        }
-    }
-
-    private func header() -> some View {
-        Text(" TUIKit デモ ", style: Style(foreground: .black, background: .cyan).bold)
-            .frame(height: 1)
-            .background(style: Style(background: .cyan))
-            .flexible(horizontal: 1, vertical: 0)
-    }
-
-    private func detail() -> some View {
-        let selected = items.indices.contains(selection) ? items[selection] : "-"
-
-        return VStack(spacing: 1) {
-            Text("選択中: \(selected)", wrap: .word).bold()
-            Text("端末サイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
-            Text("直前のイベント: \(lastEventDescription)", wrap: .word)
-
-            VStack(spacing: 0) {
-                Text("進捗（+ / - で増減）").dim()
-                ProgressBar(value: progress, showsPercentage: true)
-            }
-
-            VStack(spacing: 0) {
-                Text(isEditing ? "入力中（Tab で戻る）" : "Tab で入力に切り替え").dim()
-                Text("入力した文字数: \(name.count)").dim()
-                TextField(
-                    text: Binding(self, \.name),
-                    state: inputState,
-                    placeholder: "ここに入力…",
-                    showsCursor: !isEditing
-                )
-                    .padding(horizontal: 1)
-                    .border(.single, style: Style(foreground: isEditing ? .yellow : .brightBlack))
-            }
-
-            Spacer()
-        }
-        .padding(horizontal: 1)
-    }
-
-    private func footer() -> some View {
-        HStack(spacing: 2) {
-            Text(" ↑↓/jk 選択 ").styled(Style(foreground: .black, background: .white))
-            Text(" ホイール スクロール ").styled(Style(foreground: .black, background: .white))
-            Text(" Tab 切り替え ").styled(Style(foreground: .black, background: .white))
-            Text(" d ダイアログ ").styled(Style(foreground: .black, background: .white))
-            Text(" Ctrl+Z 一時停止 ").styled(Style(foreground: .black, background: .white))
-            Text(" q 終了 ").styled(Style(foreground: .black, background: .white))
-            Spacer()
-        }
-        .frame(height: 1)
-        .flexible(horizontal: 1, vertical: 0)
+        .screenOverlay(Dialog(isShowing: isShowingDialog))
     }
 
     var cursorPosition: Point? {
@@ -210,6 +149,101 @@ final class DemoApp: TerminalApp {
         case .character(let character): return String(character)
         case .function(let number): return "F\(number)"
         default: return String(describing: key)
+        }
+    }
+}
+
+/// 画面上端の見出し。
+private struct Header: View {
+    var body: some View {
+        Text(" TUIKit デモ ", style: Style(foreground: .black, background: .cyan).bold)
+            .frame(height: 1)
+            .background(style: Style(background: .cyan))
+            .flexible(horizontal: 1, vertical: 0)
+    }
+}
+
+/// 選択中の項目と入力の状態を並べる欄。
+private struct Detail: View {
+    let selected: String
+    let terminalSize: Size
+    let lastEventDescription: String
+    let progress: Double
+    let isEditing: Bool
+    let name: Binding<String>
+    let inputState: TextFieldState
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text("選択中: \(selected)", wrap: .word).bold()
+            Text("端末サイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
+            Text("直前のイベント: \(lastEventDescription)", wrap: .word)
+
+            VStack(spacing: 0) {
+                Text("進捗（+ / - で増減）").dim()
+                ProgressBar(value: progress, showsPercentage: true)
+            }
+
+            VStack(spacing: 0) {
+                Text(isEditing ? "入力中（Tab で戻る）" : "Tab で入力に切り替え").dim()
+                Text("入力した文字数: \(name.wrappedValue.count)").dim()
+                TextField(
+                    text: name,
+                    state: inputState,
+                    placeholder: "ここに入力…",
+                    showsCursor: !isEditing
+                )
+                    .padding(horizontal: 1)
+                    .border(.single, style: Style(foreground: isEditing ? .yellow : .brightBlack))
+            }
+
+            Spacer()
+        }
+        .padding(horizontal: 1)
+    }
+}
+
+/// 画面下端の操作の一覧。
+private struct Footer: View {
+    private let hints = [
+        "↑↓/jk 選択",
+        "ホイール スクロール",
+        "Tab 切り替え",
+        "d ダイアログ",
+        "Ctrl+Z 一時停止",
+        "q 終了",
+    ]
+
+    var body: some View {
+        HStack(spacing: 2) {
+            for hint in hints {
+                Text(" \(hint) ").styled(Style(foreground: .black, background: .white))
+            }
+            Spacer()
+        }
+        .frame(height: 1)
+        .flexible(horizontal: 1, vertical: 0)
+    }
+}
+
+/// 画面の中央に重ねるダイアログ。
+private struct Dialog: View {
+    let isShowing: Bool
+
+    var body: some View {
+        let textStyle = Style(foreground: .brightWhite, background: .blue)
+        return ZStack {
+            if isShowing {
+                VStack(spacing: 1, alignment: .center) {
+                    Text("画面の中央に重ねたダイアログです。", style: textStyle, wrap: .word)
+                    Text("下に敷いた全角文字を覆っても、行の桁はずれません。", style: textStyle, wrap: .word)
+                    Text("Enter か Esc で閉じる", style: textStyle).dim()
+                }
+                .padding(horizontal: 2, vertical: 1)
+                .border(.double, style: Style(foreground: .yellow, background: .blue), title: "ダイアログ")
+                .background(style: Style(background: .blue))
+                .frame(width: 44, height: 9)
+            }
         }
     }
 }

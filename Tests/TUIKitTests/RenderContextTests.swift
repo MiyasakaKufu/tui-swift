@@ -11,7 +11,7 @@ private final class PathLog {
 }
 
 /// 渡された文脈の経路を記録するビュー。
-private struct PathProbe: View {
+private struct PathProbe: PrimitiveView {
     /// 記録に使う名前。
     let name: String
     /// 記録先。

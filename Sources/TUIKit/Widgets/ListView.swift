@@ -242,7 +242,7 @@ public final class ListState {
 }
 
 /// 選択可能なリスト。
-public struct ListView: View {
+public struct ListView: PrimitiveView {
     /// 各行に表示する文字列。
     public var items: [String]
     /// スクロール位置を持つ状態。`Binding` を渡さずに作った場合は選択位置も持つ。

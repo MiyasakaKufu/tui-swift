@@ -108,7 +108,7 @@ enum StackLayout {
 }
 
 /// 子ビューを縦に並べる。
-public struct VStack: View {
+public struct VStack: PrimitiveView {
     /// 並べる子ビュー。
     public var children: [any View]
     /// 子ビューの間隔。負の値は 0 に丸められる。
@@ -217,7 +217,7 @@ public struct VStack: View {
 }
 
 /// 子ビューを横に並べる。
-public struct HStack: View {
+public struct HStack: PrimitiveView {
     /// 並べる子ビュー。
     public var children: [any View]
     /// 子ビューの間隔。負の値は 0 に丸められる。

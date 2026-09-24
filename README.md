@@ -177,7 +177,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | 入力 | `InputParser`, `InputReader`, `KeyEvent`, `MouseEvent` | バイト列からイベントへの増分解析 |
 | 描画 | `Buffer`, `Cell`, `Renderer`, `Style` | セル単位の画面バッファと差分出力 |
 | 文字 | `DisplayWidth`, `TextWrapping`, `TabExpansion` | 表示幅の計算、折り返し、タブの展開 |
-| ビュー | `View`, `VStack`, `HStack`, `ZStack`, `Text`, 各種修飾子 | レイアウトと描画 |
+| ビュー | `View`, `PrimitiveView`, `VStack`, `HStack`, `ZStack`, `Text`, 各種修飾子 | レイアウトと描画 |
 | 部品 | `ListView`, `TextField`, `ProgressBar`, `Binding` | 状態を持つウィジェットと、アプリの値を渡す口 |
 | 実行 | `TerminalApp`, `Application`, `Component` | エントリポイントとイベントループ |
 
@@ -185,7 +185,8 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 
 1. `Application` が `Component.body` を読んで `View` のツリーを組み立てる。
 2. ツリーを `Buffer`（`Cell` の二次元配列）へ描画する。親は子を直接呼ばず、
-   `RenderContext` を通して測り、描く。
+   `RenderContext` を通して測り、描く。`body` を持つビューは、その `body` を測り、描く。
+   ビューの同一性は親の中での位置（`.id(_:)` を付けたビューは鍵）で決まり、フレームをまたいで保たれる。
 3. `Renderer` が前フレームの `Buffer` と比較し、変わったセルだけを書き出す。
 
 ビューは値型で状態を持たない。状態は次の 2 つに分けて置く。
