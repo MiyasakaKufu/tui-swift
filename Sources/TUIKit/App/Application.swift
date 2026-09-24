@@ -46,11 +46,8 @@ public final class Application<Root: Component> {
     public init(
         root: Root,
         options: ApplicationOptions = .default,
-        terminal: Terminal? = nil
+        terminal: Terminal = Terminal()
     ) {
-        // 既定値に `Terminal()` と書き直すとコンパイルが通らない。
-        // 既定引数の式はこの宣言の隔離を継承せず、非隔離の文脈からの呼び出しになる。
-        let terminal = terminal ?? Terminal()
         self.root = root
         self.options = options
         self.buffer = Buffer(size: .zero, ambiguousWidth: options.ambiguousWidth)

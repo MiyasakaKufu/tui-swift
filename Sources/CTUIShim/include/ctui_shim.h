@@ -2,6 +2,8 @@
 #define CTUI_SHIM_H
 
 #include <signal.h>
+#include <stddef.h>
+#include <termios.h>
 
 // Swift から C の可変長引数関数 `ioctl` を直接呼ぶことはできない。
 // この宣言を消して Swift 側から `ioctl` を呼んではいけない。
@@ -42,6 +44,36 @@ int ctui_restore_signal_handler(int signal_number, const struct sigaction *previ
 // シグナルハンドラから触る状態を Swift のグローバル変数へ移してはいけない。ハンドラが書いてよい
 // 静的な変数は `volatile sig_atomic_t` かロックフリーなアトミック型に限られ、Swift の変数はどちらでもない。
 // `nonisolated(unsafe)` は並行性検査を黙らせるだけで型は変わらず、`Atomic` は macOS 15 からしか使えない。
+
+/// クラッシュしたときとプロセスが終わるときに、端末属性を戻し、打ち消す制御コードを書き出すよう仕掛ける。
+///
+/// - Parameters:
+///   - input: 端末属性を戻すファイル記述子。
+///   - output: 制御コードを書き出すファイル記述子。
+///   - attributes: 戻す先の端末属性。
+///   - sequence: 書き出す制御コード。
+///   - length: `sequence` のバイト数。
+/// - Returns: 成功なら 0、制御コードの領域を確保できなければ -1。
+/// - Note: 仕掛けられるのは一組だけ。二度目からは記述子と端末属性が上書きされ、
+///   制御コードは初めに渡したものが使われ続ける。
+int ctui_crash_restorer_arm(int input,
+                            int output,
+                            const struct termios *attributes,
+                            const unsigned char *sequence,
+                            size_t length);
+
+/// 仕掛けたハンドラを外し、前の設定へ戻す。
+///
+/// - Note: 二重に呼んでも安全。
+void ctui_crash_restorer_disarm(void);
+
+/// 仕掛けた端末を今すぐ戻す。仕掛けていなければ何もしない。
+///
+/// シグナルハンドラから呼べる。使うのは非同期シグナル安全な `write(2)` と `tcsetattr(3)` だけ。
+///
+/// - See: [The Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9799919799/) の
+///   「Signal Concepts」にある Async-Signal-Safe Functions。
+void ctui_crash_restorer_restore(void);
 
 /// ウィンドウサイズ変更の合図を立てる。
 void ctui_signal_set_window_resize(void);
