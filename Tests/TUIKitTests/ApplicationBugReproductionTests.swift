@@ -5,6 +5,7 @@ import Glibc
 #endif
 
 import Foundation
+import Synchronization
 import XCTest
 import CTUITestSupport
 @testable import TUIKit
@@ -48,8 +49,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
         component.onTimeout = { [weak application] in application?.stop() }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+        let hasStartedLoop = component.hasStartedLoop
         let sender = Thread {
-            guard component.hasStartedLoop.wait(timeout: 5) else { return }
+            guard hasStartedLoop.wait(timeout: 5) else { return }
             writeByte(master, UInt8(ascii: "a"))
             Thread.sleep(forTimeInterval: 0.2)
             writeByte(master, UInt8(ascii: "b"))
@@ -94,8 +96,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
         component.onTimeout = { [weak application] in application?.stop() }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+        let hasStartedLoop = component.hasStartedLoop
         let sender = Thread {
-            guard component.hasStartedLoop.wait(timeout: 5) else { return }
+            guard hasStartedLoop.wait(timeout: 5) else { return }
             writeBytes(master, Array("\u{1B}[I".utf8))
             Thread.sleep(forTimeInterval: 0.2)
             writeBytes(master, Array("\u{1B}[O".utf8))
@@ -199,8 +202,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
         component.onTimeout = { [weak application] in application?.stop() }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+        let hasStartedLoop = component.hasStartedLoop
         let sender = Thread {
-            guard component.hasStartedLoop.wait(timeout: 5) else { return }
+            guard hasStartedLoop.wait(timeout: 5) else { return }
             writeBytes(master, Array("\u{1B}[<35;4;2M".utf8))
         }
         sender.start()
@@ -307,8 +311,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
         component.onTimeout = { [weak application] in application?.stop() }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+        let hasStartedLoop = component.hasStartedLoop
         let sender = Thread {
-            guard component.hasStartedLoop.wait(timeout: 5) else { return }
+            guard hasStartedLoop.wait(timeout: 5) else { return }
             writeByte(master, 0x09)
         }
         sender.start()
@@ -367,8 +372,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
         }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+        let hasStartedLoop = component.hasStartedLoop
         let sender = Thread {
-            guard component.hasStartedLoop.wait(timeout: 5) else { return }
+            guard hasStartedLoop.wait(timeout: 5) else { return }
             writeByte(master, 0x1A)
         }
         sender.start()
@@ -624,20 +630,15 @@ private final class SuspendRecordingComponent: Component {
 // MARK: - 補助
 
 /// スレッドをまたいで一度だけ立てるフラグ。
-private final class Latch {
-    private let lock = NSLock()
-    private var isRaised = false
+private final class Latch: Sendable {
+    private let isRaised = Atomic(false)
 
     func set() {
-        lock.lock()
-        isRaised = true
-        lock.unlock()
+        isRaised.store(true, ordering: .releasing)
     }
 
     var isSet: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return isRaised
+        isRaised.load(ordering: .acquiring)
     }
 
     /// フラグが立つまで待つ。
@@ -658,13 +659,12 @@ private final class Latch {
 /// pty の master 側に溜まる出力を読み続けるスレッド。
 ///
 /// 求められたときだけ読んだ内容を覚え、それ以外は読み捨てる。
-private final class OutputDrain {
+private final class OutputDrain: Sendable {
     private let descriptor: Int32
     private let recordsOutput: Bool
     private let stopped = Latch()
     private let finished = Latch()
-    private let lock = NSLock()
-    private var recorded: [UInt8] = []
+    private let recorded = Mutex<[UInt8]>([])
 
     init(descriptor: Int32, recordsOutput: Bool = false) {
         self.descriptor = descriptor
@@ -711,16 +711,12 @@ private final class OutputDrain {
     }
 
     private var output: String {
-        lock.lock()
-        defer { lock.unlock() }
-        return String(decoding: recorded, as: UTF8.self)
+        recorded.withLock { String(decoding: $0, as: UTF8.self) }
     }
 
     private func record(_ bytes: ArraySlice<UInt8>) {
         guard recordsOutput else { return }
-        lock.lock()
-        recorded.append(contentsOf: bytes)
-        lock.unlock()
+        recorded.withLock { $0.append(contentsOf: bytes) }
     }
 }
 
