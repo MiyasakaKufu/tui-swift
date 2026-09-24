@@ -15,7 +15,7 @@ struct ViewPath: Hashable {
     private var components: [Component]
 
     /// ルートの経路。
-    static let root = ViewPath(components: [])
+    static var root: ViewPath { ViewPath(components: []) }
 
     /// 子の経路を返す。
     ///
