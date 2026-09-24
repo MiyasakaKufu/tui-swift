@@ -1,5 +1,5 @@
 /// 文字列を表示するビュー。
-public struct Text: View {
+public struct Text: PrimitiveView {
     /// 表示する文字列。
     public var content: String
     /// 文字のスタイル。

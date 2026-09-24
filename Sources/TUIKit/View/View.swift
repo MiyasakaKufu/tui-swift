@@ -37,10 +37,34 @@ public struct LayoutTraits: Hashable, Sendable {
 
 /// 画面へ描画できるもの。
 ///
+/// ビューには 2 種類ある。`body` で別のビューを組み合わせる合成ビューと、
+/// `sizeThatFits(_:context:)` と `render(into:rect:context:)` を自分で書くプリミティブ（`PrimitiveView`）。
+///
+/// ```swift
+/// struct Greeting: View {
+///     let name: String
+///
+///     var body: some View {
+///         Text("こんにちは、\(name)").bold()
+///     }
+/// }
+/// ```
+///
+/// 合成ビューは `body` だけを書けばよい。測定・描画・余白の分配は `body` のビューに任される。
+///
 /// 子を持つビューは、子の `sizeThatFits(_:context:)` と `render(into:rect:context:)` を直接呼ばず、
 /// 受け取った `RenderContext` の同名のメソッドを通して呼ぶ。
 @MainActor
 public protocol View {
+    /// `body` が返すビューの型。適合側が `some View` で書けば推論される。プリミティブでは `Never`。
+    associatedtype Body: View
+
+    /// このビューを組み立てるビュー。
+    ///
+    /// - Note: 1 フレームのうちに、測定と描画で何度も読まれる。読むたびに違うビューを返すと、
+    ///   測ったときと描いたときで中身が食い違う。
+    var body: Body { get }
+
     /// `proposal` の範囲で希望するサイズを返す。
     ///
     /// - Parameters:
@@ -65,12 +89,77 @@ public protocol View {
 }
 
 extension View {
+    /// `body` のビューが希望するサイズを返す。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: `body` のビューが希望するサイズ。
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
+        context.sizeThatFits(of: body, index: 0, proposal: proposal)
+    }
+
+    /// `body` のビューを描画する。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 描画する矩形。
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
+        context.render(body, index: 0, into: &buffer, rect: rect)
+    }
+
+    /// `body` のビューと同じ。
+    public var layoutTraits: LayoutTraits { body.layoutTraits }
+}
+
+/// `body` を持たず、自分で測定と描画を行うビュー。
+///
+/// `Text` や `VStack` のように、別のビューの組み合わせでは表せないビューがこれに適合する。
+///
+/// - Warning: `sizeThatFits(_:context:)` と `render(into:rect:context:)` を必ず書く。
+///   書かないと、合成ビュー向けの既定の実装が選ばれ、`body` を読んだところで止まる。
+@MainActor
+public protocol PrimitiveView: View where Body == Never {}
+
+extension PrimitiveView {
+    /// プリミティブには無い `body`。
+    ///
+    /// - Precondition: 読まない。読むとプログラムが止まる。
+    public var body: Never {
+        fatalError("\(Self.self) はプリミティブなので body を持たない")
+    }
+
     /// 希望サイズのまま配置される。
     public var layoutTraits: LayoutTraits { .fixed }
 }
 
+extension Never: PrimitiveView {
+    /// `Never` 自身。
+    public typealias Body = Never
+
+    /// 値が存在しないため、読まれることのない `body`。
+    public var body: Never { switch self {} }
+
+    /// 値が存在しないので呼ばれない。
+    ///
+    /// - Parameters:
+    ///   - proposal: 親から提案された領域の大きさ。
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 返らない。
+    public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { switch self {} }
+
+    /// 値が存在しないので呼ばれない。
+    ///
+    /// - Parameters:
+    ///   - buffer: 描画先のバッファ。
+    ///   - rect: 描画する矩形。
+    ///   - context: ライブラリから渡される文脈。
+    public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
+}
+
 /// 何も描画しないビュー。
-public struct EmptyView: View {
+public struct EmptyView: PrimitiveView {
     /// 何も描画しないビューを作る。
     public init() {}
 
@@ -92,7 +181,7 @@ public struct EmptyView: View {
 }
 
 /// 領域全体を 1 文字で塗りつぶすビュー。
-public struct Fill: View {
+public struct Fill: PrimitiveView {
     /// 敷き詰める文字。
     public var character: Character
     /// 文字に付けるスタイル。
@@ -131,7 +220,7 @@ public struct Fill: View {
 }
 
 /// 余白を押し広げるビュー。
-public struct Spacer: View {
+public struct Spacer: PrimitiveView {
     /// 最低限確保する長さ。
     public var minLength: Int
 
@@ -166,7 +255,7 @@ public struct Spacer: View {
 }
 
 /// 1 本の罫線。
-public struct Divider: View {
+public struct Divider: PrimitiveView {
     /// 罫線を伸ばす方向。
     public var axis: Axis
     /// 罫線に使う文字。

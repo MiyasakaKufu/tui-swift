@@ -297,7 +297,7 @@ public final class TextFieldState {
 }
 
 /// 1 行のテキスト入力欄。
-public struct TextField: View {
+public struct TextField: PrimitiveView {
     /// カーソル位置を持つ状態。`Binding` を渡さずに作った場合は内容も持つ。
     public var state: TextFieldState
     /// 空のときに表示する文字列。

@@ -16,6 +16,7 @@ public final class Application<Root: Component> {
     private let reader: InputReader
     private let renderer: Renderer
     private let eventQueue: LoopEventQueue<Root.Message>
+    private let graph = ViewGraph()
 
     /// 別スレッドや `Task` から、`Component.Message` の値をイベントループへ届ける送り口。
     ///
@@ -354,9 +355,7 @@ public final class Application<Root: Component> {
         buffer.clear()
 
         let view = root.body
-        let bounds = buffer.bounds
-        let context = RenderContext(screen: bounds, ambiguousWidth: options.ambiguousWidth)
-        view.render(into: &buffer, rect: bounds, context: context)
+        graph.renderFrame(view, into: &buffer, ambiguousWidth: options.ambiguousWidth)
         renderer.render(buffer, cursor: root.cursorPosition)
     }
 }

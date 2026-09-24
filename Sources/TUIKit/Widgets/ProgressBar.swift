@@ -1,5 +1,5 @@
 /// 進捗バー。
-public struct ProgressBar: View {
+public struct ProgressBar: PrimitiveView {
     /// 0.0 〜 1.0 に丸められた進捗。
     public var progress: Double
     /// 進んだ部分を埋める文字。

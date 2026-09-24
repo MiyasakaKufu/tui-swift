@@ -1,5 +1,5 @@
 /// 内容の周囲に余白を取るビュー。
-public struct PaddingView<Content: View>: View {
+public struct PaddingView<Content: View>: PrimitiveView {
     /// 余白の内側に置く内容。
     public var content: Content
     /// 内容の周囲に取る余白。
@@ -50,7 +50,7 @@ public struct PaddingView<Content: View>: View {
 }
 
 /// 内容を枠線で囲むビュー。
-public struct BorderView<Content: View>: View {
+public struct BorderView<Content: View>: PrimitiveView {
     /// 枠線の内側に置く内容。
     public var content: Content
     /// 枠線に使う文字の組み合わせ。
@@ -179,7 +179,7 @@ public struct BorderView<Content: View>: View {
 }
 
 /// 背景を塗るビュー。
-public struct BackgroundView<Content: View>: View {
+public struct BackgroundView<Content: View>: PrimitiveView {
     /// 背景の上に置く内容。
     public var content: Content
     /// 背景を塗るスタイル。
@@ -222,7 +222,7 @@ public struct BackgroundView<Content: View>: View {
 }
 
 /// サイズを固定するビュー。負の幅・高さは 0 に丸められる。
-public struct FrameView<Content: View>: View {
+public struct FrameView<Content: View>: PrimitiveView {
     /// 固定した領域に置く内容。
     public var content: Content
     /// 固定する幅。`nil` なら内容の希望に任せる。負の値は 0 に丸められる。
@@ -300,7 +300,7 @@ public struct FrameView<Content: View>: View {
 }
 
 /// 余白の分配ルールだけを差し替えるビュー。
-public struct FlexibleView<Content: View>: View {
+public struct FlexibleView<Content: View>: PrimitiveView {
     /// 分配ルールを差し替える対象の内容。
     public var content: Content
     /// 内容の代わりに使う、余白の分配に関する性質。
@@ -341,7 +341,7 @@ public struct FlexibleView<Content: View>: View {
 }
 
 /// 与えられた領域の中で内容を寄せるビュー。
-public struct AlignedView<Content: View>: View {
+public struct AlignedView<Content: View>: PrimitiveView {
     /// 領域の中に寄せて置く内容。
     public var content: Content
     /// 横に寄せる向き。

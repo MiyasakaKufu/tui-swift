@@ -37,7 +37,7 @@ enum OverlayLayout {
 ///
 /// 並びの後ろにあるビューほど手前に描かれる。下のビューを確実に覆うには、重ねるビューの側で
 /// `background(style:)` や `Fill` を使って領域を塗る。
-public struct ZStack: View {
+public struct ZStack: PrimitiveView {
     /// 重ねる子ビュー。先頭が最背面。
     public var children: [any View]
     /// 子ビューを横に寄せる向き。
@@ -129,7 +129,7 @@ public struct ZStack: View {
 ///
 /// 重ねるビューはサイズの計算にも余白の分配にも加わらないため、これを挟んでも親のレイアウトは
 /// 変わらない。
-public struct OverlayView<Content: View, Overlay: View>: View {
+public struct OverlayView<Content: View, Overlay: View>: PrimitiveView {
     /// 下に敷く内容。
     public var content: Content
     /// 内容の上へ重ねるビュー。
@@ -201,7 +201,7 @@ public struct OverlayView<Content: View, Overlay: View>: View {
 ///   「`rect` の外のセルは書き換えない」から外れる唯一のビュー。
 /// - Note: 重ねるビューが描かれるのは、このビューが描かれた時点。後から描かれる兄弟ビューには
 ///   上書きされるので、いちばん外側のビューへ付ける。
-public struct ScreenOverlayView<Content: View, Overlay: View>: View {
+public struct ScreenOverlayView<Content: View, Overlay: View>: PrimitiveView {
     /// 下に敷く内容。
     public var content: Content
     /// 画面全体を基準に重ねるビュー。

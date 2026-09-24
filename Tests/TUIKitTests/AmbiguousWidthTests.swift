@@ -134,7 +134,7 @@ final class AmbiguousWidthTests: XCTestCase {
 
     func testChildContextsCarryTheSetting() async {
         let root = RenderContext(screen: Rect(x: 0, y: 0, width: 1, height: 1), ambiguousWidth: .wide)
-        XCTAssertEqual(root.child(0).child(1).ambiguousWidth, .wide)
+        XCTAssertEqual(root.context(for: EmptyView(), index: 0).context(for: EmptyView(), index: 1).ambiguousWidth, .wide)
     }
 
     func testBufferPlacesAmbiguousCharactersBySetting() async {

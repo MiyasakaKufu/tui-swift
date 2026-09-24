@@ -1,21 +1,38 @@
 /// ビューツリーの中で、ビューが置かれている位置。
 ///
-/// - Invariant: 親の経路と、親の中での子の番号だけで決まる。同じ子を何度測っても、測っただけで
-///   描かなくても、描く途中で測り直しても、同じ子には同じ経路が振られる。
-struct ViewPath: Hashable, Sendable {
-    /// ルートから順に並べた、各段での子の番号。
-    private var indices: [Int]
+/// - Invariant: 親の経路と、親の中での子の番号（`id(_:)` で鍵を付けた子は鍵）だけで決まる。
+///   同じ子を何度測っても、測っただけで描かなくても、描く途中で測り直しても、同じ子には同じ経路が振られる。
+struct ViewPath: Hashable {
+    /// 経路の 1 段。
+    enum Component: Hashable {
+        /// 親の中での子の番号。
+        case index(Int)
+        /// `id(_:)` で付けた鍵。
+        case key(AnyHashable)
+    }
+
+    /// ルートから順に並べた、各段での子の位置。
+    private var components: [Component]
 
     /// ルートの経路。
-    static let root = ViewPath(indices: [])
+    static let root = ViewPath(components: [])
 
     /// 子の経路を返す。
     ///
     /// - Parameters:
-    ///   - index: 親の中での子の番号。
-    /// - Returns: この経路の下に `index` を足した経路。
-    func appending(_ index: Int) -> ViewPath {
-        ViewPath(indices: indices + [index])
+    ///   - component: 親の中での子の位置。
+    /// - Returns: この経路の下に `component` を足した経路。
+    func appending(_ component: Component) -> ViewPath {
+        ViewPath(components: components + [component])
+    }
+
+    /// `other` がこの経路と同じか、この経路の下にあるかを返す。
+    ///
+    /// - Parameters:
+    ///   - other: 調べる経路。
+    /// - Returns: `other` がこの経路で始まるなら `true`。
+    func contains(_ other: ViewPath) -> Bool {
+        other.components.starts(with: components)
     }
 }
 
@@ -33,8 +50,14 @@ struct ViewPath: Hashable, Sendable {
 ///   `children` の並びのように、子の位置で決まる値を使う。
 @MainActor
 public struct RenderContext {
+    /// このビューのノード。
+    let node: ViewNode
+
+    /// ノードを持つグラフ。
+    let graph: ViewGraph
+
     /// このビューの経路。
-    let path: ViewPath
+    var path: ViewPath { node.path }
 
     /// 画面全体の矩形。
     ///
@@ -55,21 +78,31 @@ public struct RenderContext {
     ///   - ambiguousWidth: 曖昧幅の文字の扱い。
     /// - Precondition: `ambiguousWidth` が描画先のバッファの `ambiguousWidth` と同じ。
     ///   違うと、ビューが測った幅とバッファに置かれるセルの桁が食い違う。
+    /// - Note: 作るたびに新しいノードのグラフを使う。前に作った文脈で辿ったビューとは、
+    ///   同じ位置にあっても同一性を共有しない。
     public init(
         screen: Rect,
         ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) {
-        self.init(path: .root, screen: screen, ambiguousWidth: ambiguousWidth)
+        let graph = ViewGraph()
+        self.init(
+            node: graph.node(at: .root, viewType: nil),
+            graph: graph,
+            screen: screen,
+            ambiguousWidth: ambiguousWidth
+        )
     }
 
-    /// 経路を指定して文脈を作る。
+    /// ノードを指定して文脈を作る。
     ///
     /// - Parameters:
-    ///   - path: 文脈を渡すビューの経路。
+    ///   - node: 文脈を渡すビューのノード。
+    ///   - graph: `node` を持つグラフ。
     ///   - screen: 画面全体の矩形。
     ///   - ambiguousWidth: 曖昧幅の文字の扱い。
-    private init(path: ViewPath, screen: Rect, ambiguousWidth: DisplayWidth.AmbiguousWidth) {
-        self.path = path
+    init(node: ViewNode, graph: ViewGraph, screen: Rect, ambiguousWidth: DisplayWidth.AmbiguousWidth) {
+        self.node = node
+        self.graph = graph
         self.screen = screen
         self.ambiguousWidth = ambiguousWidth
     }
@@ -77,10 +110,18 @@ public struct RenderContext {
     /// 子のビューへ渡す文脈を返す。
     ///
     /// - Parameters:
+    ///   - child: 文脈を渡す子のビュー。
     ///   - index: 親の中での子の番号。
-    /// - Returns: 経路に `index` を足した文脈。
-    func child(_ index: Int) -> RenderContext {
-        RenderContext(path: path.appending(index), screen: screen, ambiguousWidth: ambiguousWidth)
+    /// - Returns: 子のノードを持つ文脈。`child` に鍵が付いていれば、経路には `index` の代わりに鍵を足す。
+    func context(for child: some View, index: Int) -> RenderContext {
+        let component: ViewPath.Component
+        if let identified = child as? any ExplicitlyIdentified {
+            component = .key(identified.identityKey)
+        } else {
+            component = .index(index)
+        }
+        let node = graph.node(at: path.appending(component), viewType: type(of: child))
+        return RenderContext(node: node, graph: graph, screen: screen, ambiguousWidth: ambiguousWidth)
     }
 
     /// 子のビューが希望するサイズを返す。
@@ -91,7 +132,7 @@ public struct RenderContext {
     ///   - proposal: 子へ提案する領域の大きさ。
     /// - Returns: 子が希望するサイズ。
     public func sizeThatFits(of child: some View, index: Int, proposal: Size) -> Size {
-        child.sizeThatFits(proposal, context: self.child(index))
+        child.sizeThatFits(proposal, context: context(for: child, index: index))
     }
 
     /// 子のビューを描画する。
@@ -102,6 +143,6 @@ public struct RenderContext {
     ///   - buffer: 描画先のバッファ。
     ///   - rect: 子を描画する矩形。
     public func render(_ child: some View, index: Int, into buffer: inout Buffer, rect: Rect) {
-        child.render(into: &buffer, rect: rect, context: self.child(index))
+        child.render(into: &buffer, rect: rect, context: context(for: child, index: index))
     }
 }
