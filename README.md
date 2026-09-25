@@ -185,7 +185,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 
 1. `Application` が `Component.body` を読んで `View` のツリーを組み立てる。
 2. ツリーを `Buffer`（`Cell` の二次元配列）へ描画する。親は子を直接呼ばず、
-   `RenderContext` を通して測り、描く。`body` を持つビューは、その `body` を測り、描く。
+   `RenderContext` を通して測り、重みを読み、描く。`body` を持つビューは、その `body` を測り、描く。
    ビューの同一性は親の中での位置（`.id(_:)` を付けたビューは鍵）で決まり、フレームをまたいで保たれる。
 3. `Renderer` が前フレームの `Buffer` と比較し、変わったセルだけを書き出す。
 
@@ -217,7 +217,7 @@ func handle(_ event: InputEvent) -> EventResult {
 
 ### レイアウトの規則
 
-各ビューは `sizeThatFits(_:context:)` で希望サイズを返し、`layoutTraits` で
+各ビューは `sizeThatFits(_:context:)` で希望サイズを返し、`layoutTraits(context:)` で
 「余った領域を引き取る重み」を表す。スタックは次の順で領域を配る。
 
 1. 重み 0 のビューに希望サイズを割り当てる。

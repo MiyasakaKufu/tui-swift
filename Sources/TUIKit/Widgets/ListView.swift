@@ -316,8 +316,12 @@ public struct ListView: PrimitiveView {
         state.itemCount = items.count
     }
 
-    /// 両方向に伸びる。
-    public var layoutTraits: LayoutTraits { .flexible }
+    /// 両方向に伸びる性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 常に `.flexible`。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits { .flexible }
 
     /// すべての項目を並べたときに必要なサイズを返す。
     ///

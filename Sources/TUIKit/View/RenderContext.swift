@@ -38,7 +38,7 @@ struct ViewPath: Hashable {
 
 /// ビューがサイズを測り、描画するときに、ライブラリから渡される文脈。
 ///
-/// 子を測るのも描くのも、子のメソッドを直接呼ばずに、この文脈を通す。
+/// 子を測るのも、子の重みを読むのも、子を描くのも、子のメソッドを直接呼ばずに、この文脈を通す。
 ///
 /// ```swift
 /// func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
@@ -133,6 +133,16 @@ public struct RenderContext {
     /// - Returns: 子が希望するサイズ。
     public func sizeThatFits(of child: some View, index: Int, proposal: Size) -> Size {
         child.sizeThatFits(proposal, context: context(for: child, index: index))
+    }
+
+    /// 子のビューの、余白の分配に関する性質を返す。
+    ///
+    /// - Parameters:
+    ///   - child: 性質を読む子のビュー。
+    ///   - index: 親の中での子の番号。
+    /// - Returns: 子の性質。
+    public func layoutTraits(of child: some View, index: Int) -> LayoutTraits {
+        child.layoutTraits(context: context(for: child, index: index))
     }
 
     /// 子のビューを描画する。

@@ -52,8 +52,8 @@ public struct LayoutTraits: Hashable, Sendable {
 ///
 /// 合成ビューは `body` だけを書けばよい。測定・描画・余白の分配は `body` のビューに任される。
 ///
-/// 子を持つビューは、子の `sizeThatFits(_:context:)` と `render(into:rect:context:)` を直接呼ばず、
-/// 受け取った `RenderContext` の同名のメソッドを通して呼ぶ。
+/// 子を持つビューは、子の `sizeThatFits(_:context:)`・`render(into:rect:context:)`・
+/// `layoutTraits(context:)` を直接呼ばず、受け取った `RenderContext` の同名のメソッドを通して呼ぶ。
 @MainActor
 public protocol View {
     /// `body` が返すビューの型。適合側が `some View` で書けば推論される。プリミティブでは `Never`。
@@ -84,8 +84,12 @@ public protocol View {
     ///   `ScreenOverlayView` だけが、この約束から外れる。
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext)
 
-    /// 余白の分配に関する性質。
-    var layoutTraits: LayoutTraits { get }
+    /// 余白の分配に関する性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 余白の分配に関する性質。
+    func layoutTraits(context: RenderContext) -> LayoutTraits
 }
 
 extension View {
@@ -109,8 +113,14 @@ extension View {
         context.render(body, index: 0, into: &buffer, rect: rect)
     }
 
-    /// `body` のビューと同じ。
-    public var layoutTraits: LayoutTraits { body.layoutTraits }
+    /// `body` のビューの性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: `body` のビューの、余白の分配に関する性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        context.layoutTraits(of: body, index: 0)
+    }
 }
 
 /// `body` を持たず、自分で測定と描画を行うビュー。
@@ -130,8 +140,12 @@ extension PrimitiveView {
         fatalError("\(Self.self) はプリミティブなので body を持たない")
     }
 
-    /// 希望サイズのまま配置される。
-    public var layoutTraits: LayoutTraits { .fixed }
+    /// 希望サイズのまま配置される性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 常に `.fixed`。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits { .fixed }
 }
 
 extension Never: PrimitiveView {
@@ -197,8 +211,12 @@ public struct Fill: PrimitiveView {
         self.style = style
     }
 
-    /// 両方向に伸びる。
-    public var layoutTraits: LayoutTraits { .flexible }
+    /// 両方向に伸びる性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 常に `.flexible`。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits { .flexible }
 
     /// 提案された領域をそのまま受け取る。
     ///
@@ -232,8 +250,12 @@ public struct Spacer: PrimitiveView {
         self.minLength = max(0, minLength)
     }
 
-    /// 両方向に伸びる。
-    public var layoutTraits: LayoutTraits { .flexible }
+    /// 両方向に伸びる性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 常に `.flexible`。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits { .flexible }
 
     /// 最低限の長さだけを希望する。
     ///
@@ -275,8 +297,12 @@ public struct Divider: PrimitiveView {
         self.style = style
     }
 
-    /// 罫線を伸ばす方向にだけ伸びる。
-    public var layoutTraits: LayoutTraits {
+    /// 罫線を伸ばす方向にだけ伸びる性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: `axis` の方向の重みだけが 1 の性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
         switch axis {
         case .horizontal: return LayoutTraits(horizontalFlex: 1, verticalFlex: 0)
         case .vertical: return LayoutTraits(horizontalFlex: 0, verticalFlex: 1)
