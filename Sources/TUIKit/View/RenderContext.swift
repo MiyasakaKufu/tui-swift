@@ -79,7 +79,9 @@ public struct RenderContext {
     /// - Precondition: `ambiguousWidth` が描画先のバッファの `ambiguousWidth` と同じ。
     ///   違うと、ビューが測った幅とバッファに置かれるセルの桁が食い違う。
     /// - Note: 作るたびに新しいノードのグラフを使う。前に作った文脈で辿ったビューとは、
-    ///   同じ位置にあっても同一性を共有しない。
+    ///   同じ位置にあっても同一性を共有せず、`State` の記憶域も共有しない。
+    /// - Note: この文脈を直接渡したビュー自身の `State` は、記憶域に結び付かず初期値のままになる。
+    ///   結び付くのは、この文脈を通して測り、重みを読み、描いた子から下。
     public init(
         screen: Rect,
         ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
@@ -113,6 +115,7 @@ public struct RenderContext {
     ///   - child: 文脈を渡す子のビュー。
     ///   - index: 親の中での子の番号。
     /// - Returns: 子のノードを持つ文脈。`child` に鍵が付いていれば、経路には `index` の代わりに鍵を足す。
+    /// - Postcondition: `child` の `State` が、子のノードの記憶域へ結び付いている。
     func context(for child: some View, index: Int) -> RenderContext {
         let component: ViewPath.Component
         if let identified = child as? any ExplicitlyIdentified {
@@ -121,6 +124,7 @@ public struct RenderContext {
             component = .index(index)
         }
         let node = graph.node(at: path.appending(component), viewType: type(of: child))
+        graph.bindState(of: child, to: node)
         return RenderContext(node: node, graph: graph, screen: screen, ambiguousWidth: ambiguousWidth)
     }
 

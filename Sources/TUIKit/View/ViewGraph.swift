@@ -1,6 +1,7 @@
 /// フレームをまたいで保持される、ビュー 1 つ分の記録。
 ///
 /// - Invariant: `path` と `viewType` が同じビューが毎フレーム辿られる間は、同じノードが使われ続ける。
+///   ノードが持つ `State` の記憶域も同じものが使われ続ける。
 @MainActor
 final class ViewNode {
     /// ビューの同一性。ノードを作り直すと別の値になる。
@@ -11,6 +12,8 @@ final class ViewNode {
     let viewType: ObjectIdentifier?
     /// 最後に辿られたフレームの番号。
     var lastVisitedFrame: Int
+    /// ビューの `State` の記憶域。プロパティの名前ごとに持つ。
+    private var states: [String: AnyObject] = [:]
 
     /// ノードを作る。
     ///
@@ -25,12 +28,27 @@ final class ViewNode {
         self.viewType = viewType
         self.lastVisitedFrame = frame
     }
+
+    /// `label` の記憶域を返す。無ければ作る。
+    ///
+    /// - Parameters:
+    ///   - label: ビューの中でのプロパティの名前。
+    ///   - initialValue: 記憶域を作るときの値。
+    /// - Returns: `label` の記憶域。
+    func storage<Value>(for label: String, initialValue: Value) -> StateStorage<Value> {
+        if let storage = states[label] as? StateStorage<Value> {
+            return storage
+        }
+        let storage = StateStorage(initialValue)
+        states[label] = storage
+        return storage
+    }
 }
 
 /// ビューのノードを、経路ごとにフレームをまたいで保持するもの。
 ///
 /// 1 フレームは `renderFrame(_:into:ambiguousWidth:)` で描く。そのフレームで辿られた位置のノードは
-/// 次のフレームへ持ち越し、辿られなかったノードは捨てる。
+/// 次のフレームへ持ち越し、辿られなかったノードは、持っている `State` の記憶域ごと捨てる。
 @MainActor
 final class ViewGraph {
     /// 経路ごとのノード。
@@ -39,6 +57,8 @@ final class ViewGraph {
     private var frame = 0
     /// 次に作るノードの同一性。
     private var nextID = 0
+    /// `State` を持たないと分かったビューの型。
+    private var typesWithoutState: Set<ObjectIdentifier> = []
 
     /// 保持しているノードの数。
     var nodeCount: Int { nodes.count }
@@ -68,13 +88,34 @@ final class ViewGraph {
         return node
     }
 
+    /// `view` の `State` を、`node` の記憶域へ結び付ける。
+    ///
+    /// - Parameters:
+    ///   - view: 結び付けるビュー。
+    ///   - node: `view` のノード。
+    /// - Note: 見るのは `view` が直接持つ格納プロパティだけ。別の構造体の中に置いた `State` は結び付かない。
+    func bindState(of view: some View, to node: ViewNode) {
+        let viewType = ObjectIdentifier(type(of: view))
+        guard !typesWithoutState.contains(viewType) else { return }
+
+        var hasState = false
+        for child in Mirror(reflecting: view).children {
+            guard let label = child.label, let property = child.value as? any StateProperty else { continue }
+            property.bind(to: node, label: label)
+            hasState = true
+        }
+        if !hasState {
+            typesWithoutState.insert(viewType)
+        }
+    }
+
     /// `view` をルートとして 1 フレーム分を描く。
     ///
     /// - Parameters:
     ///   - view: ルートのビュー。
     ///   - buffer: 描画先のバッファ。画面全体として扱う。
     ///   - ambiguousWidth: 曖昧幅の文字の扱い。
-    /// - Postcondition: このフレームで辿られなかった位置のノードを捨てる。
+    /// - Postcondition: このフレームで辿られなかった位置のノードを、`State` の記憶域ごと捨てる。
     func renderFrame(
         _ view: some View,
         into buffer: inout Buffer,
@@ -83,8 +124,10 @@ final class ViewGraph {
         frame += 1
 
         let bounds = buffer.bounds
+        let rootNode = node(at: .root, viewType: type(of: view))
+        bindState(of: view, to: rootNode)
         let context = RenderContext(
-            node: node(at: .root, viewType: type(of: view)),
+            node: rootNode,
             graph: self,
             screen: bounds,
             ambiguousWidth: ambiguousWidth
