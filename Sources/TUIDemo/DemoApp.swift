@@ -27,7 +27,6 @@ final class DemoApp: TerminalApp {
     ]
 
     private var selection = 0
-    private var name = ""
     private let listState = ListState()
     private let inputState = TextFieldState()
     private var progress = 0.35
@@ -51,7 +50,6 @@ final class DemoApp: TerminalApp {
                     lastEventDescription: lastEventDescription,
                     progress: progress,
                     isEditing: isEditing,
-                    name: Binding(self, \.name),
                     inputState: inputState
                 )
                     .border(.rounded, title: "詳細")
@@ -170,8 +168,8 @@ private struct Detail: View {
     let lastEventDescription: String
     let progress: Double
     let isEditing: Bool
-    let name: Binding<String>
     let inputState: TextFieldState
+    @State var name = ""
 
     var body: some View {
         VStack(spacing: 1) {
@@ -186,9 +184,9 @@ private struct Detail: View {
 
             VStack(spacing: 0) {
                 Text(isEditing ? "入力中（Tab で戻る）" : "Tab で入力に切り替え").dim()
-                Text("入力した文字数: \(name.wrappedValue.count)").dim()
+                Text("入力した文字数: \(name.count)").dim()
                 TextField(
-                    text: name,
+                    text: $name,
                     state: inputState,
                     placeholder: "ここに入力…",
                     showsCursor: !isEditing

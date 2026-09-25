@@ -15,8 +15,14 @@ public struct PaddingView<Content: View>: PrimitiveView {
         self.insets = insets
     }
 
-    /// 内容と同じ。
-    public var layoutTraits: LayoutTraits { content.layoutTraits }
+    /// 内容の性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 内容の、余白の分配に関する性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        context.layoutTraits(of: content, index: 0)
+    }
 
     /// 余白の分を足した希望サイズを返す。
     ///
@@ -84,8 +90,14 @@ public struct BorderView<Content: View>: PrimitiveView {
         self.titleStyle = titleStyle
     }
 
-    /// 内容と同じ。
-    public var layoutTraits: LayoutTraits { content.layoutTraits }
+    /// 内容の性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 内容の、余白の分配に関する性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        context.layoutTraits(of: content, index: 0)
+    }
 
     /// 枠線の 2 桁・2 行を足した希望サイズを返す。
     ///
@@ -195,8 +207,14 @@ public struct BackgroundView<Content: View>: PrimitiveView {
         self.style = style
     }
 
-    /// 内容と同じ。
-    public var layoutTraits: LayoutTraits { content.layoutTraits }
+    /// 内容の性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 内容の、余白の分配に関する性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        context.layoutTraits(of: content, index: 0)
+    }
 
     /// 内容の希望サイズをそのまま返す。
     ///
@@ -260,11 +278,16 @@ public struct FrameView<Content: View>: PrimitiveView {
         self.verticalAlignment = verticalAlignment
     }
 
-    /// サイズを固定した方向は伸びず、固定していない方向は内容と同じ。
-    public var layoutTraits: LayoutTraits {
-        LayoutTraits(
-            horizontalFlex: width == nil ? content.layoutTraits.horizontalFlex : 0,
-            verticalFlex: height == nil ? content.layoutTraits.verticalFlex : 0
+    /// サイズを固定した方向は伸びず、固定していない方向は内容と同じ性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 固定した方向の重みを 0 にした、内容の性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        let traits = context.layoutTraits(of: content, index: 0)
+        return LayoutTraits(
+            horizontalFlex: width == nil ? traits.horizontalFlex : 0,
+            verticalFlex: height == nil ? traits.verticalFlex : 0
         )
     }
 
@@ -316,8 +339,12 @@ public struct FlexibleView<Content: View>: PrimitiveView {
         self.traits = traits
     }
 
-    /// `traits` に差し替えた性質。
-    public var layoutTraits: LayoutTraits { traits }
+    /// `traits` に差し替えた性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: `traits`。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits { traits }
 
     /// 内容の希望サイズをそのまま返す。
     ///
@@ -361,8 +388,12 @@ public struct AlignedView<Content: View>: PrimitiveView {
         self.vertical = vertical
     }
 
-    /// 両方向に伸びる。
-    public var layoutTraits: LayoutTraits { .flexible }
+    /// 両方向に伸びる性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 常に `.flexible`。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits { .flexible }
 
     /// 提案された領域をそのまま受け取る。
     ///

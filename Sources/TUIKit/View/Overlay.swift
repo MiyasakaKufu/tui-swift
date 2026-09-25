@@ -20,7 +20,7 @@ enum OverlayLayout {
         vertical: VerticalAlignment,
         context: RenderContext
     ) -> Rect {
-        let traits = child.layoutTraits
+        let traits = context.layoutTraits(of: child, index: index)
         let desired = context.sizeThatFits(of: child, index: index, proposal: rect.size)
         let width = traits.horizontalFlex > 0 ? rect.width : min(desired.width, rect.width)
         let height = traits.verticalFlex > 0 ? rect.height : min(desired.height, rect.height)
@@ -77,11 +77,16 @@ public struct ZStack: PrimitiveView {
         self.vertical = vertical
     }
 
-    /// 子ビューのうち最も大きい重み。
-    public var layoutTraits: LayoutTraits {
-        LayoutTraits(
-            horizontalFlex: children.map { $0.layoutTraits.horizontalFlex }.max() ?? 0,
-            verticalFlex: children.map { $0.layoutTraits.verticalFlex }.max() ?? 0
+    /// 子ビューのうち最も大きい重みを返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 方向ごとに、子ビューの重みの最大をとった性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        let traits = children.enumerated().map { context.layoutTraits(of: $1, index: $0) }
+        return LayoutTraits(
+            horizontalFlex: traits.map(\.horizontalFlex).max() ?? 0,
+            verticalFlex: traits.map(\.verticalFlex).max() ?? 0
         )
     }
 
@@ -158,8 +163,14 @@ public struct OverlayView<Content: View, Overlay: View>: PrimitiveView {
         self.vertical = vertical
     }
 
-    /// 内容と同じ。
-    public var layoutTraits: LayoutTraits { content.layoutTraits }
+    /// 内容の性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 内容の、余白の分配に関する性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        context.layoutTraits(of: content, index: 0)
+    }
 
     /// 内容の希望サイズをそのまま返す。
     ///
@@ -230,8 +241,14 @@ public struct ScreenOverlayView<Content: View, Overlay: View>: PrimitiveView {
         self.vertical = vertical
     }
 
-    /// 内容と同じ。
-    public var layoutTraits: LayoutTraits { content.layoutTraits }
+    /// 内容の性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 内容の、余白の分配に関する性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        context.layoutTraits(of: content, index: 0)
+    }
 
     /// 内容の希望サイズをそのまま返す。
     ///

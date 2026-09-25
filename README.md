@@ -177,7 +177,7 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 | 入力 | `InputParser`, `InputReader`, `KeyEvent`, `MouseEvent` | バイト列からイベントへの増分解析 |
 | 描画 | `Buffer`, `Cell`, `Renderer`, `Style` | セル単位の画面バッファと差分出力 |
 | 文字 | `DisplayWidth`, `TextWrapping`, `TabExpansion` | 表示幅の計算、折り返し、タブの展開 |
-| ビュー | `View`, `PrimitiveView`, `VStack`, `HStack`, `ZStack`, `Text`, 各種修飾子 | レイアウトと描画 |
+| ビュー | `View`, `PrimitiveView`, `State`, `VStack`, `HStack`, `ZStack`, `Text`, 各種修飾子 | レイアウトと描画 |
 | 部品 | `ListView`, `TextField`, `ProgressBar`, `Binding` | 状態を持つウィジェットと、アプリの値を渡す口 |
 | 実行 | `TerminalApp`, `Application`, `Component` | エントリポイントとイベントループ |
 
@@ -185,15 +185,16 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
 
 1. `Application` が `Component.body` を読んで `View` のツリーを組み立てる。
 2. ツリーを `Buffer`（`Cell` の二次元配列）へ描画する。親は子を直接呼ばず、
-   `RenderContext` を通して測り、描く。`body` を持つビューは、その `body` を測り、描く。
+   `RenderContext` を通して測り、重みを読み、描く。`body` を持つビューは、その `body` を測り、描く。
    ビューの同一性は親の中での位置（`.id(_:)` を付けたビューは鍵）で決まり、フレームをまたいで保たれる。
 3. `Renderer` が前フレームの `Buffer` と比較し、変わったセルだけを書き出す。
 
-ビューは値型で状態を持たない。状態は次の 2 つに分けて置く。
+ビューは値型で、毎フレーム作り直される。状態は次のように分けて置く。
 
 | 種類 | 例 | 置き場所 |
 | --- | --- | --- |
-| 値 | 入力欄の内容、リストの選択位置 | アプリ（`Component` のプロパティ）。`Binding` で部品に渡す |
+| 値（複数のビューやイベントの処理で使う） | リストの選択位置 | アプリ（`Component` のプロパティ）。`Binding` で部品に渡す |
+| 値（1 つのビューの中だけで使う） | 入力欄の内容 | ビューの `@State`。`$` で得た `Binding` を部品に渡す |
 | 表示状態 | カーソル位置、スクロール位置、直前に描いた矩形 | `TextFieldState` / `ListState`。`Component` が保持する |
 
 ```swift
@@ -212,12 +213,32 @@ func handle(_ event: InputEvent) -> EventResult {
 `Binding` は読み出しと書き戻しの組を持つ値型で、`Binding(get:set:)` でも作れる。
 部品が書き戻すのはイベントの処理の中だけで、描画の中では書き戻さない。
 
+1 つのビューの中だけで使う値は、アプリへ持ち上げずに `@State` で持てる。
+
+```swift
+struct NameForm: View {
+    let inputState: TextFieldState
+    @State var name = ""
+
+    var body: some View {
+        VStack {
+            TextField(text: $name, state: inputState)
+            Text("\(name.count) 文字")
+        }
+    }
+}
+```
+
+`@State` の値はビューの構造体ではなく、ライブラリがビューの同一性ごとに持つ記憶域に置かれ、
+フレームをまたいで残る。あるフレームで測られも、重みを読まれも、描かれもしなかったビューの記憶域は、そのフレームの終わりに捨てる。
+同じ位置に別の型のビューが来たときも捨てる。
+
 `Binding` を渡さない `TextField(state:)` / `ListView(items:state:)` も残している。
 こちらは値も状態のクラスが持ち、`inputState.text` や `listState.selectedIndex` で読む。
 
 ### レイアウトの規則
 
-各ビューは `sizeThatFits(_:context:)` で希望サイズを返し、`layoutTraits` で
+各ビューは `sizeThatFits(_:context:)` で希望サイズを返し、`layoutTraits(context:)` で
 「余った領域を引き取る重み」を表す。スタックは次の順で領域を配る。
 
 1. 重み 0 のビューに希望サイズを割り当てる。

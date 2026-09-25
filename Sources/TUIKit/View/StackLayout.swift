@@ -40,7 +40,7 @@ enum StackLayout {
         // 伸びるビューには主軸 0 を提案し、最小サイズだけを先に確保する。
         // 余りは後から重みに応じて配るので、先着順に領域を食い尽くすことがない。
         var sizes = children.enumerated().map { (index, child) -> Int in
-            let isFlexible = child.layoutTraits.flex(on: axis) > 0
+            let isFlexible = context.layoutTraits(of: child, index: index).flex(on: axis) > 0
             let desired = context.sizeThatFits(
                 of: child,
                 index: index,
@@ -52,7 +52,7 @@ enum StackLayout {
 
         let total = sizes.reduce(0, +)
         if total < content {
-            distribute(extra: content - total, to: &sizes, children: children, axis: axis)
+            distribute(extra: content - total, to: &sizes, children: children, axis: axis, context: context)
         } else if total > content {
             shrink(by: total - content, sizes: &sizes)
         }
@@ -66,9 +66,16 @@ enum StackLayout {
     ///   - sizes: 配り先のサイズ。重みを持つ要素だけが増える。
     ///   - children: `sizes` に対応する子ビュー。
     ///   - axis: 重みを読む軸。
+    ///   - context: 親が受け取った文脈。
     /// - Postcondition: 重みを持つ子が 1 つ以上あれば、`extra` をすべて配り切る。
-    private static func distribute(extra: Int, to sizes: inout [Int], children: [any View], axis: Axis) {
-        let weights = children.map { $0.layoutTraits.flex(on: axis) }
+    private static func distribute(
+        extra: Int,
+        to sizes: inout [Int],
+        children: [any View],
+        axis: Axis,
+        context: RenderContext
+    ) {
+        let weights = children.enumerated().map { context.layoutTraits(of: $1, index: $0).flex(on: axis) }
         let totalWeight = weights.reduce(0, +)
         guard totalWeight > 0 else { return }
 
@@ -144,11 +151,16 @@ public struct VStack: PrimitiveView {
         self.alignment = alignment
     }
 
-    /// 子ビューのうち最も大きい重み。
-    public var layoutTraits: LayoutTraits {
-        LayoutTraits(
-            horizontalFlex: children.map { $0.layoutTraits.horizontalFlex }.max() ?? 0,
-            verticalFlex: children.map { $0.layoutTraits.verticalFlex }.max() ?? 0
+    /// 子ビューのうち最も大きい重みを返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 方向ごとに、子ビューの重みの最大をとった性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        let traits = children.enumerated().map { context.layoutTraits(of: $1, index: $0) }
+        return LayoutTraits(
+            horizontalFlex: traits.map(\.horizontalFlex).max() ?? 0,
+            verticalFlex: traits.map(\.verticalFlex).max() ?? 0
         )
     }
 
@@ -204,7 +216,7 @@ public struct VStack: PrimitiveView {
                     index: index,
                     proposal: Size(width: rect.width, height: height)
                 )
-                let width = child.layoutTraits.horizontalFlex > 0
+                let width = context.layoutTraits(of: child, index: index).horizontalFlex > 0
                     ? rect.width
                     : min(desired.width, rect.width)
                 let x = rect.minX + alignment.offset(content: width, available: rect.width)
@@ -253,11 +265,16 @@ public struct HStack: PrimitiveView {
         self.alignment = alignment
     }
 
-    /// 子ビューのうち最も大きい重み。
-    public var layoutTraits: LayoutTraits {
-        LayoutTraits(
-            horizontalFlex: children.map { $0.layoutTraits.horizontalFlex }.max() ?? 0,
-            verticalFlex: children.map { $0.layoutTraits.verticalFlex }.max() ?? 0
+    /// 子ビューのうち最も大きい重みを返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 方向ごとに、子ビューの重みの最大をとった性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        let traits = children.enumerated().map { context.layoutTraits(of: $1, index: $0) }
+        return LayoutTraits(
+            horizontalFlex: traits.map(\.horizontalFlex).max() ?? 0,
+            verticalFlex: traits.map(\.verticalFlex).max() ?? 0
         )
     }
 
@@ -313,7 +330,7 @@ public struct HStack: PrimitiveView {
                     index: index,
                     proposal: Size(width: width, height: rect.height)
                 )
-                let height = child.layoutTraits.verticalFlex > 0
+                let height = context.layoutTraits(of: child, index: index).verticalFlex > 0
                     ? rect.height
                     : min(desired.height, rect.height)
                 let y = rect.minY + alignment.offset(content: height, available: rect.height)

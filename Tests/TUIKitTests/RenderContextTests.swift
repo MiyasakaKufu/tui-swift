@@ -8,6 +8,8 @@ private final class PathLog {
     var measured: [String: Set<ViewPath>] = [:]
     /// 描かれたときの経路。描かれた順に並ぶ。
     var rendered: [String: [ViewPath]] = [:]
+    /// 余白の分配に関する性質を読まれたときの経路。
+    var traitsRead: [String: Set<ViewPath>] = [:]
 }
 
 /// 渡された文脈の経路を記録するビュー。
@@ -17,7 +19,17 @@ private struct PathProbe: PrimitiveView {
     /// 記録先。
     let log: PathLog
     /// 余白の分配に関する性質。
-    var layoutTraits: LayoutTraits = .fixed
+    var traits: LayoutTraits = .fixed
+
+    /// 経路を記録し、`traits` を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: `traits`。
+    func layoutTraits(context: RenderContext) -> LayoutTraits {
+        log.traitsRead[name, default: []].insert(context.path)
+        return traits
+    }
 
     /// 経路を記録し、1 桁・1 行を希望する。
     ///
@@ -54,10 +66,10 @@ final class RenderContextTests: XCTestCase {
         let log = PathLog()
         let view = VStack {
             PathProbe(name: "fixed", log: log)
-            PathProbe(name: "flexible", log: log, layoutTraits: .flexible)
+            PathProbe(name: "flexible", log: log, traits: .flexible)
             HStack {
                 PathProbe(name: "left", log: log)
-                PathProbe(name: "right", log: log, layoutTraits: .flexible)
+                PathProbe(name: "right", log: log, traits: .flexible)
             }
             .padding(1)
             .border()
@@ -85,6 +97,32 @@ final class RenderContextTests: XCTestCase {
         XCTAssertEqual(Set(paths).count, names.count, "別の子に同じ経路が振られた")
     }
 
+    func testTraitsAreReadAtSamePathAsLayoutAndRender() async {
+        let log = PathLog()
+        let view = VStack {
+            PathProbe(name: "fixed", log: log)
+            HStack {
+                PathProbe(name: "left", log: log)
+                PathProbe(name: "right", log: log, traits: .flexible)
+            }
+            .padding(1)
+            .border()
+            .frame(height: 3)
+            ZStack {
+                PathProbe(name: "back", log: log)
+            }
+        }
+        .screenOverlay(PathProbe(name: "dialog", log: log))
+
+        draw(view, width: 20, height: 20)
+
+        for name in ["fixed", "left", "right", "back", "dialog"] {
+            let read = log.traitsRead[name] ?? []
+            XCTAssertEqual(read.count, 1, "\(name) の性質が 1 つの経路で読まれていない")
+            XCTAssertEqual(read, log.measured[name], "\(name) の性質を読んだ経路が、測った経路と違う")
+        }
+    }
+
     func testChildMeasuredButNotDrawnKeepsPathWhenDrawnLater() async {
         let log = PathLog()
         let view = VStack {
@@ -105,7 +143,7 @@ final class RenderContextTests: XCTestCase {
         let log = PathLog()
         let view = HStack {
             PathProbe(name: "a", log: log)
-            PathProbe(name: "b", log: log, layoutTraits: .flexible)
+            PathProbe(name: "b", log: log, traits: .flexible)
         }
 
         draw(view, width: 10, height: 1)

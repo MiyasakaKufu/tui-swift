@@ -21,4 +21,11 @@ extension View {
         let context = RenderContext(screen: Rect(origin: Point(x: 0, y: 0), size: proposal))
         return sizeThatFits(proposal, context: context)
     }
+
+    /// ルートのビューとして読んだときの、余白の分配に関する性質を返す。
+    ///
+    /// - Returns: 余白の分配に関する性質。
+    func layoutTraitsAsRoot() -> LayoutTraits {
+        layoutTraits(context: RenderContext(screen: .zero))
+    }
 }

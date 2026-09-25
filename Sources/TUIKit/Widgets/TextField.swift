@@ -360,8 +360,14 @@ public struct TextField: PrimitiveView {
         self.showsCursor = showsCursor
     }
 
-    /// 横方向にだけ伸びる。
-    public var layoutTraits: LayoutTraits { LayoutTraits(horizontalFlex: 1, verticalFlex: 0) }
+    /// 横方向にだけ伸びる性質を返す。
+    ///
+    /// - Parameters:
+    ///   - context: ライブラリから渡される文脈。
+    /// - Returns: 横方向の重みだけが 1 の性質。
+    public func layoutTraits(context: RenderContext) -> LayoutTraits {
+        LayoutTraits(horizontalFlex: 1, verticalFlex: 0)
+    }
 
     /// 与えられた幅いっぱい、高さ 1 行を希望する。
     ///

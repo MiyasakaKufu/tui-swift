@@ -106,8 +106,8 @@ final class ViewBodyTests: XCTestCase {
     }
 
     func testCompositeViewTakesLayoutTraitsFromItsBody() async {
-        XCTAssertEqual(Stretch().layoutTraits, .flexible)
-        XCTAssertEqual(Badge(label: "a").layoutTraits, .fixed)
+        XCTAssertEqual(Stretch().layoutTraitsAsRoot(), .flexible)
+        XCTAssertEqual(Badge(label: "a").layoutTraitsAsRoot(), .fixed)
 
         var buffer = Buffer(size: Size(width: 3, height: 2))
         VStack {

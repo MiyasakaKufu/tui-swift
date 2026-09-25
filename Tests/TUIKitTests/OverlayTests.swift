@@ -47,7 +47,7 @@ final class OverlayTests: XCTestCase {
         let proposal = Size(width: 10, height: 10)
 
         XCTAssertEqual(view.sizeThatFitsAsRoot(proposal), content.sizeThatFitsAsRoot(proposal))
-        XCTAssertEqual(view.layoutTraits, content.layoutTraits)
+        XCTAssertEqual(view.layoutTraitsAsRoot(), content.layoutTraitsAsRoot())
     }
 
     func testOverlayDoesNotMoveSiblings() async {
@@ -82,7 +82,7 @@ final class OverlayTests: XCTestCase {
         let proposal = Size(width: 10, height: 10)
 
         XCTAssertEqual(view.sizeThatFitsAsRoot(proposal), content.sizeThatFitsAsRoot(proposal))
-        XCTAssertEqual(view.layoutTraits, content.layoutTraits)
+        XCTAssertEqual(view.layoutTraitsAsRoot(), content.layoutTraitsAsRoot())
     }
 
     func testScreenOverlayAlignsToScreenEdge() async {
