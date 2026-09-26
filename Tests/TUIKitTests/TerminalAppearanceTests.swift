@@ -67,8 +67,8 @@ final class TerminalAppearanceTests: XCTestCase {
         defer { pty.close() }
 
         // `deactivate()` や `restore()` を呼んだ後でマスタ側を読むように直してはいけない。
-        // macOS ではそれらが返らず、テストが止まる。raw モードの間は書き出しが送られ切るのを
-        // 待ってから端末属性を戻し、macOS の疑似端末ではマスタ側が読むまで送られ切らない。
+        // macOS ではそれらが返らず、テストが止まる。
+        // raw モードの間は書き出しが送られ切るのを待ってから端末属性を戻し、macOS の疑似端末ではマスタ側が読むまで送られ切らない。
         // Linux では待たずに済むので、Linux だけで確かめても気づけない。
         let drain = OutputDrain(descriptor: pty.master, recordsOutput: true)
         drain.start()
