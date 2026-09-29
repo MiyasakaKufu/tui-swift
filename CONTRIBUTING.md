@@ -4,7 +4,7 @@ DocC・コメント・コミットログは日本語で書く。適用範囲は 
 
 ## 情報の置き場所
 
-情報の種類ごとに、置く媒体を次のように決める。[^t-wada]
+情報の種類ごとに、置く媒体を次のように決める。[^1]
 
 | 種類 | 置き場所 |
 | --- | --- |
@@ -32,7 +32,7 @@ public なすべての宣言に書く。非 public には必須としないが�
 
 ### 要約
 
-1 文の断片をピリオドで終える。完全な文にしない。宣言の種類ごとに書き出しを揃える。[^api-guidelines]
+1 文の断片をピリオドで終える。完全な文にしない。宣言の種類ごとに書き出しを揃える。[^2]
 
 | 宣言 | 何を書くか |
 | --- | --- |
@@ -43,7 +43,7 @@ public なすべての宣言に書く。非 public には必須としないが�
 
 ### パラメーターと返り値
 
-パラメーターがあれば、すべてに説明を書く。各パラメーターを独立して説明し、目的と、必要なら許容値の範囲を書く。[^symbol-docs]
+パラメーターがあれば、すべてに説明を書く。各パラメーターを独立して説明し、目的と、必要なら許容値の範囲を書く。[^3]
 
 記法は `- Parameters:` のネスト形に統一する。引数が 1 つでも単数形の `- Parameter x:` は使わない（引数が増えたときに書き換えが要らないため）。並べる順序は宣言に合わせ、名前は DocC が参照する内部名（`_ event: InputEvent` なら `event`）を使う。
 
@@ -63,7 +63,7 @@ public なすべての宣言に書く。非 public には必須としないが�
 | 計算量 | `- Complexity:` |
 | 外部仕様・規格の出どころ | `- See:` |
 
-使えるコールアウトは次のもの。[^callouts]
+使えるコールアウトは次のもの。[^4]
 
 Attention, Author, Authors, Bug, Complexity, Copyright, Date, Experiment, Important, Invariant, Note, Postcondition, Precondition, Remark, Remarks, Requires, See, Since, Todo, Version, Warning
 
@@ -128,7 +128,7 @@ swift test
 
 要約の書き出し、コールアウトの選び方、コードを言い換えただけのコメント、`//` が Why not になっているか、典拠が DocC に置かれ `- See:` の URL が開けるかは機械的に判定できない。レビューで見る。手順は `.claude/skills/comment-review` にある。
 
-[^t-wada]: t-wada 氏の整理に従う。和田卓人（t-wada）の X への投稿（2017 年 9 月 5 日）。<https://x.com/t_wada/status/904916106153828352>
-[^api-guidelines]: 要約の書き方は Swift の API 設計指針に従う。Swift API Design Guidelines. <https://www.swift.org/documentation/api-design-guidelines/>
-[^symbol-docs]: パラメーターと返り値の書き方は Apple による DocC の書き方に従う。Writing symbol documentation in your source files. <https://developer.apple.com/documentation/xcode/writing-symbol-documentation-in-your-source-files>
-[^callouts]: swift/docs/DocumentationComments.md. <https://github.com/apple/swift/blob/main/docs/DocumentationComments.md>
+[^1]: t-wada 氏の整理に従う。和田卓人（t-wada）の X への投稿（2017 年 9 月 5 日）。<https://x.com/t_wada/status/904916106153828352>
+[^2]: 要約の書き方は Swift の API 設計指針に従う。Swift API Design Guidelines. <https://www.swift.org/documentation/api-design-guidelines/>
+[^3]: パラメーターと返り値の書き方は Apple による DocC の書き方に従う。Writing symbol documentation in your source files. <https://developer.apple.com/documentation/xcode/writing-symbol-documentation-in-your-source-files>
+[^4]: swift/docs/DocumentationComments.md. <https://github.com/apple/swift/blob/main/docs/DocumentationComments.md>
