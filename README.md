@@ -157,8 +157,8 @@ swift run tui-demo
 DisplayWidth.ambiguousWidth = .wide   // 全角として扱う
 ```
 
-環境変数 `RUNEWIDTH_EASTASIAN` が `1` なら、最初の計算時に自動で `.wide` になる
-（go-runewidth や tcell と同じ規則）。ロケールからの推測は端末側の設定と食い違うと
+環境変数 `RUNEWIDTH_EASTASIAN` が `1` なら、最初の計算時に自動で `.wide` になる。[^runewidth]
+ロケールからの推測は端末側の設定と食い違うと
 かえって崩れるため自動では行わないが、必要なら明示的に呼べる。
 
 ```swift
@@ -288,3 +288,5 @@ DocC・コメント・コミットログの書き方は `CONTRIBUTING.md` にま
 ## ライセンス
 
 MIT License（`LICENSE` を参照）。
+
+[^runewidth]: go-runewidth や tcell と同じ規則。<https://github.com/mattn/go-runewidth>、<https://github.com/gdamore/tcell>

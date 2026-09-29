@@ -4,7 +4,7 @@ DocC・コメント・コミットログは日本語で書く。適用範囲は 
 
 ## 情報の置き場所
 
-[t-wada 氏の整理](https://x.com/t_wada/status/904916106153828352)に従う。
+t-wada 氏の整理に従う。[^t-wada]
 
 | 種類 | 置き場所 |
 | --- | --- |
@@ -20,7 +20,7 @@ DocC は上の 4 分類と別の軸にある。`//` が保守者に向くのに�
 
 ## DocC（`///`）の書き方
 
-[Swift API Design Guidelines](https://www.swift.org/documentation/api-design-guidelines/) と [Writing symbol documentation in your source files](https://developer.apple.com/documentation/xcode/writing-symbol-documentation-in-your-source-files) に従う。
+Swift の API 設計指針[^api-guidelines]と、Apple による DocC の書き方[^symbol-docs]に従う。
 
 ### 書く対象
 
@@ -65,9 +65,9 @@ public なすべての宣言に書く。非 public には必須としないが�
 | 計算量 | `- Complexity:` |
 | 外部仕様・規格の出どころ | `- See:` |
 
-使えるコールアウトは [swift/docs/DocumentationComments.md](https://github.com/apple/swift/blob/main/docs/DocumentationComments.md) にある次のもの。
+使えるコールアウトは次のもの。[^callouts]
 
-> Attention, Author, Authors, Bug, Complexity, Copyright, Date, Experiment, Important, Invariant, Note, Postcondition, Precondition, Remark, Remarks, Requires, See, Since, Todo, Version, Warning
+Attention, Author, Authors, Bug, Complexity, Copyright, Date, Experiment, Important, Invariant, Note, Postcondition, Precondition, Remark, Remarks, Requires, See, Since, Todo, Version, Warning
 
 ### 典拠（外部仕様・規格）
 
@@ -129,3 +129,8 @@ swift test
 - `///` と宣言の間に `//` が挟まっていないか
 
 要約の書き出し、コールアウトの選び方、コードを言い換えただけのコメント、`//` が Why not になっているか、典拠が DocC に置かれ `- See:` の URL が開けるかは機械的に判定できない。レビューで見る。手順は `.claude/skills/comment-review` にある。
+
+[^t-wada]: 和田卓人（t-wada）の X への投稿（2017 年 9 月 5 日）。<https://x.com/t_wada/status/904916106153828352>
+[^api-guidelines]: Swift API Design Guidelines. <https://www.swift.org/documentation/api-design-guidelines/>
+[^symbol-docs]: Writing symbol documentation in your source files. <https://developer.apple.com/documentation/xcode/writing-symbol-documentation-in-your-source-files>
+[^callouts]: swift/docs/DocumentationComments.md. <https://github.com/apple/swift/blob/main/docs/DocumentationComments.md>
