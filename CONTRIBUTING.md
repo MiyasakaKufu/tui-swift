@@ -128,7 +128,7 @@ swift test
 
 要約の書き出し、コールアウトの選び方、コードを言い換えただけのコメント、`//` が Why not になっているか、典拠が DocC に置かれ `- See:` の URL が開けるかは機械的に判定できない。レビューで見る。手順は `.claude/skills/comment-review` にある。
 
-[^1]: t-wada 氏の整理に従う。和田卓人（t-wada）の X への投稿（2017 年 9 月 5 日）。<https://x.com/t_wada/status/904916106153828352>
+[^1]: Takuto Wada（t_wada）、X への投稿、2017 年 9 月 5 日。<https://x.com/t_wada/status/904916106153828352>
 [^2]: 要約の書き方は Swift の API 設計指針に従う。Swift API Design Guidelines. <https://www.swift.org/documentation/api-design-guidelines/>
 [^3]: パラメーターと返り値の書き方は Apple による DocC の書き方に従う。Writing symbol documentation in your source files. <https://developer.apple.com/documentation/xcode/writing-symbol-documentation-in-your-source-files>
 [^4]: swift/docs/DocumentationComments.md. <https://github.com/apple/swift/blob/main/docs/DocumentationComments.md>
