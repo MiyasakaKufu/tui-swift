@@ -1,7 +1,6 @@
 # TUIKit
 
-Swift で書かれた、依存ライブラリなしのターミナル UI（TUI）ライブラリ。
-macOS と Linux で動作し、標準ライブラリと POSIX API だけを使う。
+ターミナル UI（TUI）アプリを Swift で構築するためのライブラリ。
 
 ```
 ┌─ 機能一覧 ─────────┐┌─ 詳細 ────────────────┐
@@ -10,6 +9,11 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
 │  キー入力の解析    ││ ███████░░░░░░░░░░  38%  │
 └────────────────┘└──────────────────────┘
 ```
+
+## 動作環境
+
+- MacOS
+- Linux
 
 ## 特徴
 
@@ -158,9 +162,9 @@ swift run tui-demo
 DisplayWidth.ambiguousWidth = .wide   // 全角として扱う
 ```
 
-環境変数 `RUNEWIDTH_EASTASIAN` が `1` なら、最初の計算時に自動で
-`.wide` になる（go-runewidth や tcell と同じ規則）。ロケールからの推測は端末エミュレータの設定と
-食い違うとかえって崩れるため自動では行わないが、必要なら明示的に呼び出せる。
+環境変数 `RUNEWIDTH_EASTASIAN` が `1` なら、最初の計算時に自動で `.wide` になる。[^1]
+ロケールからの推測は端末エミュレータの設定と食い違うと
+かえって崩れるため自動では行わないが、必要なら明示的に呼び出せる。
 
 ```swift
 DisplayWidth.ambiguousWidth = DisplayWidth.resolveAmbiguousWidth(usingLocale: true)
@@ -299,3 +303,5 @@ DocC・コメント・コミットログの書き方は `CONTRIBUTING.md` にま
 ## ライセンス
 
 MIT License（`LICENSE` を参照）。
+
+[^1]: go-runewidth や tcell と同じ規則。<https://github.com/mattn/go-runewidth>、<https://github.com/gdamore/tcell>

@@ -66,35 +66,47 @@ final class TerminalAppearanceTests: XCTestCase {
         let pty = try openPseudoTerminal()
         defer { pty.close() }
 
+        // `deactivate()` や `restore()` を呼んだ後でマスタ側を読むように直してはいけない。
+        // macOS ではそれらが返らず、テストが止まる。
+        // raw モードの間は書き出しが送られ切るのを待ってから端末属性を戻し、macOS の疑似端末ではマスタ側が読むまで送られ切らない。
+        // Linux では待たずに済むので、Linux だけで確かめても気づけない。
+        let drain = OutputDrain(descriptor: pty.master, recordsOutput: true)
+        drain.start()
+        defer { drain.stop() }
+
         let terminal = Terminal(input: pty.slave, output: pty.slave)
         try terminal.enableRawMode()
         defer { terminal.restore() }
 
         terminal.setWindowTitle("タイトル")
         terminal.setCursorShape(.bar)
-        _ = readOutput(from: pty.master)
+        XCTAssertTrue(drain.waitForOutput(containing: ANSI.setCursorShape(.bar), timeout: 2))
+        drain.reset()
 
         terminal.deactivate()
 
-        let deactivated = readOutput(from: pty.master)
         XCTAssertTrue(
-            deactivated.contains(ANSI.setCursorShape(.default)),
+            drain.waitForOutput(containing: ANSI.setCursorShape(.default), timeout: 2),
             "一時停止でカーソル形状が戻らない"
         )
         XCTAssertTrue(
-            deactivated.contains(ANSI.restoreWindowTitle),
+            drain.waitForOutput(containing: ANSI.restoreWindowTitle, timeout: 2),
             "一時停止でタイトルが戻らない"
         )
+        XCTAssertTrue(drain.waitForOutput(containing: ANSI.showCursor, timeout: 2))
+        drain.reset()
 
         try terminal.reactivate()
 
-        let reactivated = readOutput(from: pty.master)
         XCTAssertTrue(
-            reactivated.contains(ANSI.saveWindowTitle + ANSI.setWindowTitle("タイトル")),
+            drain.waitForOutput(
+                containing: ANSI.saveWindowTitle + ANSI.setWindowTitle("タイトル"),
+                timeout: 2
+            ),
             "再開でタイトルが設定し直されない"
         )
         XCTAssertTrue(
-            reactivated.contains(ANSI.setCursorShape(.bar)),
+            drain.waitForOutput(containing: ANSI.setCursorShape(.bar), timeout: 2),
             "再開でカーソル形状が設定し直されない"
         )
     }
