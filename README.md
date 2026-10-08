@@ -22,7 +22,7 @@ macOS と Linux で動作し、標準ライブラリと POSIX API だけを使�
   タブ幅は、指定しなければ `Cell` 4 個分で、`Text(_:tabSize:)` や `.tabStops(every:)` で変えられる。
 - **宣言的なレイアウト** — `VStack` / `HStack` / `Spacer` / `border` などを組み合わせて画面を記述する。
 - **`View` の重ね描き** — `ZStack` で同じ領域へ `View` を重ね、`.overlay` でレイアウトを変えずに上へ足す。
-  `.screenOverlay` は画面全体を基準に置くので、`View` をどれだけ入れ子にしていても中央にダイアログを出せる。
+  `.screenOverlay` は画面全体を基準に置くので、深い階層からでも中央にダイアログを出せる。
 - **入力の解析** — 矢印キー、ファンクションキー、修飾キー、マウス（SGR 1006）、
   ブラケットペーストを解釈する。分割して届いたシーケンスも正しく扱う。
   端末エミュレータが対応していれば kitty keyboard protocol を使い、Ctrl+I と Tab のように
@@ -196,8 +196,8 @@ DisplayWidth.width(of: "─", ambiguous: .wide)   // 2
    位置（`View.id(_:)` を付けた `View` はその引数）で決まる。
 3. `Renderer` が、直前に書き出した `Buffer` と比べ、変わった `Cell` だけを端末デバイスへ書き出す。
 
-`View` に準拠する型は値型で、`Application.draw()` のたびに作り直される。`Application.draw()` をまたいで
-残す値は、次のように分けて置く。
+`View` に準拠する型は値型で、`Application.draw()` のたびに作り直される。
+状態は次のように分けて置く。
 
 | 使う場所 | 例 | 置き場所 |
 | --- | --- | --- |
@@ -219,7 +219,7 @@ func handle(_ event: InputEvent) -> EventResult {
 ```
 
 `Binding` は、別の場所にあるプロパティの値を取得するクロージャと書き換えるクロージャの組を持つ値型で、
-`Binding(get:set:)` でも作れる。`ListView`・`TextField` が `Binding` で値を書き換えるのは
+`Binding(get:set:)` でも作れる。`ListView`・`TextField` が `Binding` で渡すプロパティを書き換えるのは
 `ListState.handle(_:)`・`TextFieldState.handle(_: InputEvent)` の中だけで、
 `View.render(into:rect:context:)` の中では書き換えない。
 
