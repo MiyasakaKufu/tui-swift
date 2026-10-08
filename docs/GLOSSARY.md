@@ -53,7 +53,7 @@
 | `View.id(_:)` に渡した引数。`ViewPath.Component` の `.key(_:)` になる | `View.id(_:)` の引数 | |
 | `View` に準拠する型の格納プロパティに `@State` として付け、そのプロパティを `Application.draw()` をまたいで残す型 | `State` | プロパティは `ViewNode` が持つ。`$` で得る `Binding` は `State.projectedValue` |
 | `View` の拡張として定義された `View.padding(_: EdgeInsets)`・`View.border(_:style:title:titleStyle:)` などのメソッド | `View` の拡張メソッド | 個々のメソッドは名前で書く |
-| `ListView`・`TextField`・`ProgressBar` | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリの型」 |
+| `Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型 | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型」 |
 | `TextFieldState.cursor`・`ListState.scrollOffset` などを持つクラス | `ListState`・`TextFieldState` | 2 つをまとめる語は置かない。5cf1d9a は、`View` の `State` へ移せるのは #53 の後と書いている |
 | 別の場所にあるプロパティの値を取得し、書き換える型 | `Binding` | |
 | `TextField` の `text:` 引数と `ListView` の `selection:` 引数に、`Binding` で渡すプロパティ。`TerminalApp` に準拠する型のインスタンスプロパティか、`View` の `@State` を付けたプロパティ | `Binding` で渡すプロパティ | |
