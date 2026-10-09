@@ -4,47 +4,47 @@ import Darwin
 import Glibc
 #endif
 
-/// 文字が端末上で占める桁数の計算。
+/// 文字が端末エミュレータで占める `Cell` の数の計算。
 ///
-/// 東アジアの全角文字と絵文字は 2 桁、結合文字や制御文字は 0 桁として扱う。
+/// 東アジアの全角文字と絵文字は `Cell` 2 個分、結合文字や制御文字は `Cell` 0 個分として扱う。
 /// East Asian Width が Ambiguous の文字（罫線素片、`…`、`█`、矢印など）は
-/// 端末の設定によって 1 桁にも 2 桁にも表示されるため、各関数の `ambiguous` で切り替える。
+/// 端末エミュレータの設定によって `Cell` 1 個分にも 2 個分にも表示されるため、各関数の `ambiguous` 引数で切り替える。
 public enum DisplayWidth {
 
-    /// East Asian Width が Ambiguous の文字を何桁として扱うか。
+    /// East Asian Width が Ambiguous の文字を `Cell` 何個分として扱うか。
     public enum AmbiguousWidth: Int, Sendable {
-        /// 1 桁として扱う。
+        /// `Cell` 1 個分として扱う。
         case narrow = 1
-        /// 2 桁として扱う。
+        /// `Cell` 2 個分として扱う。
         case wide = 2
     }
 
-    /// 曖昧幅の扱いを上書きする環境変数の名前。
+    /// ロケールより先に見て `DisplayWidth.AmbiguousWidth` を決める環境変数の名前。
     ///
     /// go-runewidth や tcell が見るものと同じ `RUNEWIDTH_EASTASIAN`。
     public static let ambiguousWidthEnvironmentVariable = "RUNEWIDTH_EASTASIAN"
 
-    /// 曖昧幅の扱いを指定しなかったときの既定値。
+    /// `ambiguous:`・`ambiguousWidth:` 引数を省いたときに使う `DisplayWidth.AmbiguousWidth`。
     ///
     /// - Note: 最初に参照した時点で `resolveAmbiguousWidth()` から一度だけ決まる。
-    ///   あとから環境変数を変えても反映されない。アプリごとに変えるには
+    ///   あとから環境変数を変えても反映されない。TUIKit アプリごとに変えるには
     ///   `ApplicationOptions.ambiguousWidth` を、呼び出しごとに変えるには各関数の `ambiguous` を指定する。
     public static let defaultAmbiguousWidth: AmbiguousWidth = resolveAmbiguousWidth()
 
     // MARK: - 設定の解決
 
-    /// 環境変数とロケールから、曖昧幅の扱いを決める。
+    /// 環境変数とロケールから `AmbiguousWidth` を決める。
     ///
     /// - Parameters:
     ///   - usingLocale: 環境変数が未設定のときに、ロケールからも推測するか。
-    /// - Returns: 決まった扱い。どちらからも決まらなければ `.narrow`。
+    /// - Returns: 決まった `AmbiguousWidth`。どちらからも決まらなければ `.narrow`。
     public static func resolveAmbiguousWidth(usingLocale: Bool = false) -> AmbiguousWidth {
         if let fromEnvironment = ambiguousWidthFromEnvironment() { return fromEnvironment }
         if usingLocale, let fromLocale = ambiguousWidthFromLocale() { return fromLocale }
         return .narrow
     }
 
-    /// 環境変数 `RUNEWIDTH_EASTASIAN` から曖昧幅の扱いを読む。
+    /// 環境変数 `RUNEWIDTH_EASTASIAN` の値から `AmbiguousWidth` を決める。
     ///
     /// - Returns: 値が `1` なら `.wide`、ほかの値なら `.narrow`。
     ///   環境変数が未設定か空文字列なら `nil`。
@@ -52,7 +52,7 @@ public enum DisplayWidth {
         parseAmbiguousWidth(environmentValue: environmentString(ambiguousWidthEnvironmentVariable))
     }
 
-    /// ロケールから曖昧幅の扱いを推測する。
+    /// ロケールから `AmbiguousWidth` を推測する。
     ///
     /// `LC_ALL` `LC_CTYPE` `LANG` の順に探し、最初に見つかった値だけを見る。
     ///
@@ -66,7 +66,7 @@ public enum DisplayWidth {
         return nil
     }
 
-    /// 曖昧幅を 2 桁として扱う言語。
+    /// 文字集合が UTF-8 のときに `.wide` を選ぶ言語。
     private static let eastAsianLanguages: Set<String> = ["ja", "ko", "zh"]
 
     /// 環境変数 `RUNEWIDTH_EASTASIAN` の値を解釈する。
@@ -98,8 +98,9 @@ public enum DisplayWidth {
         let language = (territory.split(separator: "_").first ?? "").lowercased()
         let codeset = parts.count > 1 ? normalizedCodeset(parts[1]) : ""
 
-        // 文字集合を見ずに言語だけで決めてはいけない。C や eucJP のロケールで端末がどちらの
-        // 幅を選ぶかは決まっておらず、推測が外れれば桁がずれたまま描き続けることになる。
+        // 文字集合を見ずに言語だけで決めてはいけない。C や eucJP のロケールで端末エミュレータが
+        // どちらの幅を選ぶかは決まっておらず、推測が外れれば、端末エミュレータが文字を表示する位置が
+        // `Buffer` に置いた `Cell` の `Point.x` とずれたまま描き続けることになる。
         guard codeset == "utf8" else { return .narrow }
         return eastAsianLanguages.contains(language) ? .wide : .narrow
     }
@@ -127,18 +128,19 @@ public enum DisplayWidth {
 
     /// 直前の文字を絵文字として表示するよう指定する異体字セレクタ。
     ///
-    /// 既定でテキスト表示の文字でも、これが付けば絵文字表示になり、幅は 2 桁になる。
+    /// UTS #51 の default text presentation の文字（`Emoji` が Yes で `Emoji_Presentation` が No の文字）でも、
+    /// これが付けば絵文字表示になり、`Cell` 2 個分になる。
     ///
     /// - See: [UTS #51: Unicode Emoji](https://www.unicode.org/reports/tr51/) の
     ///   emoji presentation sequence の定義。
     private static let emojiPresentationSelector: UInt32 = 0xFE0F
 
-    /// 1 文字（書記素クラスタ）の表示幅を返す。
+    /// 1 文字（書記素クラスタ）が端末エミュレータで占める `Cell` の数を返す。
     ///
     /// - Parameters:
     ///   - character: 幅を求める文字。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `defaultAmbiguousWidth` に従う。
-    /// - Returns: 桁数。全角文字と絵文字は 2、結合文字と制御文字は 0。
+    ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    /// - Returns: `Cell` の数。全角文字と絵文字は 2、結合文字と制御文字は 0。
     public static func width(
         of character: Character,
         ambiguous: AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
@@ -158,12 +160,12 @@ public enum DisplayWidth {
         return 1
     }
 
-    /// 文字列全体の表示幅を返す。
+    /// 文字列全体が端末エミュレータで占める `Cell` の数を返す。
     ///
     /// - Parameters:
     ///   - string: 幅を求める文字列。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `defaultAmbiguousWidth` に従う。
-    /// - Returns: 各文字の桁数の合計。
+    ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    /// - Returns: 各文字の `DisplayWidth.width(of: Character, ambiguous: AmbiguousWidth)` の戻り値の合計。
     public static func width(
         of string: String,
         ambiguous: AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
@@ -175,15 +177,15 @@ public enum DisplayWidth {
         return total
     }
 
-    /// 表示幅が `limit` を超えないように末尾を切り詰める。
+    /// `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` の戻り値が `limit` を超えないように末尾を切り詰める。
     ///
     /// - Parameters:
     ///   - string: 切り詰める文字列。
-    ///   - limit: 許容する表示幅。0 以下なら空文字列を返す。
+    ///   - limit: 許容する `Cell` の数。0 以下なら空文字列を返す。
     ///   - ellipsis: 切り詰めたときに末尾へ付ける文字列。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `defaultAmbiguousWidth` に従う。
-    /// - Returns: 表示幅が `limit` 以下の文字列。切り詰めが起きなければ `string` そのまま。
-    /// - Note: `ellipsis` 自身の幅も `limit` に含める。
+    ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    /// - Returns: `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` の戻り値が `limit` 以下の文字列。切り詰めが起きなければ `string` そのまま。
+    /// - Note: `ellipsis` 自身が占める `Cell` の数も `limit` に含める。
     ///   `ellipsis` だけで `limit` に達する場合は付けずに切り詰める。
     public static func truncate(
         _ string: String,
@@ -203,13 +205,13 @@ public enum DisplayWidth {
         return String(head) + ellipsis
     }
 
-    /// 表示幅が `limit` を超えない範囲の接頭辞を返す。
+    /// `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` の戻り値が `limit` を超えない範囲の接頭辞を返す。
     ///
     /// - Parameters:
     ///   - string: 切り出す元の文字列。
-    ///   - limit: 許容する表示幅。0 以下なら空の `Substring` を返す。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `defaultAmbiguousWidth` に従う。
-    /// - Returns: 表示幅が `limit` 以下になる最長の接頭辞。
+    ///   - limit: 許容する `Cell` の数。0 以下なら空の `Substring` を返す。
+    ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    /// - Returns: `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` の戻り値が `limit` 以下になる最長の接頭辞。
     /// - Postcondition: 全角文字を途中で割らない。
     public static func prefix(
         of string: String,
@@ -288,7 +290,7 @@ public enum DisplayWidth {
 
     // MARK: - 範囲表
 
-    /// 表示幅を持たない制御文字のコードポイント範囲。
+    /// `Cell` 0 個分として扱う制御文字のコードポイント範囲。
     ///
     /// C0 制御文字（`0x00`〜`0x1F`）と、DELETE および C1 制御文字（`0x7F`〜`0x9F`）。
     /// いずれも一般カテゴリは Cc。

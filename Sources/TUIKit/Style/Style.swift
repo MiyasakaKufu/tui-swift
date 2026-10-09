@@ -1,4 +1,4 @@
-/// 1 セル分の見た目（文字色・背景色・装飾）。
+/// `Cell` 1 個分の見た目（文字色・背景色・装飾）。
 public struct Style: Hashable, Sendable {
     /// 文字色。
     public var foreground: Color
@@ -23,7 +23,7 @@ public struct Style: Hashable, Sendable {
         self.attributes = attributes
     }
 
-    /// 装飾なしの既定スタイル。
+    /// 文字色・背景色が `Color.default` で、装飾のないスタイル。
     public static let plain = Style()
 
     /// 文字色だけを差し替えたスタイル。
@@ -83,11 +83,11 @@ public struct Style: Hashable, Sendable {
     /// 打ち消し線を足したスタイル。
     public var strikethrough: Style { adding(.strikethrough) }
 
-    /// `previous` の状態から自分へ遷移するための SGR シーケンス。
+    /// `previous` から自分へ切り替える SGR を、`hasPrefix(ANSI.csi)` が `true` の `String` で返す。
     ///
     /// - Parameters:
     ///   - previous: 遷移前のスタイル。
-    /// - Returns: 遷移に必要な SGR シーケンス。差分がなければ空文字列。
+    /// - Returns: 自分へ切り替える SGR。`m` で終わる。差分がなければ空文字列。
     /// - Note: 装飾を落とす必要がある場合は、いったん全解除（SGR 0）してから再設定する。
     public func sgrSequence(transitioningFrom previous: Style) -> String {
         if self == previous { return "" }

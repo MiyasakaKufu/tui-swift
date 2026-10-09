@@ -68,7 +68,7 @@ final class InputParserTests: XCTestCase {
         )
     }
 
-    /// 修飾パラメータのない `CSI P`〜`CSI S` も F1〜F4 として扱う。
+    /// 修飾パラメータのない `CSI P`〜`CSI S` のバイト列も F1〜F4 として扱う。
     func testFunctionKeysOneToFourWithoutModifiers() async {
         XCTAssertEqual(events(bytes("\u{1B}[P")), [.key(KeyEvent(.function(1)))])
         XCTAssertEqual(events(bytes("\u{1B}[S")), [.key(KeyEvent(.function(4)))])
@@ -325,7 +325,7 @@ final class InputParserTests: XCTestCase {
         )
     }
 
-    /// Shift+Tab は、形式が変わっても `CSI Z` と同じキーになる。
+    /// Shift+Tab は、形式が変わっても `CSI Z` のバイト列と同じキーになる。
     func testKeyboardProtocolShiftTabMatchesLegacyBackTab() async {
         XCTAssertEqual(events(bytes("\u{1B}[9;2u")), events(bytes("\u{1B}[Z")))
         XCTAssertEqual(events(bytes("\u{1B}[9;2u")), [.key(KeyEvent(.backTab))])

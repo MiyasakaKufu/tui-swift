@@ -1,4 +1,4 @@
-/// 別スレッドや `Task` から、`Component.Message` の値をイベントループへ届ける送り口。
+/// 別スレッドや `Task` から、`Component.Message` の値を `Application` のイベントループへ届ける型。
 ///
 /// どのスレッド・どの `Task` からでも送れる。送られた値は、送った順に `Component.receive(_:)` へ渡され、
 /// 続けて画面が描き直される。`ApplicationOptions.frameInterval` を設定していなくても届く。
@@ -9,7 +9,7 @@ public struct MessageSender<Message: Sendable>: Sendable {
 
     private let eventQueue: LoopEventQueue<Message>
 
-    /// 値を入れる先を指定して送り口を作る。
+    /// 値を入れる先を指定して `MessageSender` を作る。
     ///
     /// - Parameters:
     ///   - eventQueue: 送られた値を入れる先。

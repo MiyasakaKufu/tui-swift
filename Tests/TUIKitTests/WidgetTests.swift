@@ -30,13 +30,13 @@ final class WidgetTests: XCTestCase {
 
     // MARK: - ListState
 
-    /// 描画済みとみなせるリストの状態を作る。
+    /// 描画済みとみなせる `ListState` を返す。
     ///
     /// - Parameters:
     ///   - itemCount: 項目の総数。
     ///   - visibleRows: 一度に表示できる行数。
-    ///   - width: 描画した矩形の桁数。
-    /// - Returns: 原点から広げた矩形を描画済みとして持つ状態。
+    ///   - width: 描画した矩形の幅（`Cell` の数）。
+    /// - Returns: 原点から広げた矩形を `ListState.renderedRect` に持つ `ListState`。
     private func listState(itemCount: Int, visibleRows: Int, width: Int = 10) -> ListState {
         let state = ListState(itemCount: itemCount)
         state.renderedRect = Rect(x: 0, y: 0, width: width, height: visibleRows)
@@ -67,7 +67,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertFalse(state.handle(.key(KeyEvent(.enter))))
     }
 
-    /// ホイールは選択ではなく表示位置を動かす。
+    /// ホイールは `ListState.selectedIndex` ではなく `ListState.scrollOffset` を動かす。
     func testListStateScrollsViewportWithWheel() async {
         let state = listState(itemCount: 20, visibleRows: 5)
         let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
@@ -81,7 +81,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.selectedIndex, 0)
     }
 
-    /// 表示位置は項目の範囲に収まり、端を超えない。
+    /// `ListState.scrollOffset` は項目の範囲に収まり、端を超えない。
     func testListStateWheelStopsAtBounds() async {
         let state = listState(itemCount: 8, visibleRows: 5)
         let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
@@ -117,7 +117,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.scrollOffset, 0)
     }
 
-    /// 選択を動かすと、表示位置は選択を追いかけて戻る。
+    /// 選択を動かすと、`ListState.scrollOffset` は選択を追いかけて戻る。
     func testListStateSelectionScrollsBackAfterWheel() async {
         let state = listState(itemCount: 20, visibleRows: 5)
         let down = MouseEvent(position: Point(x: 1, y: 1), button: .none, action: .scrollDown)
@@ -129,19 +129,19 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(state.scrollOffset, 1)
     }
 
-    /// 縦方向のリストは横スクロールを扱わない（親に委ねる）。
+    /// `ListState.handle(_:)` は横スクロールの `MouseEvent` を扱わず、`false` を返す。
     func testListStateDoesNotHandleHorizontalScroll() async {
         let state = listState(itemCount: 5, visibleRows: 5)
         for action in [MouseAction.scrollLeft, .scrollRight] {
             let event = MouseEvent(position: .zero, button: .none, action: action)
             XCTAssertFalse(state.handle(.mouse(event)), "\(action) は扱わないこと")
             XCTAssertEqual(state.selectedIndex, 0, "\(action) で選択が動かないこと")
-            XCTAssertEqual(state.scrollOffset, 0, "\(action) で表示位置が動かないこと")
+            XCTAssertEqual(state.scrollOffset, 0, "\(action) で `ListState.scrollOffset` が動かないこと")
         }
     }
 
-    /// トラックパッドで斜めに動かすと横スクロールのコードが混ざる。
-    /// 縦のノッチ数ぶんだけ表示位置が動き、横スクロールは無視されること。
+    /// トラックパッドで斜めに動かすと横スクロールのバイト列が混ざる。
+    /// 縦のノッチ数ぶんだけ `ListState.scrollOffset` が動き、横スクロールは無視されること。
     func testListStateIgnoresHorizontalWheelInDiagonalStream() async {
         let state = listState(itemCount: 30, visibleRows: 5)
 
@@ -166,10 +166,10 @@ final class WidgetTests: XCTestCase {
         let press = MouseEvent(position: Point(x: 3, y: 2), button: .left, action: .press)
         XCTAssertTrue(state.handle(.mouse(press)))
         XCTAssertEqual(state.selectedIndex, 2)
-        XCTAssertEqual(state.scrollOffset, 0, "クリックで表示位置が動かないこと")
+        XCTAssertEqual(state.scrollOffset, 0, "クリックで `ListState.scrollOffset` が動かないこと")
     }
 
-    /// 矩形が原点から離れていても、その中での行の位置で項目が決まる。
+    /// `ListState.renderedRect` が原点から離れていても、その中での行の位置で項目が決まる。
     func testListStateSelectsClickedItemInOffsetRect() async {
         let state = ListState(itemCount: 10)
         state.renderedRect = Rect(x: 2, y: 1, width: 5, height: 4)
@@ -187,7 +187,7 @@ final class WidgetTests: XCTestCase {
         let press = MouseEvent(position: Point(x: 1, y: 1), button: .left, action: .press)
         XCTAssertTrue(state.handle(.mouse(press)))
         XCTAssertEqual(state.selectedIndex, 7)
-        XCTAssertEqual(state.scrollOffset, 6, "クリックで表示位置が動かないこと")
+        XCTAssertEqual(state.scrollOffset, 6, "クリックで `ListState.scrollOffset` が動かないこと")
     }
 
     func testListStateIgnoresClickOnRowWithoutItem() async {
@@ -250,7 +250,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertEqual(render(list, width: 5, height: 2), "  b  \n> c  ")
     }
 
-    /// 描画は選択を追いかけ直さないので、ホイールで動かした表示位置が残る。
+    /// 描画は選択を追いかけ直さないので、ホイールで動かした `ListState.scrollOffset` が残る。
     func testListViewKeepsWheelScrollAcrossRenders() async {
         let items = ["a", "b", "c", "d"]
         let state = ListState()
@@ -260,14 +260,14 @@ final class WidgetTests: XCTestCase {
         XCTAssertTrue(state.handle(.mouse(down)))
         XCTAssertEqual(state.scrollOffset, 2)
 
-        // `ListView` は描画のたびに作られ、`itemCount` が代入し直される。
-        // そこで表示位置が選択へ戻らないことを、本番と同じ形で確かめる。
+        // 同じ `ListView` を使い回して描画し直してはいけない。`ListState.itemCount` への代入が起きず、
+        // `Application.draw()` のたびに `ListView` を作る使い方で `ListState.scrollOffset` が保たれるかを試せなくなる。
         XCTAssertEqual(render(ListView(items: items, state: state), width: 5, height: 2), "  c  \n  d  ")
         XCTAssertEqual(state.scrollOffset, 2)
         XCTAssertEqual(state.selectedIndex, 0)
     }
 
-    /// 表示できる行数が変わったときは、選択が見える位置へ戻る。
+    /// 表示できる行数が変わったときは、`ListState.scrollOffset` が選択の見える位置へ戻る。
     func testListViewScrollsToSelectionWhenHeightChanges() async {
         let items = ["a", "b", "c", "d"]
         let state = ListState()
@@ -430,11 +430,11 @@ final class WidgetTests: XCTestCase {
     /// 👍🏽（肌の色の修飾子付き）
     private let thumbsUpEmoji = "\u{1F44D}\u{1F3FD}"
 
-    /// 端末から届いたバイト列をパーサ経由で入力欄に流し込む。
+    /// 端末デバイスから読み取ったとみなすバイト列を、`InputParser` 経由で `TextFieldState` に流し込む。
     ///
     /// - Parameters:
-    ///   - text: 端末から届いたとみなす文字列。
-    ///   - state: 流し込む先の入力欄。
+    ///   - text: 端末デバイスから読み取ったとみなすバイト列の元の文字列。UTF-8 にして 1 バイトずつ渡す。
+    ///   - state: 流し込む先の `TextFieldState`。
     private func typeText(_ text: String, into state: TextFieldState) {
         // まとめて `feed` してはいけない。1 回の read に収まった場合しか試せなくなる。
         var parser = InputParser()
@@ -523,8 +523,11 @@ final class WidgetTests: XCTestCase {
     func testScrolledTextFieldDoesNotShowHalfOfWideCharacter() async {
         let state = TextFieldState(text: "あいう")
         let field = TextField(state: state, showsCursor: false)
-        // 必要なスクロール量は 3 桁だが、「い」の途中で切れないよう 4 桁へ切り上げる。
-        XCTAssertEqual(field.scrollOffset(forWidth: 4), 4)
+        XCTAssertEqual(
+            field.scrollOffset(forWidth: 4),
+            4,
+            "「い」の途中で切れないよう、`Cell` 3 個分を `Cell` 4 個分へ切り上げること"
+        )
         XCTAssertEqual(render(field, width: 4, height: 1), "う  ")
     }
 
@@ -550,7 +553,7 @@ final class WidgetTests: XCTestCase {
                 }
                 XCTAssertTrue(
                     boundaries.contains(offset),
-                    "幅 \(width)・内容 \(state.text) でスクロール量 \(offset) が文字の区切りにない"
+                    "幅 \(width)・`TextFieldState.text` \(state.text) でスクロール量 \(offset) が文字の区切りにない"
                 )
                 XCTAssertLessThan(state.cursorColumn() - offset, width)
             }

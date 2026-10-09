@@ -94,7 +94,7 @@ static void ctui_crash_restore_previous_action(int signal_number) {
 static void ctui_crash_handle_signal(int signal_number) {
     ctui_crash_restorer_restore();
 
-    // 前の設定へ戻さずに送り直してはいけない。`SA_NODEFER` のためこのハンドラがまた呼ばれ、
+    // 前の設定へ戻さずに送り直してはいけない。`SA_NODEFER` のためこのハンドラがまた呼び出され、
     // Swift ランタイムのクラッシュ表示やコアダンプが行われなくなる。
     ctui_crash_restore_previous_action(signal_number);
     (void)raise(signal_number);
@@ -118,7 +118,7 @@ int ctui_crash_restorer_arm(int input,
     }
 
     // 先に下ろすのをやめてはいけない。書き換えている途中でシグナルが来ると、ハンドラが
-    // 古い記述子と新しい端末属性のような食い違った組で端末を戻す。
+    // 古い記述子と新しい termios のような食い違った組で端末デバイスを戻す。
     ctui_crash_is_armed = 0;
     ctui_crash_input_descriptor = input;
     ctui_crash_output_descriptor = output;
@@ -134,8 +134,8 @@ int ctui_crash_restorer_arm(int input,
         ctui_crash_is_handler_installed = 1;
     }
 
-    // このフラグを外すと、arm を呼ぶたびにハンドラが積まれる。
-    // 終了時に同じ制御コードが、その回数だけ tty へ書き出される。
+    // このフラグを外すと、arm を呼び出すたびにハンドラが積まれる。
+    // 終了時に同じ `ctui_crash_sequence` が、その回数だけ端末デバイスへ書き出される。
     if (!ctui_crash_is_exit_handler_installed) {
         ctui_crash_is_exit_handler_installed = 1;
         (void)atexit(ctui_crash_handle_exit);
@@ -196,12 +196,13 @@ void ctui_signal_wake_up(void) {
     int descriptor = (int)ctui_wakeup_write_descriptor;
     if (descriptor < 0) { return; }
 
-    // `errno` の退避を外してはいけない。割り込まれた側が、自分が呼んだ関数の `errno` を
-    // 読んだつもりで `write(2)` の結果を読む。
+    // `errno` の退避を外してはいけない。シグナルに割り込まれたコードが、自分が呼び出した関数の
+    // `errno` を読んだつもりで `write(2)` の結果を読む。
     int saved_errno = errno;
     unsigned char byte = 0;
-    // 書けなかったときに書き直してはいけない。書けないのはパイプが満杯のときで、読む側が止まって
-    // いれば空かないので、シグナルハンドラから戻らなくなる。満杯なら起こす合図はすでに届いている。
+    // 書けなかったときに書き直してはいけない。書けないのはパイプが満杯のときで、パイプを読み出す
+    // コードが止まっていれば空かないので、シグナルハンドラから戻らなくなる。
+    // 満杯なら起こす合図はすでに届いている。
     (void)write(descriptor, &byte, 1);
     errno = saved_errno;
 }

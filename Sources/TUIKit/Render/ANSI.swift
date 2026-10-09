@@ -1,12 +1,18 @@
-/// よく使う ANSI エスケープシーケンス。
+/// 端末デバイスへ書き出す `String` の定数と、それを組み立てる関数をまとめた型。
 public enum ANSI {
     /// エスケープ文字 `ESC`。
     public static let escape = "\u{1B}"
-    /// 制御シーケンス導入子 `CSI`（`ESC [`）。
+    /// CSI（Control Sequence Introducer）の `ESC [`。
+    ///
+    /// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/)
+    ///   の「CSI - CONTROL SEQUENCE INTRODUCER」。
     public static let csi = "\u{1B}["
-    /// オペレーティングシステムコマンド導入子 `OSC`（`ESC ]`）。
+    /// OSC（Operating System Command）の `ESC ]`。
+    ///
+    /// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/)
+    ///   の「OSC - OPERATING SYSTEM COMMAND」。
     public static let osc = "\u{1B}]"
-    /// `OSC` の文字列を終える `BEL`。
+    /// `ANSI.osc` で始めた `String` を終える `BEL`。
     public static let bell = "\u{07}"
 
     /// 文字色・背景色・装飾をすべて解除する。
@@ -23,9 +29,9 @@ public enum ANSI {
     /// カーソルを表示する。
     public static let showCursor = "\u{1B}[?25h"
 
-    /// 代替画面バッファへ切り替える。
+    /// 端末エミュレータの代替画面（alternate screen）へ切り替える。
     public static let enterAlternateScreen = "\u{1B}[?1049h"
-    /// 代替画面バッファから元の画面へ戻る。
+    /// 端末エミュレータの代替画面から元の画面へ戻る。
     public static let exitAlternateScreen = "\u{1B}[?1049l"
 
     /// クリック・ドラッグ・ホイールを SGR 拡張形式（1006）で受け取る。
@@ -35,7 +41,7 @@ public enum ANSI {
     /// マウスの通知（1000 / 1002 / 1003 / 1006）をすべて止める。
     ///
     /// - Note: それぞれ独立した DECSET モードなので、一部を送り直しても他は落ちない。
-    ///   範囲を狭めるときは、この列を送ってから入れ直す。
+    ///   範囲を狭めるときは、`ANSI.disableMouseTracking` を送ってから入れ直す。
     /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「Mouse Tracking」。
     public static let disableMouseTracking = "\u{1B}[?1006l\u{1B}[?1003l\u{1B}[?1002l\u{1B}[?1000l"
 
@@ -46,34 +52,36 @@ public enum ANSI {
 
     /// 同期出力（DECSET 2026）を開始し、終了するまで画面の更新を保留させる。
     ///
-    /// - Note: 対応しない端末はこの制御コードを読み飛ばすため、送っても表示は変わらない。
+    /// - Note: 対応しない端末エミュレータは `ANSI.beginSynchronizedUpdate` を読み飛ばすため、
+    ///   送っても表示は変わらない。
     public static let beginSynchronizedUpdate = "\u{1B}[?2026h"
     /// 同期出力を終了し、保留していた更新をまとめて表示させる。
     public static let endSynchronizedUpdate = "\u{1B}[?2026l"
 
-    /// 今のウィンドウタイトルとアイコン名を端末のスタックへ積む。
+    /// 今のウィンドウタイトルとアイコン名を端末エミュレータのスタックへ積む。
     ///
-    /// - Note: タイトルのスタックに対応しない端末はこの制御コードを読み飛ばすため、
-    ///   積まれない。
+    /// - Note: タイトルのスタックに対応しない端末エミュレータは `ANSI.saveWindowTitle` を
+    ///   読み飛ばすため、積まれない。
     public static let saveWindowTitle = "\u{1B}[22;0t"
-    /// 端末のスタックからウィンドウタイトルとアイコン名を戻す。
+    /// 端末エミュレータのスタックからウィンドウタイトルとアイコン名を戻す。
     ///
     /// - Note: スタックが空なら何も起きない。
     public static let restoreWindowTitle = "\u{1B}[23;0t"
 
-    /// 端末のフォーカス変化を受け取る。
+    /// 端末エミュレータのフォーカス変化を受け取る。
     public static let enableFocusReporting = "\u{1B}[?1004h"
     /// フォーカス変化の通知を止める。
     public static let disableFocusReporting = "\u{1B}[?1004l"
 
     /// kitty keyboard protocol の対応状況を問い合わせる。
     ///
-    /// - Note: 対応する端末だけが `CSI ? <flags> u` を返す。対応しない端末は何も返さない。
+    /// - Note: 対応する端末エミュレータだけが `CSI ? <flags> u` のバイト列を送ってくる。
+    ///   対応しない端末エミュレータは何も送ってこない。
     public static let queryKeyboardProtocol = "\u{1B}[?u"
-    /// 端末の種別を問い合わせる。
+    /// 端末エミュレータの種別を問い合わせる。
     ///
-    /// - Note: どの端末も `CSI ? <params> c` を返すため、先に送った問い合わせの応答が
-    ///   出揃ったことを知る目印に使える。
+    /// - Note: どの端末エミュレータも `CSI ? <params> c` のバイト列を送ってくるため、
+    ///   先に送った問い合わせの応答が出揃ったことを知る目印に使える。
     public static let queryDeviceAttributes = "\u{1B}[c"
 
     /// キーの曖昧さを解消する形式（kitty keyboard protocol の flag 1）でキーを受け取る。
@@ -83,48 +91,48 @@ public enum ANSI {
 
     /// クリップボードへ渡せる Base64 の長さの上限（バイト）。
     ///
-    /// - Note: 受け付ける長さは端末ごとに違い、OSC 52 の仕様にも定めがない。
+    /// - Note: 受け付ける長さは端末エミュレータごとに違い、OSC 52 の仕様にも定めがない。
     public static let clipboardLimit = 100_000
 
-    /// ウィンドウタイトルとアイコン名を設定するシーケンスを組み立てる。
+    /// ウィンドウタイトルとアイコン名を設定する、`hasPrefix(ANSI.osc)` が `true` の `String` を組み立てる。
     ///
     /// - Parameters:
     ///   - title: 設定するタイトル。
-    /// - Returns: タイトルを設定するシーケンス。
+    /// - Returns: タイトルを設定する `String`。
     /// - Note: `title` の制御文字は取り除く。
     public static func setWindowTitle(_ title: String) -> String {
         let scalars = title.unicodeScalars.filter { $0.properties.generalCategory != .control }
         return osc + "0;" + String(String.UnicodeScalarView(scalars)) + bell
     }
 
-    /// カーソル形状を設定するシーケンスを組み立てる。
+    /// カーソルの形を設定する、`hasPrefix(ANSI.csi)` が `true` の `String` を組み立てる。
     ///
     /// - Parameters:
     ///   - shape: 設定する形。
-    /// - Returns: カーソル形状を設定するシーケンス。
+    /// - Returns: カーソルの形を設定する `String`。
     public static func setCursorShape(_ shape: CursorShape) -> String {
         "\u{1B}[\(shape.parameter) q"
     }
 
-    /// カーソルを移動するシーケンスを組み立てる。
+    /// カーソルを移動する、`hasPrefix(ANSI.csi)` が `true` の `String` を組み立てる。
     ///
     /// - Parameters:
     ///   - row: 移動先の行。1 起点。1 未満は 1 に丸める。
-    ///   - column: 移動先の列。1 起点。1 未満は 1 に丸める。
-    /// - Returns: カーソルを移動するシーケンス。
+    ///   - column: 移動先の列。左端が 1（`Point.x` に 1 を足した値）。1 未満は 1 に丸める。
+    /// - Returns: カーソルを移動する `String`。
     public static func moveCursor(row: Int, column: Int) -> String {
         "\u{1B}[\(max(1, row));\(max(1, column))H"
     }
 
-    /// 文字列をクリップボードへ書き込むシーケンス（OSC 52）を組み立てる。
+    /// 文字列をクリップボードへ書き込む、`hasPrefix(ANSI.osc)` が `true` の `String`（OSC 52）を組み立てる。
     ///
     /// - Parameters:
     ///   - text: クリップボードへ渡す文字列。空文字列を渡すとクリップボードを空にする。
     ///   - limit: Base64 に変換した後の長さの上限（バイト）。
-    /// - Returns: クリップボードへ書き込むシーケンス。上限を超えるなら `nil`。
-    /// - Note: OSC 52 を既定で拒否する端末がある（xterm の `allowWindowOps`、
-    ///   tmux の `set-clipboard`）。端末は応答を返さないため、書き込めたかは送った側から
-    ///   判別できない。
+    /// - Returns: クリップボードへ書き込む `String`。上限を超えるなら `nil`。
+    /// - Note: OSC 52 をデフォルトで拒否する端末エミュレータがある（xterm の `allowWindowOps`、
+    ///   tmux の `set-clipboard`）。端末エミュレータは応答を送ってこないため、書き込めたかは
+    ///   TUIKit アプリから判別できない。
     public static func setClipboard(_ text: String, limit: Int = ANSI.clipboardLimit) -> String? {
         let encoded = Base64.encode(text)
         guard encoded.utf8.count <= limit else { return nil }

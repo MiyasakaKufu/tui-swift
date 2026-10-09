@@ -34,7 +34,7 @@ final class Latch: Sendable {
     }
 }
 
-/// pty の master 側に溜まる出力を読み続けるスレッド。
+/// pty の master に溜まる出力を読み続けるスレッド。
 ///
 /// 求められたときだけ読んだ内容を覚え、それ以外は読み捨てる。
 final class OutputDrain: Sendable {

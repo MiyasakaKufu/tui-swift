@@ -1,13 +1,13 @@
-/// 直前のフレームとの差分だけを端末へ書き出すレンダラ。
+/// 直前に書き出した `Buffer` と比べ、変わった `Cell` だけを端末デバイスへ書き出す型。
 @MainActor
 public final class Renderer {
     private let output: TerminalOutput
     private var previous: Buffer?
 
-    /// 書き出し先を指定してレンダラを作る。
+    /// 書き出し先を指定して `Renderer` を作る。
     ///
     /// - Parameters:
-    ///   - output: 差分を書き出す先。
+    ///   - output: 変わった `Cell` を書き出す先。
     public init(output: TerminalOutput) {
         self.output = output
     }
@@ -17,7 +17,7 @@ public final class Renderer {
         previous = nil
     }
 
-    /// バッファを描画し、直前のフレームとの差分だけを書き出す。
+    /// `buffer` を直前に書き出した `Buffer` と比べ、変わった `Cell` だけを書き出す。
     ///
     /// - Parameters:
     ///   - buffer: 描画したい画面内容。
@@ -32,7 +32,8 @@ public final class Renderer {
             out += ANSI.clearScreen
         }
 
-        // フレーム冒頭で SGR を全解除しているので、現在のスタイルは既定値。
+        // 上の `ANSI.reset` を外すか、`currentStyle` の初期値を変えてはいけない。端末エミュレータの SGR と
+        // `currentStyle` が食い違い、`Style.sgrSequence(transitioningFrom:)` が最初の `Cell` の SGR を省く。
         var currentStyle = Style.plain
         var cursorRow = -1
         var cursorColumn = -1
@@ -46,7 +47,8 @@ public final class Renderer {
                 for x in 0..<width {
                     dirty[x] = buffer[x, y] != previousBuffer[x, y]
                 }
-                // 継続セルだけを描き直しても全角文字は直らない。基底セルから描き直す。
+                // `Cell.isContinuation` が `true` の `Cell` だけを描き直しても全角文字は直らない。
+                // 左隣の、全角文字を持つ `Cell` から描き直す。
                 for x in 1..<max(1, width) where dirty[x] && buffer[x, y].isContinuation {
                     dirty[x - 1] = true
                 }
@@ -72,7 +74,8 @@ public final class Renderer {
                 while column < width {
                     let cell = buffer[column, y]
                     if cell.isContinuation {
-                        // 直前の全角文字が既にこの桁を埋めている。
+                        // この `Cell` の `Cell.character` を書き出してはいけない。直前の全角文字で端末エミュレータの
+                        // カーソルはこの `Cell` の先へ進んでいるので、その行の右側の `Cell` がずれる。
                         column += 1
                         continue
                     }
@@ -102,8 +105,8 @@ public final class Renderer {
         out += ANSI.endSynchronizedUpdate
 
         previous = buffer
-        // フレームを分けて書き出してはいけない。閉じる前に止まると、端末は更新を
-        // 保留したまま待ち続ける。
+        // `out` を分けて書き出してはいけない。`ANSI.endSynchronizedUpdate` を書き出す前に止まると、
+        // 端末エミュレータは更新を保留したまま待ち続ける。
         output.write(out)
         output.flush()
     }

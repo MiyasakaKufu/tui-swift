@@ -1,14 +1,14 @@
 import XCTest
 @testable import TUIKit
 
-/// `body` だけを書いた表示専用のコンポーネント。
+/// `Component.body` だけを書いた表示専用の `Component` に準拠する型。
 private final class DisplayOnlyComponent: Component {
     var body: some View {
         Text("こんにちは")
     }
 }
 
-/// `@main` を付けずに起動できる形だけ確かめるためのアプリ。
+/// `@main` を付けずに起動できる形だけ確かめるための `TerminalApp` に準拠する型。
 private final class MinimalApp: TerminalApp {
     static var options: ApplicationOptions { ApplicationOptions(mouseTracking: .buttons) }
 
@@ -82,9 +82,9 @@ final class ComponentTests: XCTestCase {
     }
 }
 
-/// `options` を書かないアプリ。既定値が使われる。
+/// `TerminalApp.options` を書かない `TerminalApp` に準拠する型。`TerminalApp.options` のデフォルトの実装が使われる。
 private final class DefaultOptionApp: TerminalApp {
     var body: some View {
-        Text("既定")
+        Text("DefaultOptionApp")
     }
 }

@@ -8,11 +8,11 @@ import Darwin
 import Glibc
 #endif
 
-/// 制御コードが途中で分かれて届いたときの `InputReader` の振る舞いを確かめる。
+/// ESC で始まるバイト列が途中で分かれて届いたときの `InputReader` の振る舞いを確かめる。
 @MainActor
 final class InputReaderTests: XCTestCase {
 
-    /// 途中までの制御コードは確定させず、続きが届いてから 1 つのイベントにする。
+    /// 途中までのバイト列は確定させず、続きが届いてから 1 つの `InputEvent` にする。
     func testSequenceDelayedMidwayIsNotTurnedIntoEscape() async throws {
         let input = try PipePair()
         defer { input.close() }
@@ -27,7 +27,7 @@ final class InputReaderTests: XCTestCase {
         ])
     }
 
-    /// 起こされただけのときも、途中までの制御コードは確定させない。
+    /// 起こされただけのときも、途中までのバイト列は確定させない。
     func testWakeupDoesNotFinishHalfSequence() async throws {
         let input = try PipePair()
         defer { input.close() }
@@ -70,7 +70,7 @@ final class InputReaderTests: XCTestCase {
         )
     }
 
-    /// 続きが届かなかった制御コードは、文字のキーに分解されない。
+    /// 続きが届かなかったバイト列は、文字のキーに分解されない。
     func testTimedOutHalfSequenceProducesNoKeys() async throws {
         let input = try PipePair()
         defer { input.close() }
@@ -95,7 +95,7 @@ final class InputReaderTests: XCTestCase {
         XCTAssertLessThan(Date().timeIntervalSince(started), 1)
     }
 
-    /// 応答しない端末では、待ち時間が過ぎたら応答なしとして戻る。
+    /// 応答しない端末エミュレータでは、待ち時間が過ぎたら応答なしとして戻る。
     func testQueryRepliesGiveUpAfterTimeout() async throws {
         let input = try PipePair()
         defer { input.close() }
@@ -122,7 +122,7 @@ final class InputReaderTests: XCTestCase {
         loopReader.adopt(queryReader.takeUnreadState())
 
         XCTAssertEqual(loopReader.wait(timeout: 0.1), [.key(KeyEvent(.character("a")))])
-        XCTAssertEqual(queryReader.wait(timeout: 0.1), [], "取り出した側に残っている")
+        XCTAssertEqual(queryReader.wait(timeout: 0.1), [], "取り出し元の `InputReader` に残っている")
     }
 
     /// ペーストの途中で起こされたときも、待ちから戻る。
@@ -182,9 +182,9 @@ private final class PipePair {
         case unavailable(errno: Int32)
     }
 
-    /// 読み取り側の記述子。
+    /// 読み取り用の記述子。
     let readEnd: Int32
-    /// 書き込み側の記述子。
+    /// 書き込み用の記述子。
     let writeEnd: Int32
     private var isReadEndClosed = false
     private var isWriteEndClosed = false
@@ -203,7 +203,7 @@ private final class PipePair {
         close()
     }
 
-    /// 文字列を書き込み側へ流す。
+    /// 文字列を `writeEnd` へ書き込む。
     ///
     /// - Parameters:
     ///   - text: 流す文字列。
@@ -212,7 +212,7 @@ private final class PipePair {
         _ = write(writeEnd, &bytes, bytes.count)
     }
 
-    /// 書き込み側だけを閉じ、読み取り側から見て入力が終わった状態にする。
+    /// `writeEnd` だけを閉じ、`readEnd` から見て入力が終わった状態にする。
     func closeWriteEnd() {
         guard !isWriteEndClosed else { return }
         isWriteEndClosed = true
@@ -228,7 +228,7 @@ private final class PipePair {
     }
 }
 
-// クラスの中から `close(2)` は直接呼べない。メンバーの `close()` が先に見つかる。
+// クラスの中から `close(2)` は直接呼び出せない。メンバーの `close()` が先に見つかる。
 /// ファイル記述子を閉じる。
 ///
 /// - Parameters:

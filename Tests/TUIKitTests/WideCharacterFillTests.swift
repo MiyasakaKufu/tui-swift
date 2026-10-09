@@ -1,7 +1,9 @@
 import XCTest
 @testable import TUIKit
 
-/// 1 セルずつ書き込む描画に全角文字を渡しても、行の表示幅がバッファの幅を超えないことを確かめる。
+/// `Cell` 1 個ずつ書き込む描画（`Fill`・`Divider`・`ProgressBar`・`View.border(_:style:title:titleStyle:)` など）に
+/// 全角文字を渡しても、`Buffer.text(ofRow:)` を
+/// `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` に渡した戻り値が、どの行でも `Buffer.size.width` を超えないことを確かめる。
 @MainActor
 final class WideCharacterFillTests: XCTestCase {
 
@@ -12,13 +14,14 @@ final class WideCharacterFillTests: XCTestCase {
         return buffer
     }
 
-    /// 各行の表示幅がバッファの幅と一致することを確かめる。
+    /// `Buffer.text(ofRow:)` を `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` に渡した戻り値が、
+    /// どの行でも `Buffer.size.width` と一致することを確かめる。
     private func assertRowsFit(_ buffer: Buffer, file: StaticString = #filePath, line: UInt = #line) {
         for y in 0..<buffer.size.height {
             XCTAssertEqual(
                 DisplayWidth.width(of: buffer.text(ofRow: y)),
                 buffer.size.width,
-                "行 \(y) の表示幅",
+                "行 \(y) の DisplayWidth.width(of: String, ambiguous: AmbiguousWidth) の戻り値",
                 file: file,
                 line: line
             )
@@ -81,14 +84,13 @@ final class WideCharacterFillTests: XCTestCase {
     }
 
     func testProgressBarWithWideCharactersPadsOddSegments() async {
-        // 幅 9 の 37.5% は 3 桁。全角文字は 1 個しか置けないので、残りの 1 桁は空白になる。
         let buffer = render(
             ProgressBar(value: 3, total: 8, filledCharacter: "＊", emptyCharacter: "・"),
             width: 9,
             height: 1
         )
         assertRowsFit(buffer)
-        XCTAssertEqual(buffer.text(ofRow: 0), "＊ ・・・")
+        XCTAssertEqual(buffer.text(ofRow: 0), "＊" + " " + "・・・")
     }
 
     func testDividerWithZeroWidthCharacterBecomesSpaces() async {
@@ -109,7 +111,7 @@ final class WideCharacterFillTests: XCTestCase {
         XCTAssertEqual(buffer.text(ofRow: 0), "X い")
     }
 
-    /// `TextField` は全角文字のセルへカーソルを重ねるとき、同じ文字を書き直す。
+    /// `TextField` は全角文字の `Cell` へカーソルを重ねるとき、同じ文字を書き直す。
     func testOverwritingWideCharacterHeadWithWideCharacterKeepsContinuation() async {
         var buffer = Buffer(size: Size(width: 4, height: 1))
         buffer.write("あい", at: Point(x: 0, y: 0))

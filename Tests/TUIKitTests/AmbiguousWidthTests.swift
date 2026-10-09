@@ -52,7 +52,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(DisplayWidth.width(of: "🎉", ambiguous: .wide), 2)
     }
 
-    /// Ambiguous でもある結合文字は、曖昧幅の設定に関わらず 0 桁になる。
+    /// Ambiguous でもある結合文字は、`ambiguous` 引数が `.wide` でも `Cell` 0 個分になる。
     func testZeroWidthCharactersStayZero() async {
         let combiningAcuteAccent = "\u{0301}"
         XCTAssertEqual(DisplayWidth.width(of: "e" + combiningAcuteAccent, ambiguous: .wide), 1)
@@ -130,7 +130,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(ApplicationOptions(ambiguousWidth: .wide).ambiguousWidth, .wide)
     }
 
-    // MARK: - 描画側の切り替え
+    // MARK: - 描画での切り替え
 
     func testChildContextsCarryTheSetting() async {
         let root = RenderContext(screen: Rect(x: 0, y: 0, width: 1, height: 1), ambiguousWidth: .wide)
@@ -162,7 +162,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertTrue(BorderStyle.ascii.fitsInSingleColumn(ambiguous: .wide))
     }
 
-    /// 枠線の文字組みは、作ったときの曖昧幅の既定値に左右されない。
+    /// `BorderStyle` が持つ文字は、作ったときの `DisplayWidth.defaultAmbiguousWidth` に左右されない。
     func testBorderStyleKeepsAmbiguousCharacters() async {
         let style = BorderStyle(
             topLeft: "╔", top: "═", topRight: "╗",
@@ -179,8 +179,9 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(render(view, width: 4, height: 3, ambiguous: .wide), "+--+\n|ab|\n+--+")
     }
 
-    /// 曖昧幅が 2 桁のとき、埋まる側（Ambiguous の `█`）だけが 2 桁になり、
-    /// 残りの側（Neutral の `░`）は 1 桁のまま行の幅が保たれる。
+    /// `ambiguous` 引数が `.wide` のとき、`ProgressBar.filledCharacter` の `█`（Ambiguous）は `Cell` 2 個分、
+    /// `ProgressBar.emptyCharacter` の `░`（Neutral）は `Cell` 1 個分になり、行の文字列の
+    /// `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` の戻り値は 10 のまま保たれる。
     func testProgressBarKeepsRowWidthWhenAmbiguousIsWide() async {
         let bar = ProgressBar(value: 0.5)
         XCTAssertEqual(render(bar, width: 10, height: 1, ambiguous: .narrow), "█████░░░░░")

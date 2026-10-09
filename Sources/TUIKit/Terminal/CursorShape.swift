@@ -1,6 +1,6 @@
-/// 端末カーソルの形と点滅の有無。
+/// 端末エミュレータが表示するカーソルの形と点滅の有無。
 public enum CursorShape: Hashable, Sendable {
-    /// 端末の設定どおりの形。
+    /// 端末エミュレータの設定どおりの形。
     case `default`
     /// 点滅するブロック。
     case blinkingBlock
