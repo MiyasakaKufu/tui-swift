@@ -15,7 +15,7 @@ final class DemoApp: TerminalApp {
     }
 
     private let items = [
-        "差分だけ書き出す",
+        "差分レンダリング",
         "全角文字・絵文字の幅計算",
         "キー入力とマウスの解析",
         "VStack / HStack によるレイアウト",
