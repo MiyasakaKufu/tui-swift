@@ -13,7 +13,7 @@ import CTUITestSupport
 @MainActor
 final class ApplicationBugReproductionTests: XCTestCase {
 
-    /// イベントを処理している最中に端末サイズが変わっても `.resize` が届く。
+    /// `Component.handle(_:)` の実行中に端末デバイスのウィンドウサイズが変わっても `.resize` が届く。
     func testResizeDuringEventHandlingIsReported() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -30,7 +30,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         let resizedSize = Size(width: 100, height: 30)
         XCTAssertEqual(setTerminalSize(master, initialSize), 0)
 
-        // 出力先が詰まるとループが止まるので、master 側は読み捨て続ける。
+        // 端末デバイスへの書き出しが詰まるとループが止まるので、master から読み捨て続ける。
         let drain = OutputDrain(descriptor: master)
         drain.start()
         defer { drain.stop() }
@@ -62,7 +62,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         XCTAssertEqual(component.reportedSizes, [initialSize, resizedSize])
     }
 
-    /// `reportsFocus` を有効にすると `.focus` が届き、終了時に通知が止まる。
+    /// `ApplicationOptions.reportsFocus` を有効にすると `.focus` が届き、終了時に通知が止まる。
     func testApplicationEnablesFocusReporting() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -77,7 +77,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
 
-        // 出力先が詰まるとループが止まるので、master 側は読み続ける。
+        // 端末デバイスへの書き出しが詰まるとループが止まるので、master から読み続ける。
         let drain = OutputDrain(descriptor: master, recordsOutput: true)
         drain.start()
         defer { drain.stop() }
@@ -109,7 +109,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         XCTAssertEqual(component.focusChanges, [true, false])
         XCTAssertTrue(
             drain.waitForOutput(containing: ANSI.enableFocusReporting, timeout: 2),
-            "フォーカス通知を有効にするシーケンスが送られていない"
+            "`ANSI.enableFocusReporting` が書き出されていない"
         )
         XCTAssertTrue(
             drain.waitForOutput(containing: ANSI.disableFocusReporting, timeout: 2),
@@ -117,10 +117,10 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
     }
 
-    /// `ambiguousWidth` の指定どおりの桁数で枠線が描かれる。
+    /// `ApplicationOptions.ambiguousWidth` が `.narrow` なら `BorderStyle.rounded` のまま、`.wide` なら `BorderStyle.ascii` で枠線が描かれる。
     func testApplicationDrawsBorderWithTheAmbiguousWidthOption() async throws {
-        // 枠全体（`╭──╮`）を探してはいけない。ルートのビューは端末全体に広がるので、
-        // 角と角の間は端末の幅まで伸び、その並びは出力に現れない。
+        // 枠全体（`╭──╮`）を探してはいけない。`Application` が最初にメソッドを呼び出す `View` は
+        // `Buffer` 全体に広がるので、角と角の間は `Buffer` の幅いっぱいまで続き、その並びは出力に現れない。
         let cases: [(DisplayWidth.AmbiguousWidth, [String])] = [
             (.narrow, ["╭──", "│ab"]),
             (.wide, ["+--", "|ab"]),
@@ -139,7 +139,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
             XCTAssertEqual(setTerminalSize(master, Size(width: 20, height: 5)), 0)
 
-            // 出力先が詰まるとループが止まるので、master 側は読み続ける。
+            // 端末デバイスへの書き出しが詰まるとループが止まるので、master から読み続ける。
             let drain = OutputDrain(descriptor: master, recordsOutput: true)
             drain.start()
             defer { drain.stop() }
@@ -168,7 +168,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         }
     }
 
-    /// `mouseTracking` が `.motion` なら、ボタンを押していない移動が `.move` として届く。
+    /// `ApplicationOptions.mouseTracking` が `.motion` なら、ボタンを押していない移動が `.move` として届く。
     func testApplicationEnablesMouseMotionTracking() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -183,7 +183,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
 
-        // 出力先が詰まるとループが止まるので、master 側は読み続ける。
+        // 端末デバイスへの書き出しが詰まるとループが止まるので、master から読み続ける。
         let drain = OutputDrain(descriptor: master, recordsOutput: true)
         drain.start()
         defer { drain.stop() }
@@ -216,7 +216,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
         XCTAssertTrue(
             drain.waitForOutput(containing: ANSI.enableMouseMotionTracking, timeout: 2),
-            "移動追跡を有効にするシーケンスが送られていない"
+            "`ANSI.enableMouseMotionTracking` が書き出されていない"
         )
         XCTAssertTrue(
             drain.waitForOutput(containing: ANSI.disableMouseTracking, timeout: 2),
@@ -224,7 +224,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
     }
 
-    /// 対応する端末では kitty keyboard protocol を有効にし、Ctrl+I と Tab を区別する。
+    /// 対応する端末エミュレータでは kitty keyboard protocol を有効にし、Ctrl+I と Tab を区別する。
     func testApplicationEnablesKeyboardProtocolWhenSupported() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -239,7 +239,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
 
-        // 出力先が詰まるとループが止まるので、master 側は読み続ける。
+        // 端末デバイスへの書き出しが詰まるとループが止まるので、master から読み続ける。
         let drain = OutputDrain(descriptor: master, recordsOutput: true)
         drain.start()
         defer { drain.stop() }
@@ -273,7 +273,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
         XCTAssertTrue(
             drain.waitForOutput(containing: ANSI.enableKeyboardProtocol, timeout: 2),
-            "対応している端末で有効にするシーケンスが送られていない"
+            "対応している端末エミュレータのとき `ANSI.enableKeyboardProtocol` が書き出されていない"
         )
         XCTAssertTrue(
             drain.waitForOutput(containing: ANSI.disableKeyboardProtocol, timeout: 2),
@@ -281,7 +281,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
     }
 
-    /// 応答しない端末では kitty keyboard protocol を有効にしない。
+    /// 応答しない端末エミュレータでは kitty keyboard protocol を有効にしない。
     func testApplicationLeavesKeyboardProtocolOffWhenUnsupported() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -296,7 +296,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
 
-        // 出力先が詰まるとループが止まるので、master 側は読み続ける。
+        // 端末デバイスへの書き出しが詰まるとループが止まるので、master から読み続ける。
         let drain = OutputDrain(descriptor: master, recordsOutput: true)
         drain.start()
         defer { drain.stop() }
@@ -322,11 +322,11 @@ final class ApplicationBugReproductionTests: XCTestCase {
         XCTAssertEqual(component.keys, [KeyEvent(.tab)], "従来どおりの形式で届いていない")
         XCTAssertFalse(
             drain.waitForOutput(containing: ANSI.enableKeyboardProtocol, timeout: 0.5),
-            "応答しない端末で有効にしてはいけない"
+            "応答しない端末エミュレータで有効にしてはいけない"
         )
     }
 
-    /// Ctrl+Z を受けると端末をシェルへ返し、再開したら設定と画面を取り戻す。
+    /// Ctrl+Z を受けると、止まる前に端末デバイスの termios を元に戻し、再開したら raw モードへ設定し直して、`Component.handle(_:)` へ `.resize` を改めて渡す。
     func testControlZSuspendsAndResumesTerminal() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -341,7 +341,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
 
-        // 出力先が詰まるとループが止まるので、master 側は読み捨て続ける。
+        // 端末デバイスへの書き出しが詰まるとループが止まるので、master から読み捨て続ける。
         let drain = OutputDrain(descriptor: master)
         drain.start()
         defer { drain.stop() }
@@ -381,9 +381,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
         try await application.run()
 
         XCTAssertFalse(isRawModeWhileStopped, "止まる前に raw モードを解いていない")
-        XCTAssertTrue(isCanonicalWhileStopped, "止まる前に端末属性を戻していない")
+        XCTAssertTrue(isCanonicalWhileStopped, "止まる前に端末デバイスの termios を戻していない")
         XCTAssertTrue(isRawModeAfterResume, "再開後に raw モードへ戻っていない")
-        XCTAssertFalse(isCanonicalAfterResume, "再開後に端末属性を設定し直していない")
+        XCTAssertFalse(isCanonicalAfterResume, "再開後に端末デバイスの termios を設定し直していない")
         XCTAssertEqual(
             component.reportedSizes,
             [Size(width: 80, height: 24), Size(width: 80, height: 24)],
@@ -391,7 +391,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
     }
 
-    /// クラッシュしたときの手順で端末が元に戻る。
+    /// クラッシュしたときの手順で、端末デバイスの termios が戻り、`CrashRestorer.restoreSequence` が書き出される。
     func testCrashRestoreReturnsTerminalToNormalMode() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -416,20 +416,20 @@ final class ApplicationBugReproductionTests: XCTestCase {
         XCTAssertFalse(isCanonicalMode(slave), "raw モードになっていない")
 
         // クラッシュのシグナルを送るとテストプロセスごと落ちるため、
-        // ハンドラが呼ぶ処理だけを直接確かめる。
+        // ハンドラが呼び出す `ctui_crash_restorer_restore()` を、`CrashRestorer.restoreTerminal()` から直接呼び出して確かめる。
         CrashRestorer.restoreTerminal()
 
-        XCTAssertTrue(isCanonicalMode(slave), "クラッシュしても端末属性が戻らない")
+        XCTAssertTrue(isCanonicalMode(slave), "クラッシュしても端末デバイスの termios が戻らない")
         XCTAssertTrue(
             drain.waitForOutput(containing: CrashRestorer.restoreSequence, timeout: 2),
-            "クラッシュしても復元用の制御コードが書き出されない"
+            "クラッシュしても `CrashRestorer.restoreSequence` が書き出されない"
         )
     }
 }
 
-// MARK: - テスト用のコンポーネント
+// MARK: - テスト用の `Component` に準拠する型
 
-/// 受け取った `.resize` を記録し、キー入力に合わせて決められた動きをするコンポーネント。
+/// 受け取った `.resize` を記録し、キー入力に合わせて決められた動きをする `Component` に準拠する型。
 private final class ResizeRecordingComponent: Component {
 
     /// 受け取った `.resize` のサイズを届いた順に並べたもの。
@@ -437,9 +437,9 @@ private final class ResizeRecordingComponent: Component {
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// 最初のキーを処理している最中に呼ばれる。
+    /// 最初のキーを受け取った `Component.handle(_:)` が、戻る前に呼び出すクロージャ。
     var onFirstKey: () -> Void = {}
-    /// 入力が届かないまま時間切れになったときの脱出口。
+    /// 入力が届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private var keyCount = 0
@@ -471,7 +471,7 @@ private final class ResizeRecordingComponent: Component {
     }
 }
 
-/// 受け取った `.focus` を記録し、フォーカスを失った時点で終了するコンポーネント。
+/// 受け取った `.focus` を記録し、フォーカスを失った時点で終了する `Component` に準拠する型。
 private final class FocusRecordingComponent: Component {
 
     /// 受け取った `.focus` の値を届いた順に並べたもの。
@@ -479,7 +479,7 @@ private final class FocusRecordingComponent: Component {
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// 通知が届かないまま時間切れになったときの脱出口。
+    /// 通知が届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private var elapsedTotal = 0.0
@@ -501,10 +501,10 @@ private final class FocusRecordingComponent: Component {
     }
 }
 
-/// 枠線で囲んだ文字列を描き、何フレームか回ったら終了するコンポーネント。
+/// 枠線で囲んだ文字列を描き、`Component.update(elapsed:)` に渡された `elapsed` の合計が 0.1 秒を超えたら `onFramesDrawn` を呼び出す `Component` に準拠する型。
 private final class BorderDrawingComponent: Component {
 
-    /// 何フレームか回ったときに呼ばれる。
+    /// 渡された `elapsed` の合計が 0.1 秒を超えたときに、`Component.update(elapsed:)` が呼び出すクロージャ。
     var onFramesDrawn: () -> Void = {}
 
     private var elapsedTotal = 0.0
@@ -521,7 +521,7 @@ private final class BorderDrawingComponent: Component {
     }
 }
 
-/// 受け取ったマウスイベントを記録し、移動が届いたら終了するコンポーネント。
+/// 受け取ったマウスイベントを記録し、移動が届いたら終了する `Component` に準拠する型。
 private final class MouseRecordingComponent: Component {
 
     /// 受け取ったマウスイベントを届いた順に並べたもの。
@@ -529,7 +529,7 @@ private final class MouseRecordingComponent: Component {
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// 移動が届かないまま時間切れになったときの脱出口。
+    /// 移動が届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private var elapsedTotal = 0.0
@@ -551,7 +551,7 @@ private final class MouseRecordingComponent: Component {
     }
 }
 
-/// 受け取ったキーを記録し、決めた数だけ届いたら終了するコンポーネント。
+/// 受け取ったキーを記録し、決めた数だけ届いたら終了する `Component` に準拠する型。
 private final class KeyRecordingComponent: Component {
 
     /// 受け取ったキーを届いた順に並べたもの。
@@ -559,7 +559,7 @@ private final class KeyRecordingComponent: Component {
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// キーが届かないまま時間切れになったときの脱出口。
+    /// キーが届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private let expectedCount: Int
@@ -590,7 +590,7 @@ private final class KeyRecordingComponent: Component {
     }
 }
 
-/// 受け取った `.resize` を記録し、再開後の 2 度目で終了するコンポーネント。
+/// 受け取った `.resize` を記録し、起動時に続く 2 度目（再開後の最初）の `.resize` で終了する `Component` に準拠する型。
 ///
 /// Ctrl+Z を処理しないので、`Application` が一時停止する。
 private final class SuspendRecordingComponent: Component {
@@ -600,9 +600,9 @@ private final class SuspendRecordingComponent: Component {
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// 一時停止から戻って `.resize` が届いたときに呼ばれる。
+    /// 起動時に続く 2 度目の `.resize`（再開後に届く最初の `.resize`）を受け取った `Component.handle(_:)` が呼び出すクロージャ。
     var onResume: () -> Void = {}
-    /// 入力が届かないまま時間切れになったときの脱出口。
+    /// 入力が届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private var elapsedTotal = 0.0

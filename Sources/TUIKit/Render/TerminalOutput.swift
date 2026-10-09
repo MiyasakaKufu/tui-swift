@@ -1,10 +1,10 @@
-/// レンダラの出力先。
+/// `Renderer` の出力先。
 @MainActor
 public protocol TerminalOutput: AnyObject {
-    /// 文字列を出力バッファへ追加する。
+    /// 文字列を、`flush()` を呼び出すまで溜めておく。
     ///
     /// - Parameters:
-    ///   - text: 追加する文字列。
+    ///   - text: 溜めておく文字列。
     func write(_ text: String)
     /// 溜めた出力を実際に書き出す。
     func flush()
@@ -14,9 +14,9 @@ public protocol TerminalOutput: AnyObject {
 public final class StringOutput: TerminalOutput {
     /// これまでに書き込まれた文字列。
     public private(set) var contents: String = ""
-    /// `write(_:)` が呼ばれた回数。
+    /// `write(_:)` が呼び出された回数。
     public private(set) var writeCount: Int = 0
-    /// `flush()` が呼ばれた回数。
+    /// `flush()` が呼び出された回数。
     public private(set) var flushCount: Int = 0
 
     /// 空の出力先を作る。

@@ -6,17 +6,17 @@ import Glibc
 
 import CTUIShim
 
-/// 端末制御に失敗したときのエラー。
+/// `Terminal` が端末デバイスを操作できなかったときのエラー。
 public enum TerminalError: Error, Equatable {
-    /// 標準入出力が端末に接続されていない。
+    /// `Terminal.inputDescriptor` か `Terminal.outputDescriptor` が端末デバイスでない。
     case notATerminal
-    /// termios の取得・設定に失敗した。
+    /// 端末デバイスの termios の取得・設定に失敗した。
     case termiosFailed(errno: Int32)
-    /// 端末サイズの取得に失敗した。
+    /// 端末デバイスのウィンドウサイズの取得に失敗した。
     case sizeUnavailable
 }
 
-/// 端末そのものを表し、raw モードや代替画面の切り替えと出力を担当する。
+/// 端末デバイスへの書き出しと termios の書き換え、端末エミュレータへ送るモードの切り替えを行う型。
 @MainActor
 public final class Terminal: TerminalOutput {
     /// 入力を読み取るファイル記述子。
@@ -24,9 +24,9 @@ public final class Terminal: TerminalOutput {
     /// 出力を書き出すファイル記述子。
     public let outputDescriptor: Int32
 
-    /// raw モードへ入る前の端末属性。戻す先として覚えておく。
+    /// raw モードへ入る前の、端末デバイスの termios。戻す先として覚えておく。
     private var originalAttributes: termios?
-    /// raw モードが今この端末に効いているか。
+    /// raw モードが今この端末デバイスに効いているか。
     private var isRawModeActive = false
     private var pendingOutput: [UInt8] = []
 
@@ -38,7 +38,7 @@ public final class Terminal: TerminalOutput {
     private var windowTitle: String?
     private var cursorShape: CursorShape?
 
-    /// 入出力のファイル記述子を指定して端末を作る。
+    /// 入出力のファイル記述子を指定して `Terminal` を作る。
     ///
     /// - Parameters:
     ///   - input: 入力を読み取るファイル記述子。
@@ -48,7 +48,7 @@ public final class Terminal: TerminalOutput {
         self.outputDescriptor = output
     }
 
-    /// 入出力の両方が端末に接続されているか。
+    /// 入出力の両方が端末デバイスに接続されているか。
     public var isTerminal: Bool {
         isatty(inputDescriptor) == 1 && isatty(outputDescriptor) == 1
     }
@@ -60,9 +60,9 @@ public final class Terminal: TerminalOutput {
 
     // MARK: - サイズ
 
-    /// 現在の端末サイズを問い合わせる。
+    /// 端末デバイスの現在のウィンドウサイズを問い合わせる。
     ///
-    /// - Returns: 端末サイズ。問い合わせに失敗した場合は環境変数 `COLUMNS` / `LINES`、
+    /// - Returns: 端末デバイスのウィンドウサイズ。問い合わせに失敗した場合は環境変数 `COLUMNS` / `LINES`、
     ///   それも無ければ 80x24。
     public func size() -> Size {
         var columns: Int32 = 0
@@ -89,19 +89,20 @@ public final class Terminal: TerminalOutput {
 
     /// canonical モードとエコーを無効にし、1 バイトずつ入力を受け取れるようにする。
     ///
-    /// - Throws: 入出力が端末でなければ `TerminalError.notATerminal`、
+    /// - Throws: 入出力が端末デバイスでなければ `TerminalError.notATerminal`、
     ///   termios の取得・設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
-    /// - Postcondition: 元の端末属性を覚えるため、`disableRawMode()` で戻せる。
+    /// - Postcondition: raw モードへ入る前の termios を覚えるため、`disableRawMode()` で戻せる。
     ///   すでに raw モードなら何もしない。
-    /// - Note: クラッシュしても端末が戻るよう、シグナルハンドラを仕掛ける。
-    /// - Note: `restore()` を呼ばずにこの `Terminal` を捨てた場合、
-    ///   tty の termios が戻り、送った設定を打ち消す制御コードが書き出されるのは、
+    /// - Note: クラッシュしても端末デバイスの termios と、端末エミュレータへ送ったモードが戻るよう、
+    ///   シグナルハンドラを仕掛ける。
+    /// - Note: `restore()` を呼び出さずにこの `Terminal` を捨てた場合、
+    ///   端末デバイスの termios が戻り、端末エミュレータへ送ったモードを戻す `String` が書き出されるのは、
     ///   プロセスが終わるときになる。その前に別の `Terminal` が raw モードへ入るか、
-    ///   `disableRawMode()`（`restore()` からも呼ばれる）を呼ぶと戻らない。
-    ///   戻す先は 1 組しか覚えておけないため。捨てる前に `restore()` を呼ぶこと。
-    ///   入出力のファイル記述子を閉じる前にも `restore()` を呼ぶこと。呼ばずに閉じると、
-    ///   プロセスが終わるときに、同じ番号を割り当てられた別のファイルへ制御コードを書き込み、
-    ///   termios を設定しようとする。
+    ///   `disableRawMode()`（`restore()` からも呼び出される）を呼び出すと戻らない。
+    ///   戻す先は 1 組しか覚えておけないため。捨てる前に `restore()` を呼び出すこと。
+    ///   入出力のファイル記述子を閉じる前にも `restore()` を呼び出すこと。呼び出さずに閉じると、
+    ///   プロセスが終わるときに、同じ番号を割り当てられた別のファイルへ
+    ///   モードを戻す `String` を書き込み、termios を設定しようとする。
     public func enableRawMode() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
         guard !isRawModeActive else { return }
@@ -113,10 +114,10 @@ public final class Terminal: TerminalOutput {
         try applyRawMode(basedOn: attributes)
     }
 
-    /// 覚えた端末属性をもとに raw モードを設定する。
+    /// `original` をもとに、端末デバイスの termios を raw モードへ書き換える。
     ///
     /// - Parameters:
-    ///   - original: raw モードへ入る前の端末属性。
+    ///   - original: raw モードへ入る前の、端末デバイスの termios。
     /// - Throws: termios の設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
     private func applyRawMode(basedOn original: termios) throws {
         var raw = original
@@ -147,16 +148,16 @@ public final class Terminal: TerminalOutput {
         )
     }
 
-    /// raw モードを解除し、元の端末属性へ戻す。
+    /// raw モードを解除し、端末デバイスの termios を元へ戻す。
     public func disableRawMode() {
         applyOriginalAttributes()
         originalAttributes = nil
         CrashRestorer.disarm()
     }
 
-    /// 覚えている端末属性を書き戻す。
+    /// 覚えている termios を端末デバイスへ書き戻す。
     ///
-    /// - Postcondition: 覚えた属性は残るので、`reactivate()` で raw モードへ戻せる。
+    /// - Postcondition: 覚えた termios は残るので、`reactivate()` で raw モードへ戻せる。
     private func applyOriginalAttributes() {
         guard isRawModeActive, var attributes = originalAttributes else { return }
         _ = tcsetattr(inputDescriptor, TCSAFLUSH, &attributes)
@@ -165,7 +166,7 @@ public final class Terminal: TerminalOutput {
 
     // MARK: - 画面モード
 
-    /// 代替画面バッファへ切り替え、画面を消す。
+    /// 端末エミュレータの代替画面（alternate screen）へ切り替え、画面を消す。
     public func enterAlternateScreen() {
         guard !isInAlternateScreen else { return }
         isInAlternateScreen = true
@@ -174,7 +175,7 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
-    /// 代替画面バッファから元の画面へ戻る。
+    /// 端末エミュレータの代替画面から元の画面へ戻る。
     public func leaveAlternateScreen() {
         guard isInAlternateScreen else { return }
         isInAlternateScreen = false
@@ -196,7 +197,7 @@ public final class Terminal: TerminalOutput {
     /// - Parameters:
     ///   - title: 設定するタイトル。
     /// - Postcondition: `restore()` / `deactivate()` で設定する前のタイトルへ戻る。
-    /// - Note: タイトルのスタックに対応しない端末では、設定はできても戻らない。
+    /// - Note: タイトルのスタックに対応しない端末エミュレータでは、設定はできても戻らない。
     public func setWindowTitle(_ title: String) {
         if windowTitle == nil { write(ANSI.saveWindowTitle) }
         windowTitle = title
@@ -208,8 +209,8 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Parameters:
     ///   - shape: 設定する形。
-    /// - Postcondition: `restore()` / `deactivate()` で端末の設定どおりの形へ戻る。
-    /// - Note: `DECSCUSR` に対応しない端末では何も変わらない。
+    /// - Postcondition: `restore()` / `deactivate()` で端末エミュレータの設定どおりの形へ戻る。
+    /// - Note: `DECSCUSR` に対応しない端末エミュレータでは何も変わらない。
     public func setCursorShape(_ shape: CursorShape) {
         guard shape != cursorShape else { return }
         cursorShape = shape
@@ -232,11 +233,11 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
-    /// マウスイベントを受け取る範囲を端末へ伝えるシーケンスを返す。
+    /// マウスイベントを受け取る範囲を端末エミュレータへ伝える `ANSI` の定数を返す。
     ///
     /// - Parameters:
     ///   - tracking: 受け取る範囲。
-    /// - Returns: 端末へ送るシーケンス。`.disabled` なら `nil`。
+    /// - Returns: `tracking` の範囲を有効にする `ANSI` の定数。`.disabled` なら `nil`。
     private static func enableSequence(for tracking: MouseTracking) -> String? {
         switch tracking {
         case .disabled: return nil
@@ -260,8 +261,8 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Parameters:
     ///   - enabled: 受け取るなら `true`。
-    /// - Note: 有効にすると、端末がフォーカスを得たとき `ESC [ I`、失ったとき `ESC [ O` を
-    ///   送ってくる。`InputParser` はこれらを `.focus` として解釈する。
+    /// - Note: 有効にすると、端末エミュレータがフォーカスを得たとき `ESC [ I`、失ったとき
+    ///   `ESC [ O` のバイト列を送ってくる。`InputParser` はこれらを `.focus` として解釈する。
     public func setFocusReportingEnabled(_ enabled: Bool) {
         guard enabled != isFocusReportingEnabled else { return }
         isFocusReportingEnabled = enabled
@@ -276,7 +277,8 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Parameters:
     ///   - enabled: 有効にするなら `true`。
-    /// - Note: 対応しない端末は制御コードを読み飛ばすため、有効にしても何も変わらない。
+    /// - Note: 対応しない端末エミュレータは `ANSI.enableKeyboardProtocol` を読み飛ばすため、
+    ///   有効にしても何も変わらない。
     ///   対応しているかは `ANSI.queryKeyboardProtocol` で問い合わせる。
     public func setKeyboardProtocolEnabled(_ enabled: Bool) {
         guard enabled != isKeyboardProtocolEnabled else { return }
@@ -285,9 +287,9 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
-    /// 端末を起動前の状態へ戻す。
+    /// 端末デバイスの termios と、端末エミュレータへ送ったモードを元に戻す。
     ///
-    /// - Note: 二重に呼んでも安全。
+    /// - Note: 二重に呼び出しても安全。
     public func restore() {
         deactivate()
         isInAlternateScreen = false
@@ -300,11 +302,11 @@ public final class Terminal: TerminalOutput {
         disableRawMode()
     }
 
-    /// 設定を覚えたまま端末を起動前の状態へ戻す。
+    /// 端末エミュレータへ送ったモードを覚えたまま、端末デバイスの termios とそのモードを元に戻す。
     ///
-    /// 一時停止のように、端末をいったんシェルへ返してから戻ってくる場合に使う。
+    /// 一時停止のように、端末デバイスをいったんシェルに使わせてから戻ってくる場合に使う。
     ///
-    /// - Postcondition: `reactivate()` で同じ設定へ戻せる。二重に呼んでも安全。
+    /// - Postcondition: `reactivate()` で raw モードと、端末エミュレータへ送ったモードへ戻せる。二重に呼び出しても安全。
     public func deactivate() {
         // 同期出力を開くのは `Renderer` で、この型は開いているかを知らない。開いたまま
         // 抜けると、後ろに続く復元が画面へ出ない。
@@ -322,12 +324,14 @@ public final class Terminal: TerminalOutput {
         applyOriginalAttributes()
     }
 
-    /// 覚えている設定を端末へ入れ直す。
+    /// 覚えている termios をもとに端末デバイスを raw モードへ戻し、覚えているモードを端末エミュレータへ送り直す。
     ///
-    /// - Throws: 入出力が端末でなければ `TerminalError.notATerminal`、
+    /// - Throws: 入出力が端末デバイスでなければ `TerminalError.notATerminal`、
     ///   termios の設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
     /// - Note: `deactivate()` の後だけでなく、捕まえられない SIGSTOP で止められた後のように、
-    ///   端末側の設定だけが失われた場合にも使える。今の状態を見ずに必ず設定し直す。
+    ///   端末デバイスの termios や端末エミュレータのモードだけが失われた場合にも使える。
+    ///   端末デバイスの termios や端末エミュレータのモードが今どうなっているかは見ずに、毎回 termios を
+    ///   書き換え、モードを送り直す。
     public func reactivate() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
 
@@ -352,14 +356,15 @@ public final class Terminal: TerminalOutput {
 
     // MARK: - クリップボード
 
-    /// 文字列をクリップボードへ渡す。
+    /// 文字列を、端末エミュレータを通してクリップボードへ渡す。
     ///
     /// - Parameters:
     ///   - text: クリップボードへ渡す文字列。空文字列を渡すとクリップボードを空にする。
     ///   - limit: Base64 に変換した後の長さの上限（バイト）。
-    /// - Returns: 端末へ送ったなら `true`。上限を超えて送らなかったなら `false`。
-    /// - Note: 端末が OSC 52 を拒否していれば、送ってもクリップボードは変わらない。
-    ///   応答がないため、戻り値では区別できない。
+    /// - Returns: `ANSI.setClipboard(_:limit:)` の戻り値を端末デバイスへ書き出したなら `true`。
+    ///   上限を超えて書き出さなかったなら `false`。
+    /// - Note: 端末エミュレータが OSC 52 を拒否していれば、書き出してもクリップボードは変わらない。
+    ///   端末エミュレータは応答を送ってこないため、戻り値では区別できない。
     @discardableResult
     public func copyToClipboard(_ text: String, limit: Int = ANSI.clipboardLimit) -> Bool {
         guard let sequence = ANSI.setClipboard(text, limit: limit) else { return false }
@@ -370,15 +375,15 @@ public final class Terminal: TerminalOutput {
 
     // MARK: - 出力
 
-    /// 文字列を出力バッファへ追加する。
+    /// 文字列を、`flush()` で端末デバイスへ書き出すまで溜めておく。
     ///
     /// - Parameters:
-    ///   - text: 追加する文字列。
+    ///   - text: 溜めておく文字列。
     public func write(_ text: String) {
         pendingOutput.append(contentsOf: Array(text.utf8))
     }
 
-    /// 溜めた出力を端末へ書き出す。
+    /// 溜めた出力を端末デバイスへ書き出す。
     public func flush() {
         guard !pendingOutput.isEmpty else { return }
         let bytes = pendingOutput
@@ -388,7 +393,7 @@ public final class Terminal: TerminalOutput {
 }
 
 // `Terminal` のメソッドにしてはいけない。`Terminal.write(_:)` が先に見つかり、
-// 自分自身を呼び続ける。
+// 自分自身を呼び出し続ける。
 
 /// `write(2)` を最後まで書き切るまで繰り返す。
 ///

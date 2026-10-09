@@ -1,6 +1,6 @@
 /// 枠線に使う文字の組み合わせ。
 public struct BorderStyle: Hashable, Sendable {
-    // var に戻すと幅 1 桁という不変条件が壊れる。差し替えはイニシャライザ経由で。
+    // var に戻すと、`DisplayWidth.AmbiguousWidth` が `.narrow` のとき幅が `Cell` 1 個分という不変条件が壊れる。差し替えはイニシャライザ経由で。
 
     /// 左上の角の文字。
     public private(set) var topLeft: Character
@@ -30,8 +30,8 @@ public struct BorderStyle: Hashable, Sendable {
     ///   - bottomLeft: 左下の角に置く文字。
     ///   - bottom: 下辺に並べる文字。
     ///   - bottomRight: 右下の角に置く文字。
-    /// - Postcondition: 曖昧幅を 1 桁と数えても 1 桁にならない文字（全角文字や絵文字）は、
-    ///   その位置の既定の文字（`single` と同じ細い実線）へ置き換わる。
+    /// - Postcondition: `DisplayWidth.AmbiguousWidth` が `.narrow` でも `Cell` 1 個分にならない文字（全角文字や絵文字）は、
+    ///   `BorderStyle.single` のその位置の文字（細い実線）へ置き換わる。
     public init(
         topLeft: Character,
         top: Character,
@@ -52,19 +52,19 @@ public struct BorderStyle: Hashable, Sendable {
         self.bottomRight = Self.singleWidth(bottomRight, fallback: "┘")
     }
 
-    // `.narrow` を既定の曖昧幅に変えてはいけない。同じ引数から環境によって違う文字組みができる。
-    // 曖昧幅が 2 桁のときの置き換え先（罫線素片）も 2 桁なので、置き換えても桁は揃わない。
+    // `.narrow` を `DisplayWidth.defaultAmbiguousWidth` に変えてはいけない。同じ引数から環境変数によって違う文字組みができる。
+    // `DisplayWidth.AmbiguousWidth` が `.wide` のときは置き換え先（罫線素片）も `Cell` 2 個分なので、置き換えても `Cell` 1 個分にはならない。
     private static func singleWidth(_ character: Character, fallback: Character) -> Character {
         DisplayWidth.width(of: character, ambiguous: .narrow) == 1 ? character : fallback
     }
 
-    /// 8 方向の文字がすべて 1 桁に収まるかを調べる。
+    /// 8 方向の文字がすべて `Cell` 1 個分に収まるかを調べる。
     ///
     /// - Parameters:
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
-    /// - Returns: すべて 1 桁なら `true`。
+    ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    /// - Returns: すべて `Cell` 1 個分なら `true`。
     /// - Note: 罫線素片は East Asian Width が Ambiguous なので、`ambiguous` が `.wide` のときは
-    ///   2 桁になる。`ascii` 以外の組み込みの文字組みは、どれも 1 桁に収まらない。
+    ///   `Cell` 2 個分になる。`BorderStyle.ascii` 以外の組み込みの文字組みは、どれも `Cell` 1 個分に収まらない。
     public func fitsInSingleColumn(
         ambiguous: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> Bool {

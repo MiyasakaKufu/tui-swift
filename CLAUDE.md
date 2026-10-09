@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-依存ライブラリなしのターミナル UI ライブラリ。`Sources/TUIKit` が本体、`Sources/TUIDemo` がデモ、
+依存ライブラリなしの TUI ライブラリ。`Sources/TUIKit` が本体、`Sources/TUIDemo` がデモ、
 `Sources/CTUIShim` は Swift から直接呼べない C の API（可変長引数の `ioctl`、
 共用体を含む `struct sigaction`）のための C シム。
 

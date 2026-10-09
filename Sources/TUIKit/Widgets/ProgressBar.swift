@@ -42,21 +42,21 @@ public struct ProgressBar: PrimitiveView {
         self.showsPercentage = showsPercentage
     }
 
-    /// 横方向にだけ伸びる性質を返す。
+    /// `LayoutTraits.horizontalFlex` だけを 1 にした `LayoutTraits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 横方向の重みだけが 1 の性質。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: `LayoutTraits.horizontalFlex` が 1、`LayoutTraits.verticalFlex` が 0 の `LayoutTraits`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         LayoutTraits(horizontalFlex: 1, verticalFlex: 0)
     }
 
-    /// 与えられた幅いっぱい、高さ 1 行を希望する。
+    /// `proposal` の幅いっぱいで、高さが 1 を超えない `Size` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: `proposal` の幅と、高さ 1 行のサイズ。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: `proposal` の幅と、1 と `proposal.height` の小さい方を高さにした `Size`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         Size(width: proposal.width, height: min(1, proposal.height))
     }
@@ -64,9 +64,9 @@ public struct ProgressBar: PrimitiveView {
     /// バーと、必要なら百分率を描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。使うのは最初の 1 行だけ。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 文字列の幅を測るときに `RenderContext.ambiguousWidth` を読む `RenderContext`。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width > 0, rect.height > 0 else { return }
 

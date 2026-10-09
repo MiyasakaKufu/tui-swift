@@ -1,4 +1,4 @@
-/// 端末の基本 16 色。
+/// 端末エミュレータの基本 16 色。
 public enum ANSIColor: UInt8, Hashable, Sendable, CaseIterable {
     /// 黒。
     case black = 0
@@ -36,13 +36,13 @@ public enum ANSIColor: UInt8, Hashable, Sendable, CaseIterable {
 
 /// 文字色・背景色。
 public enum Color: Hashable, Sendable {
-    /// 端末の既定色（SGR 39 / 49）。
+    /// 端末エミュレータが文字色・背景色に使うデフォルトの色（SGR 39 / 49）。
     case `default`
     /// 基本 16 色。
     case ansi(ANSIColor)
     /// xterm 256 色。
     case xterm256(UInt8)
-    /// 24 ビットカラー（トゥルーカラー）。対応していない端末では無視される。
+    /// 24 ビットカラー（トゥルーカラー）。対応していない端末エミュレータでは無視される。
     case rgb(r: UInt8, g: UInt8, b: UInt8)
 
     /// 基本 16 色の黒。

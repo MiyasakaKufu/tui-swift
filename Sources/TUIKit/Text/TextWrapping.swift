@@ -10,21 +10,21 @@ public enum WrapMode: Hashable, Sendable {
     case character
 }
 
-/// 表示幅を考慮した行分割。
+/// 端末エミュレータで占める `Cell` の数で行の長さを測る行分割。
 public enum TextWrapping {
 
     /// `text` を幅 `width` に収まる行の配列へ分割する。
     ///
     /// 改行文字は常に行の区切りとして扱う。LF（`\n`）だけでなく、
     /// CRLF（`\r\n`）・単独の CR（`\r`）も 1 つの改行として扱う。
-    /// タブは `tabSize` 桁ごとのタブストップまでの空白へ展開する。
+    /// タブは、`tabSize` 個の `Cell` ごとに置いたタブストップまでの空白へ展開する。
     ///
     /// - Parameters:
     ///   - text: 分割する文字列。
-    ///   - width: 1 行に許す表示幅。0 以下なら、各段落を空行として返す。
+    ///   - width: 1 行に許す `Cell` の数。0 以下なら、各段落を空行として返す。
     ///   - mode: 折り返しの方法。
     ///   - tabSize: タブストップの間隔。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
     /// - Returns: 各行の文字列。タブは展開済み。
     public static func wrap(
         _ text: String,

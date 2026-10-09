@@ -1,7 +1,7 @@
-/// 選択位置とスクロール位置を扱うリストの状態。
+/// 選択位置とスクロール位置を扱う、`ListView` が使うクラス。
 ///
-/// 選択位置（値）は自分で持つか、`ListView(items:selection:state:)` に渡した `Binding` を通して
-/// アプリが持つ値を読み書きする。スクロール位置（表示状態）はどちらの場合もここに置く。
+/// 選択位置は自分で持つか、`ListView(items:selection:state:style:selectedStyle:selectionMarker:marginMarker:)` に
+/// `Binding` で渡すプロパティを読み書きする。スクロール位置（`ListState.scrollOffset`）はどちらの場合もここに置く。
 @MainActor
 public final class ListState {
     private var ownedSelection: Int = 0
@@ -9,7 +9,7 @@ public final class ListState {
 
     /// 選択している項目の位置。
     ///
-    /// - Note: `Binding` の先の値が項目の範囲を外れていれば、端へ丸めた値を返す。
+    /// - Note: `Binding` で渡すプロパティの値が項目の範囲を外れていれば、端へ丸めた値を返す。
     ///   丸めた値は書き戻さない。書き戻すのは選択を動かす操作をしたときだけ。
     public var selectedIndex: Int {
         let raw = selectionBinding?.wrappedValue ?? ownedSelection
@@ -33,14 +33,14 @@ public final class ListState {
     public var itemCount: Int {
         didSet {
             // 同じ値の代入で表示位置を選択へ戻してはいけない。
-            // `ListView` は描画のたびに作られ、同じ項目数が入り直すので、
-            // ホイールで動かした表示位置が 1 フレームで消える。
+            // `ListView` は `Application.draw()` のたびに作られ、同じ項目数が入り直すので、
+            // ホイールで動かした表示位置が次の `Application.draw()` で消える。
             guard itemCount != oldValue else { return }
             scrollToSelection()
         }
     }
 
-    /// 項目数を指定して状態を作る。
+    /// 項目数を指定して `ListState` を作る。
     ///
     /// - Parameters:
     ///   - itemCount: 項目の総数。
@@ -51,7 +51,7 @@ public final class ListState {
     /// 選択位置の読み書きを `selection` へ向ける。
     ///
     /// - Parameters:
-    ///   - selection: アプリが持つ選択位置を読み書きする口。
+    ///   - selection: 選択位置を持つプロパティを読み書きする `Binding`。
     func bind(_ selection: Binding<Int>) {
         selectionBinding = selection
     }
@@ -67,7 +67,9 @@ public final class ListState {
             return
         }
         // 比べずに書き戻したくなるが、端で ↑ を押したときのように選択が動かない操作でも
-        // アプリの値が代入され、代入を契機に処理を走らせるアプリでそれが空振りで走る。
+        // `Binding` で渡すプロパティへ代入される。TUIKit を使う開発者が、`Binding(_:_:)` にキーパスで
+        // 渡したプロパティや、`Binding(get:set:)` の `set` で代入するプロパティに `didSet` を書いていれば、
+        // 値が変わらないのに `didSet` が呼び出される。
         guard selectionBinding.wrappedValue != clamped else { return }
         selectionBinding.wrappedValue = clamped
     }
@@ -123,7 +125,7 @@ public final class ListState {
     /// 上下キー・PageUp/PageDown・Home/End と縦方向のホイール、左ボタンの押下を処理する。
     ///
     /// - Parameters:
-    ///   - event: 端末から届いたイベント。
+    ///   - event: 処理する `InputEvent`。
     /// - Returns: 選択または表示位置を動かしたら `true`。
     /// - Note: ホイールは選択ではなく表示位置を `wheelScrollRows` 行動かす。
     ///   左ボタンの押下は、その位置にある項目を選択する。表示位置は動かさない。
@@ -133,13 +135,13 @@ public final class ListState {
     public func handle(_ event: InputEvent) -> Bool {
         guard case .key(let keyEvent) = event else {
             if case .mouse(let mouseEvent) = event {
-                // 1 列の選択リストなので、扱うのは縦方向のみ。横スクロールは
-                // トラックパッドの斜めの動きで混ざってくるが、このビューの
-                // 責務ではないので false を返して親に委ねる。
+                // 横ホイールも縦と同じように扱いたくなるが、そうすると `true` が返る。戻り値が `false` の
+                // ときだけ `InputEvent` を別のコードへ渡すように `ListState.handle(_:)` を呼び出していると、
+                // 横ホイールがそのコードへ届かなくなる。
                 //
-                // `default` を置かずに全ケースを列挙している。`MouseAction` が
-                // 増えたときにコンパイルエラーとなり、この場で方針を決めることを
-                // 強制するため。
+                // `default` を置かずに `MouseAction` のすべての `case` を列挙している。
+                // `MouseAction` の `case` が増えたときにコンパイルエラーとなり、この場で
+                // 方針を決めることを強制するため。
                 switch mouseEvent.action {
                 case .scrollUp:
                     return scrollByWheel(at: mouseEvent.position, rows: -wheelScrollRows)
@@ -149,7 +151,7 @@ public final class ListState {
                     return false
                 case .press:
                     // ボタンを問わず選択したくなるが、右ボタンや拡張ボタンに別の操作を
-                    // 割り当てたアプリで、その操作のたびに選択が動いてしまう。
+                    // 割り当てた TUIKit アプリで、その操作のたびに選択が動いてしまう。
                     guard mouseEvent.button == .left else { return false }
                     return selectItem(at: mouseEvent.position)
                 case .release, .drag, .move:
@@ -194,8 +196,8 @@ public final class ListState {
         return true
     }
 
-    // 座標から項目を求める式を公開したくなるが、`render(into:rect:context:)` が行の並べ方を
-    // 変えたときに、式を写したアプリの側が黙って壊れる。
+    // 座標から項目を求める式を公開したくなるが、`ListView.render(into:rect:context:)` が
+    // 行の並べ方を変えたときに、式を写した TUIKit アプリのコードが黙って壊れる。
     /// 矩形の中で起きた押下として、その位置の項目を選択する。
     ///
     /// - Parameters:
@@ -245,7 +247,7 @@ public final class ListState {
 public struct ListView: PrimitiveView {
     /// 各行に表示する文字列。
     public var items: [String]
-    /// スクロール位置を持つ状態。`Binding` を渡さずに作った場合は選択位置も持つ。
+    /// スクロール位置を持つ `ListState`。`Binding` を渡さずに作った場合は選択位置も持つ。
     public var state: ListState
     /// 非選択行のスタイル。
     public var style: Style
@@ -253,15 +255,15 @@ public struct ListView: PrimitiveView {
     public var selectedStyle: Style
     /// 選択行の先頭に付ける印。
     public var selectionMarker: String
-    /// 非選択行の先頭に入れる字下げ。既定では `selectionMarker` と同じ幅の空白。
+    /// 非選択行の先頭に入れる字下げ。`nil` なら `selectionMarker` と同じ幅の空白。
     public var marginMarker: String?
 
-    /// アプリが持つ選択位置を動かすリストを作る。
+    /// `Binding` で渡すプロパティに選択位置を持たせる `ListView` を作る。
     ///
     /// - Parameters:
     ///   - items: 各行に表示する文字列。
-    ///   - selection: 選択位置を読み書きする口。
-    ///   - state: スクロール位置を持つ状態。選択位置は持たず、`selection` を読み書きする。
+    ///   - selection: 選択位置を持つプロパティを読み書きする `Binding`。
+    ///   - state: スクロール位置を持つ `ListState`。選択位置は持たず、`selection` を読み書きする。
     ///   - style: 非選択行のスタイル。
     ///   - selectedStyle: 選択行のスタイル。
     ///   - selectionMarker: 選択行の先頭に付ける印。
@@ -289,11 +291,11 @@ public struct ListView: PrimitiveView {
         )
     }
 
-    /// 選択位置も持つ状態と項目を指定してリストを作る。
+    /// 選択位置も持つ `ListState` と項目を指定して `ListView` を作る。
     ///
     /// - Parameters:
     ///   - items: 各行に表示する文字列。
-    ///   - state: 選択位置とスクロール位置を持つ状態。
+    ///   - state: 選択位置とスクロール位置を持つ `ListState`。
     ///   - style: 非選択行のスタイル。
     ///   - selectedStyle: 選択行のスタイル。
     ///   - selectionMarker: 選択行の先頭に付ける印。
@@ -316,19 +318,20 @@ public struct ListView: PrimitiveView {
         state.itemCount = items.count
     }
 
-    /// 両方向に伸びる性質を返す。
+    /// `LayoutTraits.horizontalFlex` と `LayoutTraits.verticalFlex` をともに 1 にした `LayoutTraits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 常に `.flexible`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: 常に `LayoutTraits.flexible`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits { .flexible }
 
-    /// すべての項目を並べたときに必要なサイズを返す。
+    /// すべての項目を並べられる `Size` を、`proposal` の範囲で返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 最も長い項目の幅に印の幅を足した幅と、項目数から決まるサイズ。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 文字列の幅を測るときに `RenderContext.ambiguousWidth` を読む `RenderContext`。
+    /// - Returns: 最も長い項目の `Cell` の数に `selectionMarker` の `Cell` の数を足した幅と、項目数を、
+    ///   それぞれ `proposal` の幅と高さで切り詰めた `Size`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let ambiguous = context.ambiguousWidth
         let width = items.reduce(0) { max($0, DisplayWidth.width(of: $1, ambiguous: ambiguous)) }
@@ -342,9 +345,9 @@ public struct ListView: PrimitiveView {
     /// 表示範囲の項目を上から並べて描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 文字列の幅を測るときに `RenderContext.ambiguousWidth` を読む `RenderContext`。
     /// - Postcondition: `state.renderedRect` が `rect` に更新され、
     ///   スクロール位置が項目の範囲へ収められる。直前の描画から選択位置が変わっていれば、
     ///   選択が表示範囲に入るようスクロールする。
@@ -354,8 +357,8 @@ public struct ListView: PrimitiveView {
         // 描画のたびに選択へ戻すと、ホイールで動かした表示位置が元に戻る。
         let rowsChanged = state.visibleRows != rect.height
         // 選択を動かす操作がスクロールも済ませるので、ここでは選択の変化を見なくてよいと
-        // 考えたくなるが、アプリが `Binding` の先の値を直接変えると操作を通らず、
-        // 選択が表示範囲の外に残る。
+        // 考えたくなるが、TUIKit を使う開発者のコードが `Binding` で渡すプロパティを直接
+        // 書き換えると操作を通らず、選択が表示範囲の外に残る。
         let selectionChanged = state.renderedSelection != state.selectedIndex
         state.renderedRect = rect
         state.renderedSelection = state.selectedIndex
@@ -377,7 +380,7 @@ public struct ListView: PrimitiveView {
             let isSelected = (index == state.selectedIndex)
             let rowStyle = isSelected ? selectedStyle : style
             let prefix = isSelected ? selectionMarker : margin
-            // 幅で切り詰める前に展開しないと、タブの分だけ桁数の計算がずれる。
+            // 幅で切り詰める前に展開しないと、タブの分だけ `Cell` の数の計算がずれる。
             let line = TabExpansion.expand(prefix + items[index], ambiguous: context.ambiguousWidth)
             let y = rect.minY + row
 

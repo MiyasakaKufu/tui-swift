@@ -6,8 +6,8 @@ public enum MouseTracking: Hashable, Sendable {
     case buttons
     /// ボタンを押していない間の移動（`.move`）も受け取る。
     ///
-    /// - Note: カーソルが 1 桁動くたびにイベントが届く。ホバーの強調やツールチップのように、
-    ///   移動そのものを使うアプリだけが選ぶ。
+    /// - Note: マウスポインタが `Cell` 1 個分動くたびにイベントが届く。ホバーの強調やツールチップのように、
+    ///   移動そのものを使う TUIKit アプリだけが選ぶ。
     case motion
 }
 
@@ -77,16 +77,17 @@ public struct MouseEvent: Hashable, Sendable {
     }
 }
 
-/// 端末から届くイベント。
+/// `InputReader` が端末デバイスから受け取ったバイト列を `InputParser` が解釈したもの（`.key` など）か、
+/// `Application` が端末デバイスのウィンドウサイズの変化から作るもの（`.resize`）を表す型。
 public enum InputEvent: Hashable, Sendable {
     /// キーが押された。
     case key(KeyEvent)
     /// マウスが操作された。
     case mouse(MouseEvent)
-    /// ウィンドウサイズが変わった。
+    /// 端末デバイスのウィンドウサイズが変わった。
     case resize(Size)
     /// ブラケットペーストで貼り付けられた文字列。
     case paste(String)
-    /// 端末のフォーカス変化（`true` で獲得）。
+    /// 端末エミュレータのフォーカス変化（`true` で獲得）。
     case focus(Bool)
 }

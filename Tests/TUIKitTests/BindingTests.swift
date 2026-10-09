@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class BindingTests: XCTestCase {
 
-    /// アプリの側で値を持つモデル。書き戻された回数も数える。
+    /// `TerminalApp` に準拠する型の代わりに、`Binding` で渡すプロパティを持つクラス。プロパティを書き換えた回数も数える。
     private final class Model {
         var name = "" { didSet { nameWrites += 1 } }
         var selection = 0 { didSet { selectionWrites += 1 } }
@@ -142,7 +142,7 @@ final class BindingTests: XCTestCase {
         let state = ListState()
         let list = ListView(items: ["a", "b"], selection: Binding(model, \.selection), state: state)
 
-        XCTAssertEqual(state.selectedIndex, 1, "範囲外の値は端へ丸めて読むこと")
+        XCTAssertEqual(state.selectedIndex, 1, "範囲外の `Binding.wrappedValue` は、端へ丸めて `ListState.selectedIndex` にすること")
         _ = list.sizeThatFitsAsRoot(Size(width: 5, height: 2))
         XCTAssertEqual(render(list, width: 5, height: 2), "  a  \n> b  ")
         XCTAssertEqual(model.selectionWrites, 0)

@@ -1,7 +1,9 @@
 import XCTest
 @testable import TUIKit
 
-/// 負の余白・サイズを渡しても領域の外に描かず、クラッシュもしないことを確かめる。
+/// `EdgeInsets`・`Size`・`Rect.inset(by: Int)`・`View.padding(_: Int)`・
+/// `View.frame(width:height:horizontalAlignment:verticalAlignment:)` に負の値を渡しても、
+/// `rect` の外に書き込まず、クラッシュもしないことを確かめる。
 @MainActor
 final class NegativeValueTests: XCTestCase {
 

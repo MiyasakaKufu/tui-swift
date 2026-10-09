@@ -36,8 +36,9 @@ public enum SignalWatcher {
 
     /// SIGWINCH、終了シグナル、SIGTSTP / SIGCONT のハンドラを登録する。
     ///
-    /// 終了シグナルは SIGTERM / SIGHUP / SIGINT / SIGQUIT。既定の動作のまま受けると、
-    /// `Application` の終了処理が行われず、端末が raw モードのまま残る。
+    /// 終了シグナルは SIGTERM / SIGHUP / SIGINT / SIGQUIT。これらをデフォルトの動作
+    /// （POSIX の default action）のまま受けると、`Application` が `Terminal.restore()` を
+    /// 呼び出さず、端末デバイスが raw モードのまま残る。
     ///
     /// - Postcondition: `wakeupDescriptor` が使えるようになる。SIGPIPE は無視される。
     public static func install() {
@@ -57,12 +58,13 @@ public enum SignalWatcher {
 
     /// 自分自身を止め、再開されるまで戻らない。
     ///
-    /// - Precondition: 呼ぶ前に端末を元へ戻しておく。
+    /// - Precondition: 呼び出す前に `Terminal.deactivate()` などで、端末デバイスの termios と、
+    ///   端末エミュレータへ送ったモードを元へ戻しておく。
     /// - Postcondition: 戻るときに SIGTSTP のハンドラを登録し直す。
     public static func stopProcess() {
         #if canImport(Darwin) || canImport(Glibc)
         _ = signal(SIGTSTP, SIG_DFL)
-        // プロセスグループごと止めてはいけない。同じ端末を使う他のプロセスまで巻き込む。
+        // プロセスグループごと止めてはいけない。同じ端末デバイスを使う他のプロセスまで巻き込む。
         _ = raise(SIGTSTP)
         _ = signal(SIGTSTP, handleSuspendSignal)
         #endif
@@ -70,14 +72,14 @@ public enum SignalWatcher {
 
     /// 自己パイプの読み取り側を待っている `poll(2)` を、シグナル無しで起こす。
     ///
-    /// - Note: `install()` を呼ぶ前は何も起こらない。
+    /// - Note: `install()` を呼び出す前は何も起こらない。
     static func wakeUp() {
         wakeUpPoll()
     }
 
     /// シグナルが届いたことを知らせるパイプの読み取り側。
     ///
-    /// `install()` を呼ぶ前や、パイプを作れなかったときは `nil`。
+    /// `install()` を呼び出す前や、パイプを作れなかったときは `nil`。
     ///
     /// - Note: 非ブロッキングなので、読み取り可能になった後は EAGAIN になるまで読み捨てられる。
     public static var wakeupDescriptor: Int32? {

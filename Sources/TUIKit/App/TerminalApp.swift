@@ -6,7 +6,7 @@ import Darwin
 import Glibc
 #endif
 
-/// `@main` を付けるだけで起動できるアプリケーション。
+/// `@main` を付けるだけで `Application` を起動できる型が準拠するプロトコル。
 ///
 ///     @main
 ///     final class Counter: TerminalApp {
@@ -21,7 +21,7 @@ import Glibc
 ///   ファイル名は型名に合わせる（`Counter.swift` など）。
 @MainActor
 public protocol TerminalApp: Component {
-    /// 起動時に呼ばれる、引数のないイニシャライザ。
+    /// 起動時に呼び出される、引数のないイニシャライザ。
     init()
 
     /// 起動時の設定。
@@ -29,12 +29,12 @@ public protocol TerminalApp: Component {
 }
 
 extension TerminalApp {
-    /// すべて既定値の設定。
+    /// イニシャライザの引数をすべて省いて作った `ApplicationOptions`（`ApplicationOptions.default`）。
     public static var options: ApplicationOptions { .default }
 
-    /// アプリケーションを起動する。
+    /// `Application` を作って起動する。
     ///
-    /// - Note: 端末を初期化できなかった場合は、標準エラー出力へ理由を書き、
+    /// - Note: `Application.run()` がエラーを投げた場合は、標準エラー出力へ理由を書き、
     ///   終了コード 1 で抜ける。
     public static func main() async {
         do {

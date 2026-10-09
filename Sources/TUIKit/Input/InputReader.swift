@@ -68,7 +68,7 @@ public final class InputReader {
 
     /// 入力を待ち、届いたイベントを返す。
     ///
-    /// 途中までしか届いていない制御コードは、続きを待つ時間が過ぎるまで確定させない。
+    /// 途中までしか届いていない、ESC で始まるバイト列は、続きを待つ時間が過ぎるまで確定させない。
     /// 待ち時間は呼び出しをまたいで測るので、`timeout` より長くなることもある。
     ///
     /// `waitForQueryReplies(timeout:)` が待つ間に届いたイベントが残っていれば、待たずに返す。
@@ -107,8 +107,9 @@ public final class InputReader {
                 // 読めたバイト数を見ずに待ち直すと、入力が閉じた後は待ちの中で回り続ける。
                 if !events.isEmpty || byteCount == 0 { return events }
 
-                // 起こされた回に待ち直してはいけない。ペースト中は `pendingWaitDuration` が nil なので
-                // 続きが届くまで戻らず、起こした側は戻ったつもりで待ち続ける。
+                // 起こされた回に待ち直してはいけない。ペースト中は `pendingWaitDuration` が nil なので、
+                // `timeout` が `nil` なら続きが届くまで戻らない。その間、終了時の `Application.run()` は入力スレッドの終了を待ったまま戻らず、
+                // シグナルで起こされたときは、そのシグナルの処理が遅れる。
                 if readiness.contains(.wakeup) { return [] }
             } else if readiness.contains(.wakeup) {
                 // 起こされただけのときに確定させてはいけない。届きかけの ESC が壊れる。
@@ -125,10 +126,10 @@ public final class InputReader {
         }
     }
 
-    /// 端末へ送った問い合わせの応答を、装置属性の応答が届くまで待つ。
+    /// 端末エミュレータへ送った問い合わせの応答を、装置属性の応答が届くまで待つ。
     ///
     /// 装置属性（`CSI c`）の応答は、それより前に送った問い合わせの応答が出揃った目印になる。
-    /// 呼ぶ前に、確かめたい問い合わせと続けて `ANSI.queryDeviceAttributes` も送っておく。
+    /// 呼び出す前に、確かめたい問い合わせと続けて `ANSI.queryDeviceAttributes` も送っておく。
     ///
     /// - Parameters:
     ///   - timeout: 待ち時間（秒）。

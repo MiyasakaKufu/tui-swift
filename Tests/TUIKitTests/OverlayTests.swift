@@ -131,7 +131,7 @@ final class OverlayTests: XCTestCase {
         view.renderAsRoot(into: &buffer, rect: bounds)
 
         for y in 0..<buffer.size.height {
-            XCTAssertEqual(DisplayWidth.width(of: buffer.text(ofRow: y)), 9, "行 \(y) の表示幅")
+            XCTAssertEqual(DisplayWidth.width(of: buffer.text(ofRow: y)), 9, "`Buffer` の行 \(y) の文字列の `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` の戻り値")
         }
     }
 }
