@@ -1,53 +1,53 @@
 import XCTest
 @testable import TUIKit
 
-/// 測られた経路と描かれた経路を、子の名前ごとに記録する。
+/// `PathProbe` のメソッドが受け取った `RenderContext.path` を、`PathProbe.name` ごとに記録するクラス。
 @MainActor
 private final class PathLog {
-    /// 測られたときの経路。
+    /// `PathProbe.sizeThatFits(_:context:)` が受け取った `RenderContext.path`。
     var measured: [String: Set<ViewPath>] = [:]
-    /// 描かれたときの経路。描かれた順に並ぶ。
+    /// `PathProbe.render(into:rect:context:)` が受け取った `RenderContext.path`。呼び出された順に並ぶ。
     var rendered: [String: [ViewPath]] = [:]
-    /// 余白の分配に関する性質を読まれたときの経路。
+    /// `PathProbe.layoutTraits(context:)` が受け取った `RenderContext.path`。
     var traitsRead: [String: Set<ViewPath>] = [:]
 }
 
-/// 渡された文脈の経路を記録するビュー。
+/// 受け取った `RenderContext.path` を `PathLog` に記録する `View`。
 private struct PathProbe: PrimitiveView {
     /// 記録に使う名前。
     let name: String
     /// 記録先。
     let log: PathLog
-    /// 余白の分配に関する性質。
+    /// `PathProbe.layoutTraits(context:)` が返す `LayoutTraits`。
     var traits: LayoutTraits = .fixed
 
-    /// 経路を記録し、`traits` を返す。
+    /// `RenderContext.path` を記録し、`traits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: `traits`。
     func layoutTraits(context: RenderContext) -> LayoutTraits {
         log.traitsRead[name, default: []].insert(context.path)
         return traits
     }
 
-    /// 経路を記録し、1 桁・1 行を希望する。
+    /// `RenderContext.path` を記録し、幅 1・高さ 1 の `Size` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 1 桁・1 行のサイズ。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: 幅 1・高さ 1 の `Size`。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         log.measured[name, default: []].insert(context.path)
         return Size(width: 1, height: 1)
     }
 
-    /// 経路を記録する。
+    /// `RenderContext.path` を記録する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         log.rendered[name, default: []].append(context.path)
     }
@@ -89,12 +89,12 @@ final class RenderContextTests: XCTestCase {
         for name in names {
             let measured = log.measured[name] ?? []
             let rendered = log.rendered[name] ?? []
-            XCTAssertEqual(measured.count, 1, "\(name) が複数の経路で測られた")
-            XCTAssertEqual(rendered.count, 1, "\(name) の描画が 1 回でない")
-            XCTAssertEqual(Set(rendered), measured, "\(name) の経路がレイアウトと描画で違う")
+            XCTAssertEqual(measured.count, 1, "\(name) の `View.sizeThatFits(_:context:)` が複数の `ViewPath` で呼び出された")
+            XCTAssertEqual(rendered.count, 1, "\(name) の `View.render(into:rect:context:)` の呼び出しが 1 回でない")
+            XCTAssertEqual(Set(rendered), measured, "\(name) の `ViewPath` が `View.sizeThatFits(_:context:)` と `View.render(into:rect:context:)` で違う")
         }
         let paths = names.compactMap { log.rendered[$0]?.first }
-        XCTAssertEqual(Set(paths).count, names.count, "別の子に同じ経路が振られた")
+        XCTAssertEqual(Set(paths).count, names.count, "別の `PathProbe` に同じ `ViewPath` が振られた")
     }
 
     func testTraitsAreReadAtSamePathAsLayoutAndRender() async {
@@ -118,8 +118,8 @@ final class RenderContextTests: XCTestCase {
 
         for name in ["fixed", "left", "right", "back", "dialog"] {
             let read = log.traitsRead[name] ?? []
-            XCTAssertEqual(read.count, 1, "\(name) の性質が 1 つの経路で読まれていない")
-            XCTAssertEqual(read, log.measured[name], "\(name) の性質を読んだ経路が、測った経路と違う")
+            XCTAssertEqual(read.count, 1, "\(name) の `View.layoutTraits(context:)` が 1 つの `ViewPath` で呼び出されていない")
+            XCTAssertEqual(read, log.measured[name], "\(name) の `View.layoutTraits(context:)` が受け取った `ViewPath` が、`View.sizeThatFits(_:context:)` が受け取った `ViewPath` と違う")
         }
     }
 

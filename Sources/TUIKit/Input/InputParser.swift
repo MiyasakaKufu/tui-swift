@@ -1,6 +1,6 @@
-/// 端末から読み取ったバイト列をイベントへ変換する増分パーサ。
+/// 端末デバイスから読み取ったバイト列を `InputEvent` へ変換する増分パーサ。
 ///
-/// エスケープシーケンスが途中までしか届いていない場合は内部に保持し、
+/// ESC で始まるバイト列が途中までしか届いていない場合は内部に保持し、
 /// 続きが来たときに解釈する。
 public struct InputParser: Sendable {
     private var pending: [UInt8] = []
@@ -13,7 +13,7 @@ public struct InputParser: Sendable {
     /// 単独の ESC の続きを待つ時間（秒）。
     private static let escapeWaitDuration = 0.05
 
-    /// 始まりだけが届いた制御コードの続きを待つ時間（秒）。
+    /// ESC と後続のバイトまでが届いた、途中までのバイト列の続きを待つ時間（秒）。
     private static let sequenceWaitDuration = 1.0
 
     /// kitty keyboard protocol が機能キーに使う、私用領域の先頭のキーコード。
@@ -70,7 +70,7 @@ public struct InputParser: Sendable {
 
     /// 未解釈のバイトの続きを待つ時間（秒）。
     ///
-    /// この時間が過ぎても続きが届かなければ `flush()` を呼んでよい。
+    /// この時間が過ぎても続きが届かなければ `InputParser.flush()` を呼び出してよい。
     /// 待っても確定できるものがないときは `nil`。
     public var pendingWaitDuration: Double? {
         guard !isInPaste, let first = pending.first, first == ControlByte.escape else { return nil }
@@ -80,8 +80,8 @@ public struct InputParser: Sendable {
     /// バイト列を流し込み、確定したイベントを取り出す。
     ///
     /// - Parameters:
-    ///   - bytes: 端末から読み取ったバイト列。
-    /// - Returns: 確定したイベント。途中までのエスケープシーケンスは内部に残る。
+    ///   - bytes: 端末デバイスから読み取ったバイト列。
+    /// - Returns: 確定したイベント。ESC で始まる途中までのバイト列は内部に残る。
     public mutating func feed(_ bytes: [UInt8]) -> [InputEvent] {
         pending.append(contentsOf: bytes)
         var events: [InputEvent] = []
@@ -115,7 +115,7 @@ public struct InputParser: Sendable {
         return events
     }
 
-    /// 溜まっている端末の応答を取り出す。
+    /// 溜まっている端末エミュレータの応答を取り出す。
     ///
     /// - Returns: `feed(_:)` が読み取った応答。取り出した分は内部から消える。
     public mutating func takeReplies() -> [TerminalReply] {
@@ -124,11 +124,11 @@ public struct InputParser: Sendable {
         return taken
     }
 
-    /// 入力が途切れたときに呼び、ESC で始まる未解釈のバイトを捨てるか確定させる。
+    /// 入力が途切れたときに呼び出し、ESC で始まる未解釈のバイトを捨てるか確定させる。
     ///
     /// 単独の ESC は Escape キー、`ESC [` と `ESC O` は Alt+[ と Alt+O になる。
     /// この 2 つは CSI と SS3 の始まりと同じ形なので、続きが届くまでは区別できない。
-    /// それより長い、途中までの制御コードは捨てる。
+    /// それより長い、途中までのバイト列は捨てる。
     ///
     /// - Returns: 確定したイベント。確定するものがなければ空配列。
     /// - Postcondition: ESC で始まる未解釈のバイトは残らない。
@@ -139,8 +139,8 @@ public struct InputParser: Sendable {
             return [.key(KeyEvent(.escape))]
         }
 
-        // 途中までの制御コードを 1 バイトずつキーにしてはいけない。
-        // 続きが届いてももう制御コードとして読めず、`ESC [ < 65 ; 10` が Escape と文字の列になる。
+        // 途中までのバイト列を 1 バイトずつキーにしてはいけない。
+        // 続きが届いてももう CSI のバイト列として読めず、`ESC [ < 65 ; 10` が Escape と文字の列になる。
         var events: [InputEvent] = []
         if pending.count == 2, pending[1] == UInt8(ascii: "[") || pending[1] == UInt8(ascii: "O") {
             let character = Character(Unicode.Scalar(pending[1]))
@@ -309,10 +309,10 @@ public struct InputParser: Sendable {
     /// SS3 で届く F1〜F4 も `CSI` で届く。
     ///
     /// - Parameters:
-    ///   - final: 制御コードの最終バイト。
+    ///   - final: `ESC [` に続くバイト列の最終バイト。
     ///   - parameters: 最終バイトの手前にあるパラメータ。
     ///   - prefix: 前置きの記号。無ければ `nil`。
-    ///   - consumed: この制御コードが使ったバイト数。
+    ///   - consumed: ESC から最終バイトまでのバイト数。
     /// - Returns: 解釈の結果。対応するキーが無ければ `.skip`。
     /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「PC-Style Function Keys」。
     private func interpret(
@@ -356,7 +356,7 @@ public struct InputParser: Sendable {
                 return .skip(consumed: consumed)
             }
             // Shift+Tab は従来 `CSI Z` として届き、Shift の付かない `.backTab` になる。
-            // `.tab` + Shift のまま返すと、アプリが同じ打鍵に 2 通りの判定を書くことになる。
+            // `.tab` + Shift のまま返すと、TUIKit を使う開発者が同じ打鍵に 2 通りの判定を書くことになる。
             if key == .tab, modifiers.contains(.shift) {
                 var rest = modifiers
                 rest.remove(.shift)
@@ -377,10 +377,10 @@ public struct InputParser: Sendable {
     /// 前置きの記号が付いた `CSI` を解釈する。
     ///
     /// - Parameters:
-    ///   - final: 制御コードの最終バイト。
+    ///   - final: `ESC [` に続くバイト列の最終バイト。
     ///   - parameters: 最終バイトの前にあるパラメータ。
     ///   - prefix: `CSI` の直後にある前置きの記号。
-    ///   - consumed: この制御コードが使うバイト数。
+    ///   - consumed: ESC から最終バイトまでのバイト数。
     /// - Returns: 解釈の結果。知らない組み合わせは読み飛ばす。
     private func interpretPrivateSequence(
         final: UInt8,
@@ -558,10 +558,10 @@ public struct InputParser: Sendable {
     }
 }
 
-/// 制御コードを組み立てるバイト。
+/// 端末デバイスから受け取るバイト列を解釈するときに見分けるバイトの値。
 ///
 /// `privatePrefixes` `parameterBytes` `intermediateBytes` `finalBytes` の区分は、
-/// 制御シーケンスの構文が定める。
+/// ECMA-48 の control sequence の構文が定める。
 ///
 /// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/)
 ///   の「Control sequences」。

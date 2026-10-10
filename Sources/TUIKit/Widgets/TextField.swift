@@ -1,7 +1,8 @@
-/// 1 行のテキスト入力の状態。
+/// 1 行のテキスト入力（`TextField`）が使うクラス。
 ///
-/// 内容（値）とカーソル位置（表示状態）を扱う。内容は自分で持つか、`TextField(text:state:)` に
-/// 渡した `Binding` を通してアプリが持つ値を読み書きする。カーソル位置はどちらの場合もここに置く。
+/// 内容（`TextFieldState.text`）とカーソル位置（`TextFieldState.cursor`）を扱う。内容は自分で持つか、
+/// `TextField(text:state:placeholder:style:placeholderStyle:showsCursor:)` に `Binding` で渡すプロパティを
+/// 読み書きする。カーソル位置はどちらの場合もここに置く。
 ///
 /// - Invariant: 内容もカーソル位置も書記素クラスタ（`Character`）単位で、
 ///   国旗や ZWJ で結合した絵文字も 1 文字として数える。
@@ -24,7 +25,9 @@ public final class TextFieldState {
             }
             let text = String(newValue)
             // 比べずに書き戻したくなるが、先頭での Ctrl+U のように何も変えない編集でも
-            // アプリの値が代入され、代入を契機に処理を走らせるアプリでそれが空振りで走る。
+            // `Binding` で渡すプロパティへ代入される。TUIKit を使う開発者が、`Binding(_:_:)` にキーパスで
+            // 渡したプロパティや、`Binding(get:set:)` の `set` で代入するプロパティに `didSet` を書いていれば、
+            // 値が変わらないのに `didSet` が呼び出される。
             guard text != textBinding.wrappedValue else { return }
             textBinding.wrappedValue = text
         }
@@ -32,19 +35,20 @@ public final class TextFieldState {
 
     /// カーソルの文字インデックス（0 〜 文字数）。
     ///
-    /// - Note: `Binding` の先の値がアプリの側でカーソル位置より短くなると、カーソルは末尾に来る。
+    /// - Note: `Binding` で渡すプロパティが `TextFieldState` の外で書き換えられ、カーソル位置より
+    ///   短くなると、カーソルは末尾に来る。
     public var cursor: Int {
         min(storedCursor, characters.count)
     }
 
     /// 直前の描画でカーソルを置いた画面上の位置。まだ描画していなければ `nil`。
     ///
-    /// - Note: IME の変換中の文字と変換候補の一覧は、端末が本物のカーソル位置に表示する。
+    /// - Note: IME の変換中の文字と変換候補の一覧は、端末エミュレータが本物のカーソル位置に表示する。
     ///   入力欄にフォーカスがある間、`Component.cursorPosition` でこの値を返すと、
-    ///   変換中の文字が入力欄の上に出る。返さなければ差分描画が最後に書き込んだ位置に出る。
+    ///   変換中の文字が入力欄の上に出る。返さなければ `Renderer` が最後に書き込んだ位置に出る。
     public internal(set) var renderedCursorPoint: Point?
 
-    /// 初期の文字列を指定して状態を作る。
+    /// 初期の文字列を指定して `TextFieldState` を作る。
     ///
     /// - Parameters:
     ///   - text: 初期の文字列。1 行に置けない文字は取り除かれる。
@@ -57,7 +61,7 @@ public final class TextFieldState {
     /// 内容の読み書きを `text` へ向ける。
     ///
     /// - Parameters:
-    ///   - text: アプリが持つ内容を読み書きする口。
+    ///   - text: 内容を持つプロパティを読み書きする `Binding`。
     func bind(_ text: Binding<String>) {
         textBinding = text
     }
@@ -73,8 +77,8 @@ public final class TextFieldState {
     /// カーソル位置までの表示幅を返す。
     ///
     /// - Parameters:
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
-    /// - Returns: 先頭からカーソルの直前の文字までの桁数。
+    ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    /// - Returns: 先頭からカーソルの直前の文字までの `Cell` の数。
     public func cursorColumn(
         ambiguous: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> Int {
@@ -112,7 +116,7 @@ public final class TextFieldState {
     }
 
     // 幅 0 の制御文字が残るとカーソル移動が止まったように見える。
-    // 入力経路のすべてでこの判定を通すこと。
+    // `TextFieldState` へ文字が入るところのすべてで、この判定を通すこと。
 
     /// 1 行の入力欄に置ける文字へ整える。
     ///
@@ -235,7 +239,7 @@ public final class TextFieldState {
     /// 文字入力・カーソル移動・削除・貼り付けを処理する。
     ///
     /// - Parameters:
-    ///   - event: 端末から届いたイベント。
+    ///   - event: 処理する `InputEvent`。
     /// - Returns: 内容やカーソルを動かしたら `true`。
     @discardableResult
     public func handle(_ event: InputEvent) -> Bool {
@@ -298,7 +302,7 @@ public final class TextFieldState {
 
 /// 1 行のテキスト入力欄。
 public struct TextField: PrimitiveView {
-    /// カーソル位置を持つ状態。`Binding` を渡さずに作った場合は内容も持つ。
+    /// カーソル位置を持つ `TextFieldState`。`Binding` を渡さずに作った場合は内容も持つ。
     public var state: TextFieldState
     /// 空のときに表示する文字列。
     public var placeholder: String
@@ -306,14 +310,15 @@ public struct TextField: PrimitiveView {
     public var style: Style
     /// プレースホルダのスタイル。
     public var placeholderStyle: Style
-    /// カーソル位置を反転表示する（アプリ側で端末カーソルを出す場合は `false`）。
+    /// カーソル位置を反転表示する（`TerminalApp` に準拠する型が `Component.cursorPosition` で
+    /// 端末エミュレータのカーソルを出す場合は `false`）。
     public var showsCursor: Bool
 
-    /// アプリが持つ文字列を編集する入力欄を作る。
+    /// `Binding` で渡すプロパティの文字列を編集する `TextField` を作る。
     ///
     /// - Parameters:
-    ///   - text: 編集する文字列を読み書きする口。
-    ///   - state: カーソル位置を持つ状態。内容は持たず、`text` を読み書きする。
+    ///   - text: 編集する文字列を持つプロパティを読み書きする `Binding`。
+    ///   - state: カーソル位置を持つ `TextFieldState`。内容は持たず、`text` を読み書きする。
     ///   - placeholder: 空のときに表示する文字列。
     ///   - style: 文字のスタイル。
     ///   - placeholderStyle: プレースホルダのスタイル。
@@ -338,10 +343,10 @@ public struct TextField: PrimitiveView {
         )
     }
 
-    /// 内容も持つ状態と見た目を指定して入力欄を作る。
+    /// 内容も持つ `TextFieldState` と見た目を指定して `TextField` を作る。
     ///
     /// - Parameters:
-    ///   - state: 内容とカーソル位置を持つ状態。
+    ///   - state: 内容とカーソル位置を持つ `TextFieldState`。
     ///   - placeholder: 空のときに表示する文字列。
     ///   - style: 文字のスタイル。
     ///   - placeholderStyle: プレースホルダのスタイル。
@@ -360,31 +365,31 @@ public struct TextField: PrimitiveView {
         self.showsCursor = showsCursor
     }
 
-    /// 横方向にだけ伸びる性質を返す。
+    /// `LayoutTraits.horizontalFlex` だけを 1 にした `LayoutTraits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 横方向の重みだけが 1 の性質。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: `LayoutTraits.horizontalFlex` が 1、`LayoutTraits.verticalFlex` が 0 の `LayoutTraits`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         LayoutTraits(horizontalFlex: 1, verticalFlex: 0)
     }
 
-    /// 与えられた幅いっぱい、高さ 1 行を希望する。
+    /// `proposal` の幅いっぱいで、高さが 1 を超えない `Size` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: `proposal` の幅と、高さ 1 行のサイズ。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: `proposal` の幅と、1 と `proposal.height` の小さい方を高さにした `Size`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         Size(width: proposal.width, height: min(1, proposal.height))
     }
 
-    /// 与えられた幅のとき、先頭何桁分をスクロールして隠すか。
+    /// 入力欄の幅が `width` のときに、スクロールして隠す先頭の `Cell` の数を返す。
     ///
     /// - Parameters:
     ///   - width: 入力欄に使える幅。
-    ///   - ambiguous: 曖昧幅の文字の扱い。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
-    /// - Returns: 隠す桁数。カーソルが幅の中に収まっていれば 0。
+    ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    /// - Returns: 隠す `Cell` の数。カーソルが幅の中に収まっていれば 0。
     /// - Postcondition: 全角文字を途中で割らない。
     public func scrollOffset(
         forWidth width: Int,
@@ -394,7 +399,7 @@ public struct TextField: PrimitiveView {
         let column = state.cursorColumn(ambiguous: ambiguous)
         guard column >= width else { return 0 }
 
-        // 必要な桁数で切ってはいけない。全角文字の途中で切れると左端が空白になる。
+        // 必要な `Cell` の数で切ってはいけない。全角文字の途中で切れると左端が空白になる。
         // 文字の区切りまで切り上げる。
         let required = column - width + 1
         var offset = 0
@@ -408,9 +413,9 @@ public struct TextField: PrimitiveView {
     /// 内容、またはプレースホルダとカーソルを描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。使うのは最初の 1 行だけ。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 文字列の幅を測るときに `RenderContext.ambiguousWidth` を読む `RenderContext`。
     /// - Postcondition: `state.renderedCursorPoint` がカーソルの画面上の位置に更新される。
     ///   描く領域がなければ `nil` になる。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
@@ -432,8 +437,8 @@ public struct TextField: PrimitiveView {
                 style: placeholderStyle,
                 clippedTo: row
             )
-            // 空でもどこに入力されるか分かるよう、プレースホルダーの先頭セルに
-            // カーソルを重ねる。表示幅は変わらない。
+            // プレースホルダを表示している間はカーソルを置かずに済ませたくなるが、置かないと
+            // 空の入力欄のどこに入力されるかが見えない。
             placeCursor(into: &buffer, at: Point(x: rect.minX, y: rect.minY), in: rect)
             return
         }
@@ -456,11 +461,11 @@ public struct TextField: PrimitiveView {
         )
     }
 
-    /// カーソルの位置を状態へ記録し、そのセルを反転させる。
+    /// カーソルの位置を `TextFieldState.renderedCursorPoint` へ記録し、その `Cell` を反転させる。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
-    ///   - point: カーソルを置くセルの位置。
+    ///   - buffer: 描画先の `Buffer`。
+    ///   - point: カーソルを置く `Cell` の位置。
     ///   - rect: 入力欄の矩形。この外へは描かない。
     /// - Postcondition: `state.renderedCursorPoint` が `point`（矩形の外なら `nil`）になる。
     private func placeCursor(into buffer: inout Buffer, at point: Point, in rect: Rect) {

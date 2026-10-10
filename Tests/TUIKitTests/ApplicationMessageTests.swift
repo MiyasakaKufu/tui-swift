@@ -9,14 +9,14 @@ import XCTest
 import CTUITestSupport
 @testable import TUIKit
 
-/// `MessageSender` で送った値と、ループの外から呼んだ `stop()`・`suspend()` がループへ渡るかを、
+/// `MessageSender` で送った値と、ループの外から呼び出した `Application.stop()`・`Application.suspend()` がループへ渡るかを、
 /// 疑似端末（pty）の上で確かめる。
 @MainActor
 final class ApplicationMessageTests: XCTestCase {
 
     private var captured = ""
 
-    /// 別スレッドから送った値で、`frameInterval` なしでも画面が更新される。
+    /// 別スレッドから送った値で、`ApplicationOptions.frameInterval` なしでも画面が更新される。
     func testMessageFromAnotherThreadUpdatesScreenWithoutFrameInterval() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -31,7 +31,7 @@ final class ApplicationMessageTests: XCTestCase {
         let sender = application.sender
         let loop = Task { try await application.run() }
 
-        // 最初の描画より前に送ってはいけない。`run()` が始まる前に送ることになり、ループは待たずに
+        // 最初の描画より前に送ってはいけない。`Application.run()` が始まる前に送ることになり、ループは待たずに
         // 溜まった値を受け取るので、待っているループを起こせるのかを確かめられない。
         let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
@@ -122,7 +122,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertEqual(component.records, ["message:first", "key:a", "key:b", "message:second"])
     }
 
-    /// 端末への問い合わせの応答を待つ間に届いたキーも、ループへ渡る。
+    /// 端末エミュレータへの問い合わせの応答を待つ間に届いたキーも、ループへ渡る。
     func testKeysArrivingDuringTerminalQueryReachTheLoop() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -148,7 +148,7 @@ final class ApplicationMessageTests: XCTestCase {
         let asked = await waitUntil(timeout: 5) { self.captured.contains(ANSI.queryDeviceAttributes) }
         XCTAssertTrue(asked, "問い合わせが出ない")
 
-        // 応答は返さない。返すと待ちが早く終わり、待ちの間に届いたことにならない。
+        // 応答は書き込まない。書き込むと待ちが早く終わり、待ちの間に届いたことにならない。
         writeByte(pty.master, UInt8(ascii: "a"))
 
         let reached = await waitUntil(timeout: 5) { component.records == ["key:a"] }
@@ -244,7 +244,7 @@ final class ApplicationMessageTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
-    /// 1 周が `frameInterval` より長くても、キーが `handle(_:)` に届くまでの遅れが伸び続けない。
+    /// 1 周が `ApplicationOptions.frameInterval` より長くても、キーが `Component.handle(_:)` に届くまでの遅れが伸び続けない。
     func testKeyLatencyStaysShortWhenLoopIsSlowerThanFrameInterval() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -271,8 +271,8 @@ final class ApplicationMessageTests: XCTestCase {
         )
         let loop = Task { try await application.run() }
 
-        // キーをテストの側で待ってから書いてはいけない。`.wake` が絶えず溜まっている間、
-        // ループはアクタを明け渡さずに回ることがあり、テストの待ちが終わらない。
+        // テストメソッドの中で待ってからキーを書くように直してはいけない（キーは `SlowUpdatingComponent.update(elapsed:)` が書く）。
+        // `.wake` が絶えず溜まっている間、ループはアクタを明け渡さずに回ることがあり、テストの待ちが終わらない。
         try await waitForLoop(loop, timeout: 20)
 
         let written = try XCTUnwrap(component.keyWritten, "キーを書く前にループが終わった")
@@ -280,7 +280,7 @@ final class ApplicationMessageTests: XCTestCase {
         XCTAssertLessThan(arrival.timeIntervalSince(written), 0.5)
     }
 
-    /// ループの外から呼んだ `stop()` で、キーを待たずにループが終わる。
+    /// ループの外から呼び出した `Application.stop()` で、キーを待たずにループが終わる。
     func testStopFromOutsideLoopEndsLoopWithoutKeys() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -294,8 +294,8 @@ final class ApplicationMessageTests: XCTestCase {
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
-        // 最初の描画より前に呼んではいけない。`run()` が始まる前に呼ぶことになり、`run()` が
-        // `isRunning` を立て直すので、ループが終わらない。
+        // `Application.stop()` を最初の描画より前に呼び出してはいけない。`Application.run()` が始まる前に呼び出すことになり、
+        // `Application.run()` が `isRunning` を立て直すので、ループが終わらない。
         let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drew, "最初の描画が終わらない")
 
@@ -303,7 +303,7 @@ final class ApplicationMessageTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
-    /// ループの外から呼んだ `suspend()` で、キーを待たずに再開後の画面を描き直す。
+    /// ループの外から呼び出した `Application.suspend()` で、キーを待たずに再開後の画面を描き直す。
     func testSuspendFromOutsideLoopRedrawsWithoutKeys() async throws {
         let pty = try PseudoTerminal()
         defer { pty.close() }
@@ -388,7 +388,7 @@ private let waitingText = "WAITING"
 /// 値が届いた後に画面へ出る文字列。
 private let arrivedText = "ARRIVED"
 
-/// 届いた値とキーを記録し、決めた数だけ届いたら終了するコンポーネント。
+/// 届いた値とキーを記録し、決めた数だけ届いたら終了する `Component` に準拠する型。
 private final class MessageRecordingComponent: Component {
 
     /// 受け取った値を届いた順に並べたもの。
@@ -397,7 +397,7 @@ private final class MessageRecordingComponent: Component {
     private(set) var records: [String] = []
     /// 最初の描画が終わったら `true`。
     private(set) var hasDrawnOnce = false
-    /// `body` が評価された回数。1 回の描画で 1 回評価される。
+    /// `Component.body` が評価された回数。1 回の描画で 1 回評価される。
     private(set) var drawCount = 0
 
     private let quitsAfter: Int
@@ -456,14 +456,14 @@ private final class MessageRecordingComponent: Component {
     }
 }
 
-/// `update(elapsed:)` のたびに決めた時間だけアクタを止め、決めた回数に達したらキーを書くコンポーネント。
+/// `Component.update(elapsed:)` のたびに決めた時間だけアクタを止め、決めた回数に達したらキーを書く `Component` に準拠する型。
 ///
 /// 書いたキーが届いたら終了する。
 private final class SlowUpdatingComponent: Component {
 
     /// キーを書いた時刻。まだ書いていなければ `nil`。
     private(set) var keyWritten: Date?
-    /// 書いたキーが `handle(_:)` に届いた時刻。まだ届いていなければ `nil`。
+    /// 書いたキーが `Component.handle(_:)` に届いた時刻。まだ届いていなければ `nil`。
     private(set) var keyArrival: Date?
 
     private let updateDuration: Double
@@ -474,9 +474,9 @@ private final class SlowUpdatingComponent: Component {
     /// 1 周の長さと、キーを書く時点を決めて作る。
     ///
     /// - Parameters:
-    ///   - updateDuration: 1 回の `update(elapsed:)` で止める時間（秒）。
-    ///   - keyWrittenAfter: `update(elapsed:)` がこの回数に達したらキーを書く。
-    ///   - master: キーを書き込む pty の master 側の記述子。
+    ///   - updateDuration: 1 回の `Component.update(elapsed:)` で止める時間（秒）。
+    ///   - keyWrittenAfter: `Component.update(elapsed:)` がこの回数に達したらキーを書く。
+    ///   - master: キーを書き込む pty の master の記述子。
     init(updateDuration: Double, keyWrittenAfter: Int, master: Int32) {
         self.updateDuration = updateDuration
         self.keyWrittenAfter = keyWrittenAfter
@@ -493,7 +493,7 @@ private final class SlowUpdatingComponent: Component {
             keyWritten = Date()
             writeByte(master, UInt8(ascii: "a"))
         }
-        // `Thread.sleep` を外してはいけない。1 周が `frameInterval` より短くなり、
+        // `Thread.sleep` を外してはいけない。1 周が `ApplicationOptions.frameInterval` より短くなり、
         // `.wake` が溜まる条件にならない。
         Thread.sleep(forTimeInterval: updateDuration)
     }
@@ -511,8 +511,8 @@ private final class SlowUpdatingComponent: Component {
 
 /// テスト用の疑似端末。
 ///
-/// - Warning: master 側は `OutputReader` で読み続ける。出力バッファが詰まると、
-///   slave 側への `write(2)` や、出力の掃き出しを待つ `tcsetattr(TCSAFLUSH)` が返らなくなる。
+/// - Warning: master は `OutputReader` で読み続ける。読まずに溜まったバイト列がカーネルの上限に達すると、
+///   slave への `write(2)` や、出力の掃き出しを待つ `tcsetattr(TCSAFLUSH)` が戻らなくなる。
 private final class PseudoTerminal {
     enum Failure: Error {
         case unavailable(errno: Int32)
@@ -536,9 +536,9 @@ private final class PseudoTerminal {
         close()
     }
 
-    /// slave 側を入出力に使う `Terminal` を作る。
+    /// slave を入出力に使う `Terminal` を作る。
     ///
-    /// - Returns: slave 側につながった `Terminal`。
+    /// - Returns: slave につながった `Terminal`。
     @MainActor
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
@@ -552,7 +552,7 @@ private final class PseudoTerminal {
     }
 }
 
-/// pty の master 側に溜まる出力を読み続け、読んだものを `AsyncStream` へ流す。
+/// pty の master に溜まる出力を読み続け、読んだものを `AsyncStream` へ流す。
 private final class OutputReader {
 
     // 読んだ内容をこのクラスに持たせてはいけない。読むスレッドとテストの両方から触ることになり、

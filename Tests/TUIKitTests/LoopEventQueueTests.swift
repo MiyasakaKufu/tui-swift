@@ -62,11 +62,11 @@ final class LoopEventQueueTests: XCTestCase {
 
     // MARK: - 補助
 
-    /// 取り出した `LoopEvent` を、種類の名前に直す。
+    /// 取り出した `LoopEvent` を、`case` の名前に直す。
     ///
     /// - Parameters:
     ///   - events: 名前に直す `LoopEvent`。
-    /// - Returns: 種類の名前を、並びを保って並べたもの。
+    /// - Returns: `case` の名前を、並びを保って並べたもの。
     private func labels(of events: [LoopEvent<Int>]) -> [String] {
         events.map { event in
             switch event {

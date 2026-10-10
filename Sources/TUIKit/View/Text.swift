@@ -1,4 +1,4 @@
-/// 文字列を表示するビュー。
+/// 文字列を表示する `View`。
 public struct Text: PrimitiveView {
     /// 表示する文字列。
     public var content: String
@@ -8,10 +8,13 @@ public struct Text: PrimitiveView {
     public var wrap: WrapMode
     /// 行の水平方向の揃え。
     public var alignment: HorizontalAlignment
-    /// タブストップの間隔。タブはこの桁数ごとの位置まで空白で埋められる。
+    /// タブストップの間隔（`Cell` の数）。
+    ///
+    /// タブは、`content` を改行で区切った行の先頭から（折り返す前に）数えた `Cell` の数が、次にこの値の倍数になる
+    /// 位置まで空白で埋められる。0 以下なら、タブは取り除かれる。
     public var tabSize: Int
 
-    /// 文字列と見た目を指定してビューを作る。
+    /// 文字列と見た目を指定して `Text` を作る。
     ///
     /// - Parameters:
     ///   - content: 表示する文字列。
@@ -33,11 +36,11 @@ public struct Text: PrimitiveView {
         self.tabSize = tabSize
     }
 
-    /// 折り返した結果が必要とするサイズを返す。
+    /// 折り返した行を収めるサイズを返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: `RenderContext.ambiguousWidth` を取得するための `RenderContext`。
     /// - Returns: 最も長い行の幅と、折り返した行数から決まるサイズ。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let ambiguous = context.ambiguousWidth
@@ -51,9 +54,9 @@ public struct Text: PrimitiveView {
     /// 折り返した各行を `rect` の中へ描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。高さに収まらない行は描画されない。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: `RenderContext.ambiguousWidth` を取得するための `RenderContext`。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         let lines = TextWrapping.wrap(

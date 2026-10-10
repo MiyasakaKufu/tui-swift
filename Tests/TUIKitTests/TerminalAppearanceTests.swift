@@ -66,9 +66,9 @@ final class TerminalAppearanceTests: XCTestCase {
         let pty = try openPseudoTerminal()
         defer { pty.close() }
 
-        // `deactivate()` や `restore()` を呼んだ後でマスタ側を読むように直してはいけない。
-        // macOS ではそれらが返らず、テストが止まる。
-        // raw モードの間は書き出しが送られ切るのを待ってから端末属性を戻し、macOS の疑似端末ではマスタ側が読むまで送られ切らない。
+        // `Terminal.deactivate()` や `Terminal.restore()` を呼び出した後で master を読むように直してはいけない。
+        // macOS ではそれらが戻らず、テストが止まる。
+        // raw モードの間は書き出しが送られ切るのを待ってから端末デバイスの termios を戻し、macOS の疑似端末では master から読み出すまで送られ切らない。
         // Linux では待たずに済むので、Linux だけで確かめても気づけない。
         let drain = OutputDrain(descriptor: pty.master, recordsOutput: true)
         drain.start()
@@ -148,8 +148,8 @@ final class TerminalAppearanceTests: XCTestCase {
 
 /// テスト用の疑似端末の両端。
 ///
-/// - Warning: マスタ側を読まないまま大量に書き出してはいけない。
-///   出力バッファが詰まると、スレーブ側への `write(2)` が返らなくなる。
+/// - Warning: master を読まないまま大量に書き出してはいけない。
+///   読まずに溜まったバイト列がカーネルの上限に達すると、slave への `write(2)` が戻らなくなる。
 private struct PseudoTerminalPair {
     let master: Int32
     let slave: Int32
@@ -172,7 +172,7 @@ private func openPseudoTerminal() throws -> PseudoTerminalPair {
     return PseudoTerminalPair(master: master, slave: slave)
 }
 
-// 構造体の中から `close(2)` は直接呼べない。メンバーの `close()` が先に見つかる。
+// 構造体の中から `close(2)` は直接呼び出せない。メンバーの `close()` が先に見つかる。
 /// ファイル記述子を閉じる。
 ///
 /// - Parameters:

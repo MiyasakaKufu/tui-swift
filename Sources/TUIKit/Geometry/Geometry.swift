@@ -1,6 +1,6 @@
-/// 端末上の座標。原点は左上、`x` は列、`y` は行を表す。
+/// `Cell` の位置を表す座標。原点は左上、`x` は横方向の位置、`y` は行を表す。
 public struct Point: Hashable, Sendable {
-    /// 列の位置。左端が 0。
+    /// 横方向の位置。左端が 0。
     public var x: Int
     /// 行の位置。上端が 0。
     public var y: Int
@@ -8,7 +8,7 @@ public struct Point: Hashable, Sendable {
     /// 座標を作る。
     ///
     /// - Parameters:
-    ///   - x: 列の位置。
+    ///   - x: 横方向の位置。
     ///   - y: 行の位置。
     public init(x: Int, y: Int) {
         self.x = x
@@ -21,7 +21,7 @@ public struct Point: Hashable, Sendable {
     /// 指定した分だけずらした座標を返す。
     ///
     /// - Parameters:
-    ///   - dx: 列方向のずれ。
+    ///   - dx: 横方向のずれ。
     ///   - dy: 行方向のずれ。
     /// - Returns: ずらした座標。
     public func offset(dx: Int = 0, dy: Int = 0) -> Point {
@@ -29,9 +29,9 @@ public struct Point: Hashable, Sendable {
     }
 }
 
-/// 桁数・行数で表したサイズ。負の値は 0 に丸められる。
+/// 横に並ぶ `Cell` の数と行数で表したサイズ。負の値は 0 に丸められる。
 public struct Size: Hashable, Sendable {
-    /// 桁数。負の値は 0 に丸められる。
+    /// 横に並ぶ `Cell` の数。負の値は 0 に丸められる。
     public var width: Int {
         didSet { width = max(0, width) }
     }
@@ -43,7 +43,7 @@ public struct Size: Hashable, Sendable {
     /// サイズを作る。
     ///
     /// - Parameters:
-    ///   - width: 桁数。
+    ///   - width: 横に並ぶ `Cell` の数。
     ///   - height: 行数。
     public init(width: Int, height: Int) {
         self.width = max(0, width)
@@ -86,9 +86,9 @@ public struct Rect: Hashable, Sendable {
     /// 座標とサイズの成分から矩形を作る。
     ///
     /// - Parameters:
-    ///   - x: 左端の列。
+    ///   - x: 左端の `Point.x`。
     ///   - y: 上端の行。
-    ///   - width: 桁数。
+    ///   - width: 横に並ぶ `Cell` の数。
     ///   - height: 行数。
     public init(x: Int, y: Int, width: Int, height: Int) {
         self.init(origin: Point(x: x, y: y), size: Size(width: width, height: height))
@@ -97,15 +97,15 @@ public struct Rect: Hashable, Sendable {
     /// 原点にある、幅・高さが 0 の矩形。
     public static let zero = Rect(x: 0, y: 0, width: 0, height: 0)
 
-    /// 桁数。
+    /// 横に並ぶ `Cell` の数。
     public var width: Int { size.width }
     /// 行数。
     public var height: Int { size.height }
-    /// 左端の列。
+    /// 左端の `Point.x`。
     public var minX: Int { origin.x }
     /// 上端の行。
     public var minY: Int { origin.y }
-    /// 右端の列。この列は領域に含まれない。
+    /// 領域の右隣の `Point.x`。この位置の `Cell` は領域に含まれない。
     public var maxX: Int { origin.x + size.width }
     /// 下端の行。この行は領域に含まれない。
     public var maxY: Int { origin.y + size.height }
@@ -137,12 +137,12 @@ public struct Rect: Hashable, Sendable {
         return Rect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
     }
 
-    /// 内側に余白を取った矩形。
+    /// 内側を `insets` の分だけ空けた矩形を返す。
     ///
     /// - Parameters:
-    ///   - insets: 上下左右に取る余白。
-    /// - Returns: 余白の分だけ狭めた矩形。余白が大きすぎる場合は幅・高さが 0 になる。
-    /// - Postcondition: 余白は負にならないため、矩形が広がることはない。
+    ///   - insets: 上下左右に空ける長さ。
+    /// - Returns: `insets` の分だけ狭めた矩形。`insets` が大きすぎる場合は幅・高さが 0 になる。
+    /// - Postcondition: `EdgeInsets` の各辺は負にならないため、矩形が広がることはない。
     public func inset(by insets: EdgeInsets) -> Rect {
         Rect(
             x: minX + insets.leading,
@@ -152,42 +152,42 @@ public struct Rect: Hashable, Sendable {
         )
     }
 
-    /// 四辺に同じ余白を取った矩形。
+    /// 四辺に同じ長さを空けた矩形を返す。
     ///
     /// - Parameters:
-    ///   - amount: 各辺に取る余白。
-    /// - Returns: 余白の分だけ狭めた矩形。
+    ///   - amount: 各辺に空ける長さ（`Cell` の数で表す）。
+    /// - Returns: `amount` の分だけ狭めた矩形。
     public func inset(by amount: Int) -> Rect {
         inset(by: EdgeInsets(all: amount))
     }
 }
 
-/// 上下左右の余白。負の値は 0 に丸められる。
+/// 上下左右に空ける長さ（`Cell` の数で表す）。負の値は 0 に丸められる。
 public struct EdgeInsets: Hashable, Sendable {
-    /// 上の余白。負の値は 0 に丸められる。
+    /// 上に空ける長さ。負の値は 0 に丸められる。
     public var top: Int {
         didSet { top = max(0, top) }
     }
-    /// 左の余白。負の値は 0 に丸められる。
+    /// 左に空ける長さ。負の値は 0 に丸められる。
     public var leading: Int {
         didSet { leading = max(0, leading) }
     }
-    /// 下の余白。負の値は 0 に丸められる。
+    /// 下に空ける長さ。負の値は 0 に丸められる。
     public var bottom: Int {
         didSet { bottom = max(0, bottom) }
     }
-    /// 右の余白。負の値は 0 に丸められる。
+    /// 右に空ける長さ。負の値は 0 に丸められる。
     public var trailing: Int {
         didSet { trailing = max(0, trailing) }
     }
 
-    /// 四辺の余白を個別に指定して作る。
+    /// 四辺に空ける長さを個別に指定して `EdgeInsets` を作る。
     ///
     /// - Parameters:
-    ///   - top: 上の余白。
-    ///   - leading: 左の余白。
-    ///   - bottom: 下の余白。
-    ///   - trailing: 右の余白。
+    ///   - top: 上に空ける長さ。
+    ///   - leading: 左に空ける長さ。
+    ///   - bottom: 下に空ける長さ。
+    ///   - trailing: 右に空ける長さ。
     public init(top: Int = 0, leading: Int = 0, bottom: Int = 0, trailing: Int = 0) {
         self.top = max(0, top)
         self.leading = max(0, leading)
@@ -195,29 +195,29 @@ public struct EdgeInsets: Hashable, Sendable {
         self.trailing = max(0, trailing)
     }
 
-    /// 四辺に同じ余白を取る。
+    /// 四辺に同じ長さを空ける `EdgeInsets` を作る。
     ///
     /// - Parameters:
-    ///   - all: 各辺の余白。
+    ///   - all: 各辺に空ける長さ。
     public init(all: Int) {
         self.init(top: all, leading: all, bottom: all, trailing: all)
     }
 
-    /// 左右と上下で余白を分けて取る。
+    /// 左右と上下で空ける長さを分けた `EdgeInsets` を作る。
     ///
     /// - Parameters:
-    ///   - horizontal: 左右の余白。
-    ///   - vertical: 上下の余白。
+    ///   - horizontal: 左右に空ける長さ。
+    ///   - vertical: 上下に空ける長さ。
     public init(horizontal: Int, vertical: Int) {
         self.init(top: vertical, leading: horizontal, bottom: vertical, trailing: horizontal)
     }
 
-    /// 余白なし。
+    /// どの辺にも空けない `EdgeInsets`。
     public static let zero = EdgeInsets()
 
-    /// 左右の余白の合計。
+    /// 左右に空ける長さの合計。
     public var horizontal: Int { leading + trailing }
-    /// 上下の余白の合計。
+    /// 上下に空ける長さの合計。
     public var vertical: Int { top + bottom }
 }
 

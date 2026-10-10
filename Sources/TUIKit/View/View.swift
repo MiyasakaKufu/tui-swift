@@ -1,32 +1,39 @@
-/// レイアウト時に、余った領域をどれだけ引き取るかを表す。
+/// `VStack`・`HStack` が配ったあとに残る `Size` を引き取る割合を、横と縦の方向ごとに持つ型。
 ///
-/// 重みが 0 のビューは希望サイズのまま配置され、1 以上のビューが余白を重みに応じて分け合う。
+/// `LayoutTraits.flex(on:)` が 0 の `View` は `View.sizeThatFits(_:context:)` の戻り値のまま配置され、
+/// 1 以上の `View` が、`VStack`・`HStack` が配ったあとに残る `Size` を `LayoutTraits.flex(on:)` の値に応じて分け合う。
 public struct LayoutTraits: Hashable, Sendable {
-    /// 横方向の重み。負の値は 0 に丸められる。
+    /// 横方向の、`HStack` が配ったあとに残る `Size` の幅を引き取る割合を表す整数。
+    ///
+    /// `VStack` の中では、1 以上なら `VStack` の幅いっぱいに広がる。負の値は 0 に丸められる。
     public var horizontalFlex: Int
-    /// 縦方向の重み。負の値は 0 に丸められる。
+    /// 縦方向の、`VStack` が配ったあとに残る `Size` の高さを引き取る割合を表す整数。
+    ///
+    /// `HStack` の中では、1 以上なら `HStack` の高さいっぱいに広がる。負の値は 0 に丸められる。
     public var verticalFlex: Int
 
-    /// 縦横の重みを指定して作る。
+    /// `horizontalFlex` と `verticalFlex` を指定して `LayoutTraits` を作る。
     ///
     /// - Parameters:
-    ///   - horizontalFlex: 横方向の重み。
-    ///   - verticalFlex: 縦方向の重み。
+    ///   - horizontalFlex: `LayoutTraits.horizontalFlex` にする整数。
+    ///   - verticalFlex: `LayoutTraits.verticalFlex` にする整数。
     public init(horizontalFlex: Int = 0, verticalFlex: Int = 0) {
         self.horizontalFlex = max(0, horizontalFlex)
         self.verticalFlex = max(0, verticalFlex)
     }
 
-    /// 希望サイズのまま配置される。
+    /// `horizontalFlex`・`verticalFlex` がともに 0 の `LayoutTraits`。
+    ///
+    /// `View.layoutTraits(context:)` がこれを返す `View` は、`View.sizeThatFits(_:context:)` の戻り値のまま配置される。
     public static let fixed = LayoutTraits()
-    /// 両方向に伸びる。
+    /// `horizontalFlex`・`verticalFlex` がともに 1 の `LayoutTraits`。
     public static let flexible = LayoutTraits(horizontalFlex: 1, verticalFlex: 1)
 
-    /// 指定した軸の重み。
+    /// `axis` の方の `horizontalFlex` か `verticalFlex` を返す。
     ///
     /// - Parameters:
-    ///   - axis: 重みを取り出す軸。
-    /// - Returns: その軸の重み。
+    ///   - axis: `horizontalFlex` と `verticalFlex` のどちらを返すかを決める軸。
+    /// - Returns: `axis` が `.horizontal` なら `horizontalFlex`、`.vertical` なら `verticalFlex`。
     public func flex(on axis: Axis) -> Int {
         switch axis {
         case .horizontal: return horizontalFlex
@@ -37,8 +44,8 @@ public struct LayoutTraits: Hashable, Sendable {
 
 /// 画面へ描画できるもの。
 ///
-/// ビューには 2 種類ある。`body` で別のビューを組み合わせる合成ビューと、
-/// `sizeThatFits(_:context:)` と `render(into:rect:context:)` を自分で書くプリミティブ（`PrimitiveView`）。
+/// `View` に準拠する型には 2 種類ある。`View.body` を持つ `View`（`View.body` で別の `View` を返す）と、
+/// `PrimitiveView`（`View.body` を持たず、`View.sizeThatFits(_:context:)` と `View.render(into:rect:context:)` を自分で書く）。
 ///
 /// ```swift
 /// struct Greeting: View {
@@ -50,100 +57,107 @@ public struct LayoutTraits: Hashable, Sendable {
 /// }
 /// ```
 ///
-/// 合成ビューは `body` だけを書けばよい。測定・描画・余白の分配は `body` のビューに任される。
+/// `View.body` を持つ `View` は `body` だけを書けばよい。`View.sizeThatFits(_:context:)`・`View.render(into:rect:context:)`・
+/// `View.layoutTraits(context:)` のデフォルトの実装は、`body` を `child` 引数として `RenderContext` の同じ名前のメソッド
+/// （`RenderContext.sizeThatFits(of:index:proposal:)` など）に渡す。
 ///
-/// 子を持つビューは、子の `sizeThatFits(_:context:)`・`render(into:rect:context:)`・
-/// `layoutTraits(context:)` を直接呼ばず、受け取った `RenderContext` の同名のメソッドを通して呼ぶ。
+/// 別の `View` の `View.sizeThatFits(_:context:)`・`View.render(into:rect:context:)`・`View.layoutTraits(context:)` は
+/// 直接呼び出さない。`context` 引数で受け取った `RenderContext` の `RenderContext.sizeThatFits(of:index:proposal:)`・
+/// `RenderContext.render(_:index:into:rect:)`・`RenderContext.layoutTraits(of:index:)` に、その `View` を
+/// `child` 引数として渡して呼び出す。
 @MainActor
 public protocol View {
-    /// `body` が返すビューの型。適合側が `some View` で書けば推論される。プリミティブでは `Never`。
+    /// `body` が返す `View` の型。`View` に準拠する型が `some View` で書けば推論される。`PrimitiveView` では `Never`。
     associatedtype Body: View
 
-    /// このビューを組み立てるビュー。
+    /// この `View` を組み立てる `View`。
     ///
-    /// - Note: 1 フレームのうちに、測定と描画で何度も読まれる。読むたびに違うビューを返すと、
-    ///   測ったときと描いたときで中身が食い違う。
+    /// - Note: `Application.draw()` の 1 回のうちに、`View.sizeThatFits(_:context:)` と `View.render(into:rect:context:)` で
+    ///   何度も値を取得される。取得するたびに違う `View` を返すと、`View.sizeThatFits(_:context:)` で測った `View` と
+    ///   `View.render(into:rect:context:)` で描いた `View` が食い違う。
     var body: Body { get }
 
-    /// `proposal` の範囲で希望するサイズを返す。
+    /// `proposal` の範囲で、この `View` の `Size` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 希望するサイズ。
-    /// - Note: 返す値は `proposal` を超えてもよいが、その場合はレイアウト側で切り詰められる。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: この `View` の `Size`。
+    /// - Note: 戻り値は `proposal` を超えてもよい。超えた分は、`VStack`・`HStack`・`ZStack`・`AlignedView` などが、
+    ///   この `View` の `View.render(into:rect:context:)` に渡す `rect` 引数の矩形を、自分の `rect` 引数の矩形に
+    ///   収めるときに切り詰める。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size
 
     /// `rect` の領域へ描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Postcondition: `rect` の外のセルは書き換えない。`context.screen` を基準に重ねる
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Postcondition: `rect` の外の `Cell` は書き換えない。`context.screen` を基準に重ねる
     ///   `ScreenOverlayView` だけが、この約束から外れる。
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext)
 
-    /// 余白の分配に関する性質を返す。
+    /// この `View` の `LayoutTraits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 余白の分配に関する性質。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: この `View` の `LayoutTraits`。
     func layoutTraits(context: RenderContext) -> LayoutTraits
 }
 
 extension View {
-    /// `body` のビューが希望するサイズを返す。
+    /// `body` の `View` の `View.sizeThatFits(_:context:)` の戻り値を返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: `body` のビューが希望するサイズ。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: `body` の `View` の `View.sizeThatFits(_:context:)` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         context.sizeThatFits(of: body, index: 0, proposal: proposal)
     }
 
-    /// `body` のビューを描画する。
+    /// `body` の `View` を描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         context.render(body, index: 0, into: &buffer, rect: rect)
     }
 
-    /// `body` のビューの性質を返す。
+    /// `body` の `View` の `LayoutTraits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: `body` のビューの、余白の分配に関する性質。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: `body` の `View` の `View.layoutTraits(context:)` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         context.layoutTraits(of: body, index: 0)
     }
 }
 
-/// `body` を持たず、自分で測定と描画を行うビュー。
+/// `View.body` を持たず、`View.sizeThatFits(_:context:)` と `View.render(into:rect:context:)` を自分で書く `View`。
 ///
-/// `Text` や `VStack` のように、別のビューの組み合わせでは表せないビューがこれに適合する。
+/// `Text` や `VStack` のように、`View.body` で別の `View` を返す形では書けない `View` がこれに準拠する。
 ///
-/// - Warning: `sizeThatFits(_:context:)` と `render(into:rect:context:)` を必ず書く。
-///   書かないと、合成ビュー向けの既定の実装が選ばれ、`body` を読んだところで止まる。
+/// - Warning: `View.sizeThatFits(_:context:)` と `View.render(into:rect:context:)` を必ず書く。
+///   書かないと、`View.body` を持つ `View` 向けのデフォルトの実装が選ばれ、`body` の値を取得したところでプロセスが終了する。
 @MainActor
 public protocol PrimitiveView: View where Body == Never {}
 
 extension PrimitiveView {
-    /// プリミティブには無い `body`。
+    /// `PrimitiveView` には無い `body`。
     ///
-    /// - Precondition: 読まない。読むとプログラムが止まる。
+    /// - Precondition: 値を取得しない。取得するとプロセスが終了する。
     public var body: Never {
-        fatalError("\(Self.self) はプリミティブなので body を持たない")
+        fatalError("\(Self.self) は PrimitiveView なので body を持たない")
     }
 
-    /// 希望サイズのまま配置される性質を返す。
+    /// `VStack`・`HStack` が配ったあとに残る `Size` を引き取らない `LayoutTraits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: 常に `.fixed`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits { .fixed }
 }
@@ -152,49 +166,49 @@ extension Never: PrimitiveView {
     /// `Never` 自身。
     public typealias Body = Never
 
-    /// 値が存在しないため、読まれることのない `body`。
+    /// `Never` のインスタンスは存在しないため、値を取得されることのない `body`。
     public var body: Never { switch self {} }
 
-    /// 値が存在しないので呼ばれない。
+    /// `Never` のインスタンスは存在しないので呼び出されない。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 返らない。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: `Size` を返すことはない。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { switch self {} }
 
-    /// 値が存在しないので呼ばれない。
+    /// `Never` のインスタンスは存在しないので呼び出されない。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
 }
 
-/// 何も描画しないビュー。
+/// 何も描画しない `View`。
 public struct EmptyView: PrimitiveView {
-    /// 何も描画しないビューを作る。
+    /// 何も描画しない `View` を作る。
     public init() {}
 
     /// 大きさを持たない。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: 常に `.zero`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { .zero }
 
     /// 何も描画しない。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
 }
 
-/// 領域全体を 1 文字で塗りつぶすビュー。
+/// 領域全体を 1 文字で塗りつぶす `View`。
 public struct Fill: PrimitiveView {
     /// 敷き詰める文字。
     public var character: Character
@@ -211,33 +225,33 @@ public struct Fill: PrimitiveView {
         self.style = style
     }
 
-    /// 両方向に伸びる性質を返す。
+    /// `LayoutTraits.horizontalFlex`・`LayoutTraits.verticalFlex` がともに 1 の `LayoutTraits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: 常に `.flexible`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits { .flexible }
 
-    /// 提案された領域をそのまま受け取る。
+    /// `proposal` をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: `proposal` と同じサイズ。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { proposal }
 
     /// 領域全体を `character` で埋める。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         buffer.fill(rect, repeating: character, style: style)
     }
 }
 
-/// 余白を押し広げるビュー。
+/// `VStack`・`HStack` が配ったあとに残る `Size` を引き取る `View`。
 public struct Spacer: PrimitiveView {
     /// 最低限確保する長さ。
     public var minLength: Int
@@ -250,19 +264,19 @@ public struct Spacer: PrimitiveView {
         self.minLength = max(0, minLength)
     }
 
-    /// 両方向に伸びる性質を返す。
+    /// `LayoutTraits.horizontalFlex`・`LayoutTraits.verticalFlex` がともに 1 の `LayoutTraits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: 常に `.flexible`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits { .flexible }
 
-    /// 最低限の長さだけを希望する。
+    /// 幅・高さがともに `minLength` の `Size` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 幅・高さがともに `minLength` のサイズ。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: 幅・高さがともに `minLength` の `Size`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         Size(width: minLength, height: minLength)
     }
@@ -270,9 +284,9 @@ public struct Spacer: PrimitiveView {
     /// 何も描画しない。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
 }
 
@@ -297,11 +311,13 @@ public struct Divider: PrimitiveView {
         self.style = style
     }
 
-    /// 罫線を伸ばす方向にだけ伸びる性質を返す。
+    /// `axis` が `.horizontal` なら `LayoutTraits.horizontalFlex` だけが 1、`.vertical` なら `LayoutTraits.verticalFlex` だけが 1 の
+    /// `LayoutTraits` を返す。
     ///
     /// - Parameters:
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: `axis` の方向の重みだけが 1 の性質。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: `axis` が `.horizontal` なら `LayoutTraits.horizontalFlex` だけが 1、`.vertical` なら `LayoutTraits.verticalFlex` だけが 1 の
+    ///   `LayoutTraits`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         switch axis {
         case .horizontal: return LayoutTraits(horizontalFlex: 1, verticalFlex: 0)
@@ -309,12 +325,13 @@ public struct Divider: PrimitiveView {
         }
     }
 
-    /// 罫線を伸ばす方向にいっぱいまで広がり、もう一方は 1 桁・1 行になる。
+    /// `axis` の方向は `proposal` と同じ長さ、もう一方は 1 の `Size` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 希望するサイズ。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: `axis` が `.horizontal` なら幅が `proposal.width` で高さが 1、
+    ///   `.vertical` なら幅が 1 で高さが `proposal.height` の `Size`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         switch axis {
         case .horizontal: return Size(width: proposal.width, height: 1)
@@ -325,9 +342,9 @@ public struct Divider: PrimitiveView {
     /// 領域を `character` で埋めて罫線を引く。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         buffer.fill(rect, repeating: character, style: style)
     }

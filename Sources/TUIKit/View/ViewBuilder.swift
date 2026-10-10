@@ -1,28 +1,28 @@
-/// `VStack` などの `content` クロージャで複数のビューを並べるためのビルダ。
+/// `VStack` などの `content` クロージャで複数の `View` を並べるためのビルダ。
 @resultBuilder
 public enum ViewBuilder {
-    /// 1 つのビューを並びにする。
+    /// 1 つの `View` を並びにする。
     ///
     /// - Parameters:
-    ///   - view: 並べるビュー。
-    /// - Returns: そのビュー 1 つだけの並び。
+    ///   - view: 並べる `View`。
+    /// - Returns: `view` 1 つだけの並び。
     public static func buildExpression(_ view: any View) -> [any View] {
         [view]
     }
 
-    /// ビューの並びをそのまま受け取る。
+    /// `View` の並びをそのまま受け取る。
     ///
     /// - Parameters:
-    ///   - views: 並べるビュー。
+    ///   - views: 並べる `View`。
     /// - Returns: 受け取った並び。
     public static func buildExpression(_ views: [any View]) -> [any View] {
         views
     }
 
-    /// クロージャに並んだビューを 1 つの並びにまとめる。
+    /// クロージャに並んだ `View` を 1 つの並びにまとめる。
     ///
     /// - Parameters:
-    ///   - components: 各行のビューの並び。
+    ///   - components: 各行の `View` の並び。
     /// - Returns: 順に連結した並び。
     public static func buildBlock(_ components: [any View]...) -> [any View] {
         components.flatMap { $0 }
@@ -31,43 +31,43 @@ public enum ViewBuilder {
     /// `if` で条件を満たさなかった場合を空の並びにする。
     ///
     /// - Parameters:
-    ///   - component: 条件を満たしたときのビューの並び。満たさなければ `nil`。
+    ///   - component: 条件を満たしたときの `View` の並び。満たさなければ `nil`。
     /// - Returns: `component`。`nil` なら空の並び。
     public static func buildOptional(_ component: [any View]?) -> [any View] {
         component ?? []
     }
 
-    /// `if` の側のビューを並びにする。
+    /// `if` の条件を満たしたときの `View` を並びにする。
     ///
     /// - Parameters:
-    ///   - component: `if` の側のビューの並び。
+    ///   - component: `if` の条件を満たしたときの `View` の並び。
     /// - Returns: 受け取った並び。
     public static func buildEither(first component: [any View]) -> [any View] {
         component
     }
 
-    /// `else` の側のビューを並びにする。
+    /// `if` の条件を満たさず `else` に進んだときの `View` を並びにする。
     ///
     /// - Parameters:
-    ///   - component: `else` の側のビューの並び。
+    ///   - component: `if` の条件を満たさず `else` に進んだときの `View` の並び。
     /// - Returns: 受け取った並び。
     public static func buildEither(second component: [any View]) -> [any View] {
         component
     }
 
-    /// `for` で作られたビューを 1 つの並びにまとめる。
+    /// `for` で作られた `View` を 1 つの並びにまとめる。
     ///
     /// - Parameters:
-    ///   - components: 繰り返しごとのビューの並び。
+    ///   - components: 繰り返しごとの `View` の並び。
     /// - Returns: 順に連結した並び。
     public static func buildArray(_ components: [[any View]]) -> [any View] {
         components.flatMap { $0 }
     }
 
-    /// `if #available` の中のビューを並びにする。
+    /// `if #available` の中の `View` を並びにする。
     ///
     /// - Parameters:
-    ///   - component: 利用できる場合のビューの並び。
+    ///   - component: 利用できる場合の `View` の並び。
     /// - Returns: 受け取った並び。
     public static func buildLimitedAvailability(_ component: [any View]) -> [any View] {
         component

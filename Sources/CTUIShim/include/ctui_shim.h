@@ -5,14 +5,14 @@
 #include <stddef.h>
 #include <termios.h>
 
-// Swift から C の可変長引数関数 `ioctl` を直接呼ぶことはできない。
-// この宣言を消して Swift 側から `ioctl` を呼んではいけない。
+// Swift から C の可変長引数関数 `ioctl` を直接呼び出すことはできない。
+// この宣言を消して Swift のコードから `ioctl` を呼び出してはいけない。
 
-/// 端末のウィンドウサイズを取得する。
+/// 端末デバイスのウィンドウサイズを取得する。
 ///
 /// - Parameters:
 ///   - fd: 問い合わせるファイル記述子。
-///   - columns: 桁数の書き込み先。`NULL` なら書き込まない。
+///   - columns: 幅（`Cell` の数）の書き込み先。`NULL` なら書き込まない。
 ///   - rows: 行数の書き込み先。`NULL` なら書き込まない。
 /// - Returns: 成功なら 0、失敗なら -1。
 int ctui_terminal_size(int fd, int *columns, int *rows);
@@ -21,7 +21,7 @@ int ctui_terminal_size(int fd, int *columns, int *rows);
 // `signal(3)` で代用してはいけない。前の設定を `struct sigaction` として受け取れず、
 // Swift ランタイムが仕掛けたクラッシュ時のハンドラへ戻せなくなる。
 
-/// シグナルハンドラを登録し、前の設定を返す。
+/// シグナルハンドラを登録し、前の設定を `previous` へ書き込む。
 ///
 /// - Parameters:
 ///   - signal_number: 登録するシグナル番号。
@@ -45,17 +45,17 @@ int ctui_restore_signal_handler(int signal_number, const struct sigaction *previ
 // 静的な変数は `volatile sig_atomic_t` かロックフリーなアトミック型に限られ、Swift の変数はどちらでもない。
 // `nonisolated(unsafe)` は並行性検査を黙らせるだけで型は変わらず、`Atomic` は macOS 15 からしか使えない。
 
-/// クラッシュしたときとプロセスが終わるときに、端末属性を戻し、打ち消す制御コードを書き出すよう仕掛ける。
+/// クラッシュしたときとプロセスが終わるときに、端末デバイスの termios を戻し、`sequence` を書き出すよう仕掛ける。
 ///
 /// - Parameters:
-///   - input: 端末属性を戻すファイル記述子。
-///   - output: 制御コードを書き出すファイル記述子。
-///   - attributes: 戻す先の端末属性。
-///   - sequence: 書き出す制御コード。
+///   - input: 端末デバイスの termios を戻すファイル記述子。
+///   - output: `sequence` を書き出す、端末デバイスのファイル記述子。
+///   - attributes: 戻す先の、端末デバイスの termios。
+///   - sequence: 端末エミュレータへ送ったモードを戻すために書き出すバイト列。
 ///   - length: `sequence` のバイト数。
-/// - Returns: 成功なら 0、制御コードの領域を確保できなければ -1。
-/// - Note: 仕掛けられるのは一組だけ。二度目からは記述子と端末属性が上書きされ、
-///   制御コードは初めに渡したものが使われ続ける。
+/// - Returns: 成功なら 0、`sequence` を写す領域を確保できなければ -1。
+/// - Note: 仕掛けられるのは一組だけ。二度目からは記述子と termios が上書きされ、
+///   `sequence` は初めに渡したものが使われ続ける。
 int ctui_crash_restorer_arm(int input,
                             int output,
                             const struct termios *attributes,
@@ -64,12 +64,12 @@ int ctui_crash_restorer_arm(int input,
 
 /// 仕掛けたハンドラを外し、前の設定へ戻す。
 ///
-/// - Note: 二重に呼んでも安全。
+/// - Note: 二重に呼び出しても安全。
 void ctui_crash_restorer_disarm(void);
 
-/// 仕掛けた端末を今すぐ戻す。仕掛けていなければ何もしない。
+/// `ctui_crash_restorer_arm` に初めて渡した `sequence` を端末デバイスへ書き出し、termios を今すぐ戻す。仕掛けていなければ何もしない。
 ///
-/// シグナルハンドラから呼べる。使うのは非同期シグナル安全な `write(2)` と `tcsetattr(3)` だけ。
+/// シグナルハンドラから呼び出せる。使うのは非同期シグナル安全な `write(2)` と `tcsetattr(3)` だけ。
 ///
 /// - See: [The Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9799919799/) の
 ///   「Signal Concepts」にある Async-Signal-Safe Functions。
@@ -115,9 +115,9 @@ int ctui_signal_wakeup_read_descriptor(void);
 
 /// 自己パイプの読み取り側を待っている `poll(2)` を起こす。
 ///
-/// シグナルハンドラから呼べる。使うのは非同期シグナル安全な `write(2)` だけ。
+/// シグナルハンドラから呼び出せる。使うのは非同期シグナル安全な `write(2)` だけ。
 ///
-/// - Postcondition: `errno` は呼ぶ前の値のまま。
+/// - Postcondition: `errno` は呼び出す前の値のまま。
 /// - See: [The Open Group Base Specifications](https://pubs.opengroup.org/onlinepubs/9799919799/) の
 ///   「Signal Concepts」にある Async-Signal-Safe Functions。
 void ctui_signal_wake_up(void);

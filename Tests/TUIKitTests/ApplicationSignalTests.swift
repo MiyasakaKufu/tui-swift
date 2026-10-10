@@ -21,8 +21,9 @@ final class ApplicationSignalTests: XCTestCase {
 
         XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 20, 5), 0, "初期サイズを設定できない")
 
-        // `body` はサイズを確認した後・次の `LoopEvent` を待つ前に呼ばれる。
-        // ここでリサイズすることで、シグナルが届くタイミングを狙って揃えられる。
+        // サイズの変更と SIGWINCH を、`ResizeProbe` に渡すクロージャの外へ移してはいけない。
+        // `ResizeProbe.body` の値は、端末デバイスのウィンドウサイズを確かめた後・次の `LoopEvent` を待つ前に
+        // 取得されるので、外で送ると、待つ直前に届く SIGWINCH を再現できない。
         let probe = ResizeProbe {
             XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 30, 8), 0, "サイズを変更できない")
             kill(getpid(), SIGWINCH)
@@ -138,9 +139,9 @@ final class ApplicationSignalTests: XCTestCase {
     /// イベントループを回す `Task` を作る。
     ///
     /// - Parameters:
-    ///   - root: ループに渡すコンポーネント。
+    ///   - root: `Application` に渡す、`Component` に準拠する型のインスタンス。
     ///   - terminal: 入出力に使う `Terminal`。
-    /// - Returns: `run()` を回している `Task`。
+    /// - Returns: `Application.run()` を回している `Task`。
     @MainActor
     private func runInBackground<Root: Component>(
         root: Root,
@@ -151,12 +152,12 @@ final class ApplicationSignalTests: XCTestCase {
             options: ApplicationOptions(usesAlternateScreen: false, usesBracketedPaste: false),
             terminal: terminal
         )
-        // 別スレッドでは回せない。`run()` はアクタの上に居るため、同じアクタの `Task` にする。
+        // 別スレッドでは回せない。`Application.run()` はアクタの上に居るため、同じアクタの `Task` にする。
         return Task { try await application.run() }
     }
 }
 
-/// リサイズの通知を記録し、二度目の通知で終了するコンポーネント。
+/// リサイズの通知を記録し、二度目の通知で終了する `Component` に準拠する型。
 ///
 /// 最初の描画で一度だけ、渡された処理を実行する。
 private final class ResizeProbe: Component, @unchecked Sendable {
@@ -185,7 +186,7 @@ private final class ResizeProbe: Component, @unchecked Sendable {
     }
 }
 
-/// 最初の描画で一度だけ終了シグナルを送り、自分からは終了しないコンポーネント。
+/// 最初の描画で一度だけ終了シグナルを送り、自分からは終了しない `Component` に準拠する型。
 private final class TerminationProbe: Component, @unchecked Sendable {
     private let trigger: () -> Void
     private var hasDrawn = false
@@ -205,11 +206,11 @@ private final class TerminationProbe: Component, @unchecked Sendable {
 
 /// テスト用の疑似端末。
 ///
-/// マスタ側を読み続けるスレッドを持つ。
+/// master を読み続けるスレッドを持つ。
 ///
 /// - Warning: 読み捨てをやめてはいけない。
-///   出力バッファが詰まると、スレーブ側への `write(2)` や、出力の掃き出しを待つ
-///   `tcsetattr(TCSAFLUSH)` が返らなくなる。
+///   読まずに溜まったバイト列がカーネルの上限に達すると、slave への `write(2)` や、出力の掃き出しを待つ
+///   `tcsetattr(TCSAFLUSH)` が戻らなくなる。
 private final class PseudoTerminal {
     enum Failure: Error {
         case unavailable(errno: Int32)
@@ -237,7 +238,7 @@ private final class PseudoTerminal {
         close()
     }
 
-    /// スレーブ側を入出力に使う端末を作る。
+    /// slave を入出力に使う `Terminal` を作る。
     @MainActor
     func terminal() -> Terminal {
         Terminal(input: slave, output: slave)
@@ -316,7 +317,7 @@ private final class PipePair {
         close()
     }
 
-    /// 読み取り側に未読のバイトがあるか。
+    /// `readEnd` に未読のバイトがあるか。
     var isReadable: Bool {
         var descriptor = pollfd(fd: readEnd, events: Int16(POLLIN), revents: 0)
         return poll(&descriptor, 1, 0) > 0
@@ -335,7 +336,7 @@ private final class PipePair {
     }
 }
 
-// クラスの中から `close(2)` は直接呼べない。メンバーの `close()` が先に見つかる。
+// クラスの中から `close(2)` は直接呼び出せない。メンバーの `close()` が先に見つかる。
 /// ファイル記述子を閉じる。
 ///
 /// - Parameters:

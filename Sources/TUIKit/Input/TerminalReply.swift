@@ -1,4 +1,4 @@
-/// 問い合わせに対して端末が返した応答。
+/// 問い合わせに対して端末エミュレータが返した応答。
 ///
 /// `InputEvent` としては届かない。`InputParser.takeReplies()` で取り出す。
 public enum TerminalReply: Hashable, Sendable {
@@ -6,6 +6,6 @@ public enum TerminalReply: Hashable, Sendable {
     ///
     /// 応答が返ること自体が対応している証拠で、`flags` は今有効になっている機能を表す。
     case keyboardProtocol(flags: Int)
-    /// 端末の種別（`CSI ? <params> c`）。
+    /// 端末エミュレータの種別（`CSI ? <params> c`）。
     case deviceAttributes
 }

@@ -1,7 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-/// `body` だけを書いた合成ビュー。
+/// `View.body` だけを書いた `View`。
 private struct Badge: View {
     let label: String
 
@@ -10,7 +10,7 @@ private struct Badge: View {
     }
 }
 
-/// 合成ビューを入れ子にした合成ビュー。
+/// `View.body` の `HStack` の中に `Badge` を並べる `View`。
 private struct BadgeRow: View {
     var body: some View {
         HStack(spacing: 1) {
@@ -20,52 +20,52 @@ private struct BadgeRow: View {
     }
 }
 
-/// 伸びるビューを `body` に持つ合成ビュー。
+/// `View.body` で、`LayoutTraits.flex(on:)` が 1 以上の `View` を返す `View`。
 private struct Stretch: View {
     var body: some View {
         Fill("*")
     }
 }
 
-/// 渡された文脈のノードを、名前ごとに記録する。
+/// `NodeProbe` が受け取った `RenderContext.node` の `ViewNode.id` を、`NodeProbe.name` ごとに記録するクラス。
 @MainActor
 private final class NodeLog {
-    /// 最後に描かれたときのノードの同一性。
+    /// 最後に `NodeProbe.render(into:rect:context:)` が呼び出されたときの `ViewNode.id`。
     var rendered: [String: Int] = [:]
-    /// 描かれた順に並べたノードの同一性。
+    /// `NodeProbe.render(into:rect:context:)` が呼び出された順に並べた `ViewNode.id`。
     var history: [String: [Int]] = [:]
 }
 
-/// 渡された文脈のノードを記録するビュー。
+/// 受け取った `RenderContext.node` の `ViewNode.id` を `NodeLog` に記録する `View`。
 private struct NodeProbe: PrimitiveView {
     /// 記録に使う名前。
     let name: String
     /// 記録先。
     let log: NodeLog
 
-    /// 1 桁・1 行を希望する。
+    /// 幅 1・高さ 1 の `Size` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 1 桁・1 行のサイズ。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: 幅 1・高さ 1 の `Size`。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         Size(width: 1, height: 1)
     }
 
-    /// ノードの同一性を記録する。
+    /// `ViewNode.id` を記録する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         log.rendered[name] = context.node.id
         log.history[name, default: []].append(context.node.id)
     }
 }
 
-/// `NodeProbe` を包む合成ビュー。
+/// `View.body` で `NodeProbe` を返す `View`。
 private struct WrappedProbe: View {
     let name: String
     let log: NodeLog
@@ -219,7 +219,7 @@ final class ViewBodyTests: XCTestCase {
         XCTAssertNotEqual(log.rendered["p"], before)
     }
 
-    // MARK: - ノードの破棄
+    // MARK: - `ViewNode` の破棄
 
     func testNodesNotVisitedInFrameAreDiscarded() async {
         let graph = ViewGraph()

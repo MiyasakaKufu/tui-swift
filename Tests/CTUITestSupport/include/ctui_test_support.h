@@ -1,20 +1,21 @@
 #ifndef CTUI_TEST_SUPPORT_H
 #define CTUI_TEST_SUPPORT_H
 
-/// 疑似端末（pty）を開き、master と slave の記述子を返す。
+/// POSIX の pseudo-terminal（pty）を開き、manager device と subsidiary device の記述子を `master`・`slave` に書き込む。
 ///
 /// - Parameters:
-///   - master: master の記述子の書き込み先。
-///   - slave: slave の記述子の書き込み先。
+///   - master: manager device の記述子の書き込み先。
+///   - slave: subsidiary device の記述子の書き込み先。
 /// - Returns: 成功なら 0、失敗なら -1。
 /// - Postcondition: 失敗した場合は記述子に触れない。
 int ctui_test_open_pty(int *master, int *slave);
 
-/// 端末のウィンドウサイズを設定する。
+/// 端末デバイスのウィンドウサイズを設定する。
 ///
 /// - Parameters:
-///   - fd: 設定するファイル記述子。
-///   - columns: 桁数。
+///   - fd: pseudo-terminal の manager device か subsidiary device のファイル記述子。どちらを渡しても、
+///     subsidiary device（端末デバイス）のウィンドウサイズが変わる。
+///   - columns: 横方向の `Cell` の数（`ws_col`）。
 ///   - rows: 行数。
 /// - Returns: 成功なら 0、失敗なら -1。
 int ctui_test_set_terminal_size(int fd, int columns, int rows);

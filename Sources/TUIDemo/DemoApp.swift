@@ -20,10 +20,10 @@ final class DemoApp: TerminalApp {
         "キー入力とマウスの解析",
         "VStack / HStack によるレイアウト",
         "枠線とタイトル",
-        "スクロールするリスト",
-        "テキスト入力",
+        "ListView のスクロール",
+        "TextField での入力",
         "ウィンドウサイズ変更への追従",
-        "ビューの重ね描きとダイアログ",
+        "View の重ね描きとダイアログ",
     ]
 
     private var selection = 0
@@ -128,8 +128,8 @@ final class DemoApp: TerminalApp {
             return parts.joined(separator: "+")
         case .mouse(let mouseEvent):
             var parts = ["マウス", "\(mouseEvent.action)"]
-            // ボタンを伴うイベントでは種類も出す。拡張ボタン（戻る・進む）を
-            // 左ボタンと見分けるために必要。ホイールは `.none` なので出ない。
+            // `MouseEvent.button` を出すのをやめると、拡張ボタン（戻る・進む）の押下が左ボタンの押下と
+            // 同じ表示になり見分けられない。
             if mouseEvent.button != .none { parts.append("\(mouseEvent.button)") }
             parts.append("(\(mouseEvent.position.x), \(mouseEvent.position.y))")
             return parts.joined(separator: " ")
@@ -174,7 +174,7 @@ private struct Detail: View {
     var body: some View {
         VStack(spacing: 1) {
             Text("選択中: \(selected)", wrap: .word).bold()
-            Text("端末サイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
+            Text("ウィンドウサイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
             Text("直前のイベント: \(lastEventDescription)", wrap: .word)
 
             VStack(spacing: 0) {
@@ -234,7 +234,7 @@ private struct Dialog: View {
             if isShowing {
                 VStack(spacing: 1, alignment: .center) {
                     Text("画面の中央に重ねたダイアログです。", style: textStyle, wrap: .word)
-                    Text("下に敷いた全角文字を覆っても、行の桁はずれません。", style: textStyle, wrap: .word)
+                    Text("下に敷いた全角文字を覆っても、その右に続く文字の位置はずれません。", style: textStyle, wrap: .word)
                     Text("Enter か Esc で閉じる", style: textStyle).dim()
                 }
                 .padding(horizontal: 2, vertical: 1)
