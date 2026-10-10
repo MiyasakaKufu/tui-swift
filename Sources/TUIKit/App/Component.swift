@@ -16,7 +16,7 @@ public protocol Component: AnyObject {
 
     /// `MessageSender.send(_:)` で送る値の型。`receive(_:)` を書けば推論される。
     ///
-    /// 準拠する型が `Component.Message` を決めなければ `Never` になる。`MessageSender` を使わないなら決めなくてよい。
+    /// 既定は `Never`。`MessageSender` を使わないなら決めなくてよい。
     associatedtype Message: Sendable = Never
 
     /// 現在の状態から画面を組み立てる。
@@ -58,8 +58,8 @@ extension Component {
     /// - Parameters:
     ///   - event: `Application` が渡す `InputEvent`。
     /// - Returns: 常に `.ignored`。
-    /// - Note: すべてのイベントが未処理になるが、イニシャライザの `quitsOnControlC:` 引数を省いて作った
-    ///   `ApplicationOptions` では `ApplicationOptions.quitsOnControlC` が `true` なので、Ctrl+C で終了できる。
+    /// - Note: すべてのイベントが未処理になるが、`ApplicationOptions.quitsOnControlC`
+    ///   が既定で有効なため Ctrl+C で終了できる。
     public func handle(_ event: InputEvent) -> EventResult { .ignored }
 
     /// `MessageSender` を使わない `Component` に準拠する型は、`Component.Message` を受け取らなくてよい。

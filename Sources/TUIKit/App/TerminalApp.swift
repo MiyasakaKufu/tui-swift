@@ -29,7 +29,7 @@ public protocol TerminalApp: Component {
 }
 
 extension TerminalApp {
-    /// イニシャライザの引数をすべて省いて作った `ApplicationOptions`（`ApplicationOptions.default`）。
+    /// すべて既定値の設定。
     public static var options: ApplicationOptions { .default }
 
     /// `Application` を作って起動する。

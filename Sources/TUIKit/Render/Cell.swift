@@ -23,6 +23,6 @@ public struct Cell: Hashable, Sendable {
         self.isContinuation = isContinuation
     }
 
-    /// `Style.plain` の空白の `Cell`。
+    /// 既定スタイルの空白の `Cell`。
     public static let empty = Cell()
 }

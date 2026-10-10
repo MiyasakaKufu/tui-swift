@@ -24,7 +24,7 @@ public enum DisplayWidth {
     /// go-runewidth や tcell が見るものと同じ `RUNEWIDTH_EASTASIAN`。
     public static let ambiguousWidthEnvironmentVariable = "RUNEWIDTH_EASTASIAN"
 
-    /// `ambiguous:`・`ambiguousWidth:` 引数を省いたときに使う `DisplayWidth.AmbiguousWidth`。
+    /// `DisplayWidth.AmbiguousWidth` を指定しなかったときの既定値。
     ///
     /// - Note: 最初に参照した時点で `resolveAmbiguousWidth()` から一度だけ決まる。
     ///   あとから環境変数を変えても反映されない。TUIKit アプリごとに変えるには
@@ -128,8 +128,7 @@ public enum DisplayWidth {
 
     /// 直前の文字を絵文字として表示するよう指定する異体字セレクタ。
     ///
-    /// UTS #51 の default text presentation の文字（`Emoji` が Yes で `Emoji_Presentation` が No の文字）でも、
-    /// これが付けば絵文字表示になり、`Cell` 2 個分になる。
+    /// 既定でテキスト表示の文字でも、これが付けば絵文字表示になり、`Cell` 2 個分になる。
     ///
     /// - See: [UTS #51: Unicode Emoji](https://www.unicode.org/reports/tr51/) の
     ///   emoji presentation sequence の定義。

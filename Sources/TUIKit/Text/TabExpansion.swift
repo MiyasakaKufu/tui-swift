@@ -4,10 +4,7 @@
 /// 自身のタブストップまで動かすため、`Cell` に書き込む前に空白へ置き換える。
 public enum TabExpansion {
 
-    /// `tabSize` 引数を省いたときのタブストップの間隔（`Cell` の数）。
-    ///
-    /// `TabExpansion.expand(_:tabSize:startColumn:ambiguous:)`・`TextWrapping.wrap(_:width:mode:tabSize:ambiguous:)`・
-    /// `Text.init(_:style:wrap:alignment:tabSize:)` が使う。
+    /// タブ幅の既定値。
     public static let defaultSize = 4
 
     /// `text` のタブを、次のタブストップまでの空白に置き換える。

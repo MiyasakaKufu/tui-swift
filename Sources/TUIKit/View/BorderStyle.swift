@@ -31,7 +31,7 @@ public struct BorderStyle: Hashable, Sendable {
     ///   - bottom: 下辺に並べる文字。
     ///   - bottomRight: 右下の角に置く文字。
     /// - Postcondition: `DisplayWidth.AmbiguousWidth` が `.narrow` でも `Cell` 1 個分にならない文字（全角文字や絵文字）は、
-    ///   `BorderStyle.single` のその位置の文字（細い実線）へ置き換わる。
+    ///   その位置の既定の文字（`BorderStyle.single` と同じ細い実線）へ置き換わる。
     public init(
         topLeft: Character,
         top: Character,
@@ -52,7 +52,7 @@ public struct BorderStyle: Hashable, Sendable {
         self.bottomRight = Self.singleWidth(bottomRight, fallback: "┘")
     }
 
-    // `.narrow` を `DisplayWidth.defaultAmbiguousWidth` に変えてはいけない。同じ引数から環境変数によって違う文字組みができる。
+    // `.narrow` を既定の曖昧幅に変えてはいけない。同じ引数から環境によって違う文字組みができる。
     // `DisplayWidth.AmbiguousWidth` が `.wide` のときは置き換え先（罫線素片）も `Cell` 2 個分なので、置き換えても `Cell` 1 個分にはならない。
     private static func singleWidth(_ character: Character, fallback: Character) -> Character {
         DisplayWidth.width(of: character, ambiguous: .narrow) == 1 ? character : fallback

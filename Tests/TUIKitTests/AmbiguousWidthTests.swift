@@ -162,7 +162,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertTrue(BorderStyle.ascii.fitsInSingleColumn(ambiguous: .wide))
     }
 
-    /// `BorderStyle` が持つ文字は、作ったときの `DisplayWidth.defaultAmbiguousWidth` に左右されない。
+    /// 枠線の文字組みは、作ったときの曖昧幅の既定値に左右されない。
     func testBorderStyleKeepsAmbiguousCharacters() async {
         let style = BorderStyle(
             topLeft: "╔", top: "═", topRight: "╗",

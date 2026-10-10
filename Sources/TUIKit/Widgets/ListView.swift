@@ -255,7 +255,7 @@ public struct ListView: PrimitiveView {
     public var selectedStyle: Style
     /// 選択行の先頭に付ける印。
     public var selectionMarker: String
-    /// 非選択行の先頭に入れる字下げ。`nil` なら `selectionMarker` と同じ幅の空白。
+    /// 非選択行の先頭に入れる字下げ。既定では `selectionMarker` と同じ幅の空白。
     public var marginMarker: String?
 
     /// `Binding` で渡すプロパティに選択位置を持たせる `ListView` を作る。

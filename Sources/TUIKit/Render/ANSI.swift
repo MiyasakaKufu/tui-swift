@@ -130,7 +130,7 @@ public enum ANSI {
     ///   - text: クリップボードへ渡す文字列。空文字列を渡すとクリップボードを空にする。
     ///   - limit: Base64 に変換した後の長さの上限（バイト）。
     /// - Returns: クリップボードへ書き込む `String`。上限を超えるなら `nil`。
-    /// - Note: OSC 52 をデフォルトで拒否する端末エミュレータがある（xterm の `allowWindowOps`、
+    /// - Note: OSC 52 を既定で拒否する端末エミュレータがある（xterm の `allowWindowOps`、
     ///   tmux の `set-clipboard`）。端末エミュレータは応答を送ってこないため、書き込めたかは
     ///   TUIKit アプリから判別できない。
     public static func setClipboard(_ text: String, limit: Int = ANSI.clipboardLimit) -> String? {

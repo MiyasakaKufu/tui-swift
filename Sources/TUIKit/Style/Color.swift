@@ -36,7 +36,7 @@ public enum ANSIColor: UInt8, Hashable, Sendable, CaseIterable {
 
 /// 文字色・背景色。
 public enum Color: Hashable, Sendable {
-    /// 端末エミュレータが文字色・背景色に使うデフォルトの色（SGR 39 / 49）。
+    /// 端末エミュレータの既定色（SGR 39 / 49）。
     case `default`
     /// 基本 16 色。
     case ansi(ANSIColor)

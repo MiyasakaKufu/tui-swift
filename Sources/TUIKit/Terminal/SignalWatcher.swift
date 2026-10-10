@@ -36,9 +36,8 @@ public enum SignalWatcher {
 
     /// SIGWINCH、終了シグナル、SIGTSTP / SIGCONT のハンドラを登録する。
     ///
-    /// 終了シグナルは SIGTERM / SIGHUP / SIGINT / SIGQUIT。これらをデフォルトの動作
-    /// （POSIX の default action）のまま受けると、`Application` が `Terminal.restore()` を
-    /// 呼び出さず、端末デバイスが raw モードのまま残る。
+    /// 終了シグナルは SIGTERM / SIGHUP / SIGINT / SIGQUIT。既定の動作のまま受けると、
+    /// `Application` が `Terminal.restore()` を呼び出さず、端末デバイスが raw モードのまま残る。
     ///
     /// - Postcondition: `wakeupDescriptor` が使えるようになる。SIGPIPE は無視される。
     public static func install() {

@@ -23,7 +23,7 @@ public struct Style: Hashable, Sendable {
         self.attributes = attributes
     }
 
-    /// 文字色・背景色が `Color.default` で、装飾のないスタイル。
+    /// 装飾なしの既定スタイル。
     public static let plain = Style()
 
     /// 文字色だけを差し替えたスタイル。

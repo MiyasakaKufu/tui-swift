@@ -85,6 +85,6 @@ final class ComponentTests: XCTestCase {
 /// `TerminalApp.options` を書かない `TerminalApp` に準拠する型。`TerminalApp.options` のデフォルトの実装が使われる。
 private final class DefaultOptionApp: TerminalApp {
     var body: some View {
-        Text("DefaultOptionApp")
+        Text("既定")
     }
 }

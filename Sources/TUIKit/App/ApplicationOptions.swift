@@ -4,13 +4,13 @@ public struct ApplicationOptions: Sendable {
     public var usesAlternateScreen: Bool
     /// マウスイベントを受け取る範囲。
     ///
-    /// - Note: イニシャライザの `mouseTracking:` 引数を省くと `.disabled` で、受け取らない。有効にしない限り `.mouse` は届かない。
+    /// - Note: 既定では受け取らない。有効にしない限り `.mouse` は届かない。
     public var mouseTracking: MouseTracking
     /// ブラケットペーストを有効にする。
     public var usesBracketedPaste: Bool
     /// 端末エミュレータのフォーカス変化を `.focus` として受け取る。
     ///
-    /// - Note: イニシャライザの `reportsFocus:` 引数を省くと `false`。有効にしない限り `.focus` は届かない。
+    /// - Note: 既定では無効。有効にしない限り `.focus` は届かない。
     ///   フォーカス通知に対応しない端末エミュレータでは、有効にしても届かない。
     public var reportsFocus: Bool
     /// 端末エミュレータが対応していれば kitty keyboard protocol を使う。
@@ -46,7 +46,7 @@ public struct ApplicationOptions: Sendable {
     /// East Asian Width が Ambiguous の文字を `Cell` 何個分として扱うか。
     ///
     /// - Note: 端末エミュレータの設定と食い違うと、罫線素片や `…` を含む行で、後ろに続く文字が横にずれる。
-    ///   イニシャライザの `ambiguousWidth:` 引数を省くと `DisplayWidth.defaultAmbiguousWidth`（環境変数 `RUNEWIDTH_EASTASIAN` から決まる）。
+    ///   既定値は `DisplayWidth.defaultAmbiguousWidth`（環境変数 `RUNEWIDTH_EASTASIAN` から決まる）。
     public var ambiguousWidth: DisplayWidth.AmbiguousWidth
 
     /// 設定を作る。
@@ -89,7 +89,7 @@ public struct ApplicationOptions: Sendable {
         self.ambiguousWidth = ambiguousWidth
     }
 
-    /// イニシャライザの引数をすべて省いて作った `ApplicationOptions`。
+    /// すべて既定値の設定。
     public static let `default` = ApplicationOptions()
 
     /// `Component.handle(_:)` が `.ignored` を返した `InputEvent` で終了するかを判定する。
