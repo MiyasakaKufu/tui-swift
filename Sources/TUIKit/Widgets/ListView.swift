@@ -330,7 +330,7 @@ public struct ListView: PrimitiveView {
     /// - Parameters:
     ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 文字列の幅を測るときに `RenderContext.ambiguousWidth` を読む `RenderContext`。
-    /// - Returns: 最も長い項目の `Cell` の数に `selectionMarker` の `Cell` の数を足した幅と、項目数を、
+    /// - Returns: 最も長い項目の `Cell` の数に `ListView.selectionMarker` の `Cell` の数を足した幅と、項目数を、
     ///   それぞれ `proposal` の幅と高さで切り詰めた `Size`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let ambiguous = context.ambiguousWidth

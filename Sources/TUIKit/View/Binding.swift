@@ -8,7 +8,7 @@
 ///   `ListState.handle(_:)`・`ListState.select(_:)` など、`TextFieldState`・`ListState` のメソッドだけ。
 ///   `TextField`・`ListView` の `View.sizeThatFits(_:context:)` と `View.render(into:rect:context:)` では値を取得するだけ。
 /// - Warning: TUIKit を使う開発者が書く `View` の `View.body`・`View.sizeThatFits(_:context:)`・`View.layoutTraits(context:)`・
-///   `View.render(into:rect:context:)` の中で `wrappedValue` へ代入すると、`Application.draw()` の 1 回のうちに
+///   `View.render(into:rect:context:)` の中で `Binding.wrappedValue` へ代入すると、`Application.draw()` の 1 回のうちに
 ///   同じ `View` を何度も辿るため、`View.sizeThatFits(_:context:)` で取得した値と
 ///   `View.render(into:rect:context:)` で取得した値が食い違う。
 @MainActor

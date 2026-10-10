@@ -71,14 +71,14 @@ public enum SignalWatcher {
 
     /// 自己パイプの読み取り側を待っている `poll(2)` を、シグナル無しで起こす。
     ///
-    /// - Note: `install()` を呼び出す前は何も起こらない。
+    /// - Note: `SignalWatcher.install()` を呼び出す前は何も起こらない。
     static func wakeUp() {
         wakeUpPoll()
     }
 
     /// シグナルが届いたことを知らせるパイプの読み取り側。
     ///
-    /// `install()` を呼び出す前や、パイプを作れなかったときは `nil`。
+    /// `SignalWatcher.install()` を呼び出す前や、パイプを作れなかったときは `nil`。
     ///
     /// - Note: 非ブロッキングなので、読み取り可能になった後は EAGAIN になるまで読み捨てられる。
     public static var wakeupDescriptor: Int32? {

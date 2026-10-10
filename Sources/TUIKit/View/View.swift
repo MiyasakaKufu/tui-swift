@@ -22,18 +22,18 @@ public struct LayoutTraits: Hashable, Sendable {
         self.verticalFlex = max(0, verticalFlex)
     }
 
-    /// `horizontalFlex`・`verticalFlex` がともに 0 の `LayoutTraits`。
+    /// `LayoutTraits.horizontalFlex`・`LayoutTraits.verticalFlex` がともに 0 の `LayoutTraits`。
     ///
     /// `View.layoutTraits(context:)` がこれを返す `View` は、`View.sizeThatFits(_:context:)` の戻り値のまま配置される。
     public static let fixed = LayoutTraits()
-    /// `horizontalFlex`・`verticalFlex` がともに 1 の `LayoutTraits`。
+    /// `LayoutTraits.horizontalFlex`・`LayoutTraits.verticalFlex` がともに 1 の `LayoutTraits`。
     public static let flexible = LayoutTraits(horizontalFlex: 1, verticalFlex: 1)
 
-    /// `axis` の方の `horizontalFlex` か `verticalFlex` を返す。
+    /// `axis` の方の `LayoutTraits.horizontalFlex` か `LayoutTraits.verticalFlex` を返す。
     ///
     /// - Parameters:
-    ///   - axis: `horizontalFlex` と `verticalFlex` のどちらを返すかを決める軸。
-    /// - Returns: `axis` が `.horizontal` なら `horizontalFlex`、`.vertical` なら `verticalFlex`。
+    ///   - axis: `LayoutTraits.horizontalFlex` と `LayoutTraits.verticalFlex` のどちらを返すかを決める軸。
+    /// - Returns: `axis` が `.horizontal` なら `LayoutTraits.horizontalFlex`、`.vertical` なら `LayoutTraits.verticalFlex`。
     public func flex(on axis: Axis) -> Int {
         switch axis {
         case .horizontal: return horizontalFlex
@@ -57,8 +57,8 @@ public struct LayoutTraits: Hashable, Sendable {
 /// }
 /// ```
 ///
-/// `View.body` を持つ `View` は `body` だけを書けばよい。`View.sizeThatFits(_:context:)`・`View.render(into:rect:context:)`・
-/// `View.layoutTraits(context:)` のデフォルトの実装は、`body` を `child` 引数として `RenderContext` の同じ名前のメソッド
+/// `View.body` を持つ `View` は `View.body` だけを書けばよい。`View.sizeThatFits(_:context:)`・`View.render(into:rect:context:)`・
+/// `View.layoutTraits(context:)` のデフォルトの実装は、`View.body` を `child` 引数として `RenderContext` の同じ名前のメソッド
 /// （`RenderContext.sizeThatFits(of:index:proposal:)` など）に渡す。
 ///
 /// 別の `View` の `View.sizeThatFits(_:context:)`・`View.render(into:rect:context:)`・`View.layoutTraits(context:)` は
@@ -67,7 +67,7 @@ public struct LayoutTraits: Hashable, Sendable {
 /// `child` 引数として渡して呼び出す。
 @MainActor
 public protocol View {
-    /// `body` が返す `View` の型。`View` に準拠する型が `some View` で書けば推論される。`PrimitiveView` では `Never`。
+    /// `View.body` が返す `View` の型。`View` に準拠する型が `some View` で書けば推論される。`PrimitiveView` では `Never`。
     associatedtype Body: View
 
     /// この `View` を組み立てる `View`。
@@ -107,17 +107,17 @@ public protocol View {
 }
 
 extension View {
-    /// `body` の `View` の `View.sizeThatFits(_:context:)` の戻り値を返す。
+    /// `View.body` の `View` の `View.sizeThatFits(_:context:)` の戻り値を返す。
     ///
     /// - Parameters:
     ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `body` の `View` の `View.sizeThatFits(_:context:)` の戻り値。
+    /// - Returns: `View.body` の `View` の `View.sizeThatFits(_:context:)` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         context.sizeThatFits(of: body, index: 0, proposal: proposal)
     }
 
-    /// `body` の `View` を描画する。
+    /// `View.body` の `View` を描画する。
     ///
     /// - Parameters:
     ///   - buffer: 描画先の `Buffer`。
@@ -127,11 +127,11 @@ extension View {
         context.render(body, index: 0, into: &buffer, rect: rect)
     }
 
-    /// `body` の `View` の `LayoutTraits` を返す。
+    /// `View.body` の `View` の `LayoutTraits` を返す。
     ///
     /// - Parameters:
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `body` の `View` の `View.layoutTraits(context:)` の戻り値。
+    /// - Returns: `View.body` の `View` の `View.layoutTraits(context:)` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         context.layoutTraits(of: body, index: 0)
     }
@@ -142,12 +142,12 @@ extension View {
 /// `Text` や `VStack` のように、`View.body` で別の `View` を返す形では書けない `View` がこれに準拠する。
 ///
 /// - Warning: `View.sizeThatFits(_:context:)` と `View.render(into:rect:context:)` を必ず書く。
-///   書かないと、`View.body` を持つ `View` 向けのデフォルトの実装が選ばれ、`body` の値を取得したところでプロセスが終了する。
+///   書かないと、`View.body` を持つ `View` 向けのデフォルトの実装が選ばれ、`View.body` の値を取得したところでプロセスが終了する。
 @MainActor
 public protocol PrimitiveView: View where Body == Never {}
 
 extension PrimitiveView {
-    /// `PrimitiveView` には無い `body`。
+    /// `PrimitiveView` には無い `View.body`。
     ///
     /// - Precondition: 値を取得しない。取得するとプロセスが終了する。
     public var body: Never {
@@ -166,7 +166,7 @@ extension Never: PrimitiveView {
     /// `Never` 自身。
     public typealias Body = Never
 
-    /// `Never` のインスタンスは存在しないため、値を取得されることのない `body`。
+    /// `Never` のインスタンスは存在しないため、値を取得されることのない `View.body`。
     public var body: Never { switch self {} }
 
     /// `Never` のインスタンスは存在しないので呼び出されない。
@@ -271,12 +271,12 @@ public struct Spacer: PrimitiveView {
     /// - Returns: 常に `.flexible`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits { .flexible }
 
-    /// 幅・高さがともに `minLength` の `Size` を返す。
+    /// 幅・高さがともに `Spacer.minLength` の `Size` を返す。
     ///
     /// - Parameters:
     ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: 幅・高さがともに `minLength` の `Size`。
+    /// - Returns: 幅・高さがともに `Spacer.minLength` の `Size`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         Size(width: minLength, height: minLength)
     }
@@ -311,12 +311,12 @@ public struct Divider: PrimitiveView {
         self.style = style
     }
 
-    /// `axis` が `.horizontal` なら `LayoutTraits.horizontalFlex` だけが 1、`.vertical` なら `LayoutTraits.verticalFlex` だけが 1 の
+    /// `Divider.axis` が `.horizontal` なら `LayoutTraits.horizontalFlex` だけが 1、`.vertical` なら `LayoutTraits.verticalFlex` だけが 1 の
     /// `LayoutTraits` を返す。
     ///
     /// - Parameters:
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `axis` が `.horizontal` なら `LayoutTraits.horizontalFlex` だけが 1、`.vertical` なら `LayoutTraits.verticalFlex` だけが 1 の
+    /// - Returns: `Divider.axis` が `.horizontal` なら `LayoutTraits.horizontalFlex` だけが 1、`.vertical` なら `LayoutTraits.verticalFlex` だけが 1 の
     ///   `LayoutTraits`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         switch axis {
@@ -325,12 +325,12 @@ public struct Divider: PrimitiveView {
         }
     }
 
-    /// `axis` の方向は `proposal` と同じ長さ、もう一方は 1 の `Size` を返す。
+    /// `Divider.axis` の方向は `proposal` と同じ長さ、もう一方は 1 の `Size` を返す。
     ///
     /// - Parameters:
     ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `axis` が `.horizontal` なら幅が `proposal.width` で高さが 1、
+    /// - Returns: `Divider.axis` が `.horizontal` なら幅が `proposal.width` で高さが 1、
     ///   `.vertical` なら幅が 1 で高さが `proposal.height` の `Size`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         switch axis {

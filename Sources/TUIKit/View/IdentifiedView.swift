@@ -9,7 +9,7 @@ protocol ExplicitlyIdentified {
 ///
 /// `RenderContext` のメソッドに渡された `index:` 引数の代わりに、`View.id(_:)` の引数を使う。`View.id(_:)` で作る。
 public struct IdentifiedView<Content: View, ID: Hashable>: View, ExplicitlyIdentified {
-    /// `id` を付ける `View`。
+    /// `IdentifiedView.id` を付ける `View`。
     public var content: Content
     /// 同一性を決める、`View.id(_:)` の引数。
     public var id: ID
@@ -24,10 +24,10 @@ public struct IdentifiedView<Content: View, ID: Hashable>: View, ExplicitlyIdent
         self.id = id
     }
 
-    /// `id` を付ける `View`（`content`）。
+    /// `IdentifiedView.id` を付ける `View`（`IdentifiedView.content`）。
     public var body: Content { content }
 
-    /// 同一性を決める `id` を `AnyHashable` に包んだもの。
+    /// 同一性を決める `IdentifiedView.id` を `AnyHashable` に包んだもの。
     var identityKey: AnyHashable { AnyHashable(id) }
 }
 

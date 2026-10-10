@@ -39,7 +39,7 @@ enum StackLayout {
 
         // `LayoutTraits.flex(on:)` の値が 1 以上の `View` にも `proposal` を渡してはいけない。`proposal` の主軸方向の
         // 長さをそのまま返す `View`（`HStack` の中の `TextField` など）が `content` を使い切り、後ろの `View` は
-        // `shrink(by:sizes:)` で 0 まで削られる。
+        // `StackLayout.shrink(by:sizes:)` で 0 まで削られる。
         var sizes = children.enumerated().map { (index, child) -> Int in
             let isFlexible = context.layoutTraits(of: child, index: index).flex(on: axis) > 0
             let desired = context.sizeThatFits(
