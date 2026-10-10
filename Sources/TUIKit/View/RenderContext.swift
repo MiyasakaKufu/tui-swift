@@ -62,7 +62,7 @@ public struct RenderContext {
     /// この `RenderContext` を受け取る `View` の `ViewNode`。
     let node: ViewNode
 
-    /// `node` を持つ `ViewGraph`。
+    /// `RenderContext.node` を持つ `ViewGraph`。
     let graph: ViewGraph
 
     /// この `RenderContext` を受け取る `View` の `ViewPath`。
@@ -85,7 +85,7 @@ public struct RenderContext {
     /// - Parameters:
     ///   - screen: 画面全体の矩形。描画先の `Buffer` 全体を渡す。
     ///   - ambiguousWidth: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。
-    /// - Precondition: `ambiguousWidth` が描画先の `Buffer` の `ambiguousWidth` と同じ。
+    /// - Precondition: `ambiguousWidth` が描画先の `Buffer` の `Buffer.ambiguousWidth` と同じ。
     ///   違うと、`View` が測った幅と、`Buffer` に置かれる `Cell` の数が食い違う。
     /// - Note: 作るたびに新しい記憶域を使う。前に作った `RenderContext` で辿った `View` とは、
     ///   同じ `index:` 引数の並びで渡しても同一性を共有せず、`State` の記憶域も共有しない。

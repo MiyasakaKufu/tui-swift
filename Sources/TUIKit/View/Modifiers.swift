@@ -1,6 +1,6 @@
-/// `PaddingView.content` の上下左右に `insets` の長さを空ける `View`。
+/// `PaddingView.content` の上下左右に `PaddingView.insets` の長さを空ける `View`。
 public struct PaddingView<Content: View>: PrimitiveView {
-    /// `insets` の内側に置く `View`。
+    /// `PaddingView.insets` の内側に置く `View`。
     public var content: Content
     /// `PaddingView.content` の上下左右に空ける長さ（左右は `Cell` の数、上下は行の数で表す）。
     public var insets: EdgeInsets
@@ -24,12 +24,12 @@ public struct PaddingView<Content: View>: PrimitiveView {
         context.layoutTraits(of: content, index: 0)
     }
 
-    /// `PaddingView.content` の `View.sizeThatFits(_:context:)` の戻り値に `insets` を足した `Size` を返す。
+    /// `PaddingView.content` の `View.sizeThatFits(_:context:)` の戻り値に `PaddingView.insets` を足した `Size` を返す。
     ///
     /// - Parameters:
     ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `PaddingView.content` の `View.sizeThatFits(_:context:)` の戻り値に `insets` を足した `Size`。`proposal` は超えない。
+    /// - Returns: `PaddingView.content` の `View.sizeThatFits(_:context:)` の戻り値に `PaddingView.insets` を足した `Size`。`proposal` は超えない。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let inner = Size(
             width: proposal.width - insets.horizontal,
@@ -42,11 +42,11 @@ public struct PaddingView<Content: View>: PrimitiveView {
         )
     }
 
-    /// `insets` の内側へ `PaddingView.content` を描画する。
+    /// `PaddingView.insets` の内側へ `PaddingView.content` を描画する。
     ///
     /// - Parameters:
     ///   - buffer: 描画先の `Buffer`。
-    ///   - rect: `insets` を含めた矩形。
+    ///   - rect: `PaddingView.insets` を含めた矩形。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         let inner = rect.inset(by: insets)
@@ -139,7 +139,7 @@ public struct BorderView<Content: View>: PrimitiveView {
     ///
     /// - Parameters:
     ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。
-    /// - Returns: `borderStyle` の文字がどれも `Cell` 1 個分に収まれば `borderStyle`、収まらなければ `.ascii`。
+    /// - Returns: `BorderView.borderStyle` の文字がどれも `Cell` 1 個分に収まれば `BorderView.borderStyle`、収まらなければ `.ascii`。
     func effectiveBorderStyle(ambiguous: DisplayWidth.AmbiguousWidth) -> BorderStyle {
         borderStyle.fitsInSingleColumn(ambiguous: ambiguous) ? borderStyle : .ascii
     }
@@ -278,13 +278,13 @@ public struct FrameView<Content: View>: PrimitiveView {
         self.verticalAlignment = verticalAlignment
     }
 
-    /// `width` を固定していれば `LayoutTraits.horizontalFlex`、`height` を固定していれば `LayoutTraits.verticalFlex` を 0 にし、ほかは
+    /// `FrameView.width` を固定していれば `LayoutTraits.horizontalFlex`、`FrameView.height` を固定していれば `LayoutTraits.verticalFlex` を 0 にし、ほかは
     /// `FrameView.content` の `View.layoutTraits(context:)` の戻り値のままにした `LayoutTraits` を返す。
     ///
     /// - Parameters:
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `FrameView.content` の `View.layoutTraits(context:)` の戻り値の、`width` を固定していれば
-    ///   `LayoutTraits.horizontalFlex`、`height` を固定していれば `LayoutTraits.verticalFlex` を 0 にした `LayoutTraits`。
+    /// - Returns: `FrameView.content` の `View.layoutTraits(context:)` の戻り値の、`FrameView.width` を固定していれば
+    ///   `LayoutTraits.horizontalFlex`、`FrameView.height` を固定していれば `LayoutTraits.verticalFlex` を 0 にした `LayoutTraits`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         let traits = context.layoutTraits(of: content, index: 0)
         return LayoutTraits(
@@ -298,7 +298,7 @@ public struct FrameView<Content: View>: PrimitiveView {
     /// - Parameters:
     ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: 固定した方向は `width`・`height`、固定していない方向は `FrameView.content` の `View.sizeThatFits(_:context:)` の戻り値。
+    /// - Returns: 固定した方向は `FrameView.width`・`FrameView.height`、固定していない方向は `FrameView.content` の `View.sizeThatFits(_:context:)` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let desired = context.sizeThatFits(of: content, index: 0, proposal: proposal)
         return Size(
@@ -341,11 +341,11 @@ public struct FlexibleView<Content: View>: PrimitiveView {
         self.traits = traits
     }
 
-    /// `traits` を返す。
+    /// `FlexibleView.traits` を返す。
     ///
     /// - Parameters:
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `traits`。
+    /// - Returns: `FlexibleView.traits`。
     public func layoutTraits(context: RenderContext) -> LayoutTraits { traits }
 
     /// `FlexibleView.content` の `View.sizeThatFits(_:context:)` の戻り値をそのまま返す。

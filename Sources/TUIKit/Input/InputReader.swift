@@ -107,7 +107,7 @@ public final class InputReader {
                 // 読めたバイト数を見ずに待ち直すと、入力が閉じた後は待ちの中で回り続ける。
                 if !events.isEmpty || byteCount == 0 { return events }
 
-                // 起こされた回に待ち直してはいけない。ペースト中は `pendingWaitDuration` が nil なので、
+                // 起こされた回に待ち直してはいけない。ペースト中は `InputParser.pendingWaitDuration` が nil なので、
                 // `timeout` が `nil` なら続きが届くまで戻らない。その間、終了時の `Application.run()` は入力スレッドの終了を待ったまま戻らず、
                 // シグナルで起こされたときは、そのシグナルの処理が遅れる。
                 if readiness.contains(.wakeup) { return [] }

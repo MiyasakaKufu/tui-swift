@@ -91,16 +91,16 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Throws: 入出力が端末デバイスでなければ `TerminalError.notATerminal`、
     ///   termios の取得・設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
-    /// - Postcondition: raw モードへ入る前の termios を覚えるため、`disableRawMode()` で戻せる。
+    /// - Postcondition: raw モードへ入る前の termios を覚えるため、`Terminal.disableRawMode()` で戻せる。
     ///   すでに raw モードなら何もしない。
     /// - Note: クラッシュしても端末デバイスの termios と、端末エミュレータへ送ったモードが戻るよう、
     ///   シグナルハンドラを仕掛ける。
-    /// - Note: `restore()` を呼び出さずにこの `Terminal` を捨てた場合、
+    /// - Note: `Terminal.restore()` を呼び出さずにこの `Terminal` を捨てた場合、
     ///   端末デバイスの termios が戻り、端末エミュレータへ送ったモードを戻す `String` が書き出されるのは、
     ///   プロセスが終わるときになる。その前に別の `Terminal` が raw モードへ入るか、
-    ///   `disableRawMode()`（`restore()` からも呼び出される）を呼び出すと戻らない。
-    ///   戻す先は 1 組しか覚えておけないため。捨てる前に `restore()` を呼び出すこと。
-    ///   入出力のファイル記述子を閉じる前にも `restore()` を呼び出すこと。呼び出さずに閉じると、
+    ///   `Terminal.disableRawMode()`（`Terminal.restore()` からも呼び出される）を呼び出すと戻らない。
+    ///   戻す先は 1 組しか覚えておけないため。捨てる前に `Terminal.restore()` を呼び出すこと。
+    ///   入出力のファイル記述子を閉じる前にも `Terminal.restore()` を呼び出すこと。呼び出さずに閉じると、
     ///   プロセスが終わるときに、同じ番号を割り当てられた別のファイルへ
     ///   モードを戻す `String` を書き込み、termios を設定しようとする。
     public func enableRawMode() throws {
@@ -157,7 +157,7 @@ public final class Terminal: TerminalOutput {
 
     /// 覚えている termios を端末デバイスへ書き戻す。
     ///
-    /// - Postcondition: 覚えた termios は残るので、`reactivate()` で raw モードへ戻せる。
+    /// - Postcondition: 覚えた termios は残るので、`Terminal.reactivate()` で raw モードへ戻せる。
     private func applyOriginalAttributes() {
         guard isRawModeActive, var attributes = originalAttributes else { return }
         _ = tcsetattr(inputDescriptor, TCSAFLUSH, &attributes)
@@ -209,7 +209,7 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Parameters:
     ///   - shape: 設定する形。
-    /// - Postcondition: `restore()` / `deactivate()` で端末エミュレータの設定どおりの形へ戻る。
+    /// - Postcondition: `Terminal.restore()` / `Terminal.deactivate()` で端末エミュレータの設定どおりの形へ戻る。
     /// - Note: `DECSCUSR` に対応しない端末エミュレータでは何も変わらない。
     public func setCursorShape(_ shape: CursorShape) {
         guard shape != cursorShape else { return }
@@ -306,7 +306,7 @@ public final class Terminal: TerminalOutput {
     ///
     /// 一時停止のように、端末デバイスをいったんシェルに使わせてから戻ってくる場合に使う。
     ///
-    /// - Postcondition: `reactivate()` で raw モードと、端末エミュレータへ送ったモードへ戻せる。二重に呼び出しても安全。
+    /// - Postcondition: `Terminal.reactivate()` で raw モードと、端末エミュレータへ送ったモードへ戻せる。二重に呼び出しても安全。
     public func deactivate() {
         // 同期出力を開くのは `Renderer` で、この型は開いているかを知らない。開いたまま
         // 抜けると、後ろに続く復元が画面へ出ない。
@@ -375,7 +375,7 @@ public final class Terminal: TerminalOutput {
 
     // MARK: - 出力
 
-    /// 文字列を、`flush()` で端末デバイスへ書き出すまで溜めておく。
+    /// 文字列を、`Terminal.flush()` で端末デバイスへ書き出すまで溜めておく。
     ///
     /// - Parameters:
     ///   - text: 溜めておく文字列。

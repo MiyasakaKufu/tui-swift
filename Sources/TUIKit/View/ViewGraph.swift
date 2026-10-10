@@ -1,6 +1,6 @@
 /// `Application.draw()` をまたいで保持される、`View` 1 つ分の記録。
 ///
-/// - Invariant: `path` と `viewType` が同じ `View` が `Application.draw()` のたびに辿られる間は、同じ `ViewNode` が
+/// - Invariant: `ViewNode.path` と `ViewNode.viewType` が同じ `View` が `Application.draw()` のたびに辿られる間は、同じ `ViewNode` が
 ///   使われ続ける。`ViewNode` が持つ `State` の記憶域も同じものが使われ続ける。
 @MainActor
 final class ViewNode {
@@ -47,13 +47,13 @@ final class ViewNode {
 
 /// `ViewNode` を、`ViewPath` ごとに `Application.draw()` をまたいで保持するもの。
 ///
-/// `Application.draw()` の 1 回分は `renderFrame(_:into:ambiguousWidth:)` で描く。その呼び出しで辿られた `ViewPath` の
+/// `Application.draw()` の 1 回分は `ViewGraph.renderFrame(_:into:ambiguousWidth:)` で描く。その呼び出しで辿られた `ViewPath` の
 /// `ViewNode` は次の呼び出しへ持ち越し、辿られなかった `ViewNode` は、持っている `State` の記憶域ごと捨てる。
 @MainActor
 final class ViewGraph {
     /// `ViewPath` ごとの `ViewNode`。
     private var nodes: [ViewPath: ViewNode] = [:]
-    /// いま描いている `renderFrame(_:into:ambiguousWidth:)` の呼び出しの通し番号。
+    /// いま描いている `ViewGraph.renderFrame(_:into:ambiguousWidth:)` の呼び出しの通し番号。
     private var frame = 0
     /// 次に作る `ViewNode` の `ViewNode.id`。
     private var nextID = 0
@@ -68,7 +68,7 @@ final class ViewGraph {
     /// - Parameters:
     ///   - path: `View` の `ViewPath`。
     ///   - viewType: `View` の型。`nil` なら型を知らない `ViewNode` として扱う。
-    /// - Returns: `path` の `ViewNode`。前の `renderFrame(_:into:ambiguousWidth:)` の呼び出しで同じ `ViewPath` に
+    /// - Returns: `path` の `ViewNode`。前の `ViewGraph.renderFrame(_:into:ambiguousWidth:)` の呼び出しで同じ `ViewPath` に
     ///   別の型の `View` があったなら、その `ViewNode` と、`path` で始まる `ViewPath` の `ViewNode` を捨てて作り直したもの。
     func node(at path: ViewPath, viewType: (any View.Type)?) -> ViewNode {
         let type = viewType.map { ObjectIdentifier($0) }

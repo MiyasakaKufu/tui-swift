@@ -1,7 +1,7 @@
 /// `Renderer` の出力先。
 @MainActor
 public protocol TerminalOutput: AnyObject {
-    /// 文字列を、`flush()` を呼び出すまで溜めておく。
+    /// 文字列を、`TerminalOutput.flush()` を呼び出すまで溜めておく。
     ///
     /// - Parameters:
     ///   - text: 溜めておく文字列。
@@ -14,9 +14,9 @@ public protocol TerminalOutput: AnyObject {
 public final class StringOutput: TerminalOutput {
     /// これまでに書き込まれた文字列。
     public private(set) var contents: String = ""
-    /// `write(_:)` が呼び出された回数。
+    /// `StringOutput.write(_:)` が呼び出された回数。
     public private(set) var writeCount: Int = 0
-    /// `flush()` が呼び出された回数。
+    /// `StringOutput.flush()` が呼び出された回数。
     public private(set) var flushCount: Int = 0
 
     /// 空の出力先を作る。

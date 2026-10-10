@@ -6,7 +6,7 @@ public struct Cell: Hashable, Sendable {
     public var style: Style
     /// 直前の全角文字が占める、右半分の `Cell` であることを示す。
     ///
-    /// - Note: `isContinuation` が `true` の `Cell` は端末デバイスへ書き出さない（直前の全角文字の
+    /// - Note: `Cell.isContinuation` が `true` の `Cell` は端末デバイスへ書き出さない（直前の全角文字の
     ///   描画によって既に埋まっているため）が、`Renderer` が直前に書き出した `Buffer` と比べるときは、
     ///   ほかの `Cell` と同じように比較される。
     public var isContinuation: Bool

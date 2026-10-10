@@ -295,7 +295,7 @@ final class ApplicationMessageTests: XCTestCase {
         let loop = Task { try await application.run() }
 
         // `Application.stop()` を最初の描画より前に呼び出してはいけない。`Application.run()` が始まる前に呼び出すことになり、
-        // `Application.run()` が `isRunning` を立て直すので、ループが終わらない。
+        // `Application.run()` が `Application.isRunning` を立て直すので、ループが終わらない。
         let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drew, "最初の描画が終わらない")
 

@@ -1,4 +1,4 @@
-/// `Cell` の位置を表す座標。原点は左上、`x` は横方向の位置、`y` は行を表す。
+/// `Cell` の位置を表す座標。原点は左上、`Point.x` は横方向の位置、`Point.y` は行を表す。
 public struct Point: Hashable, Sendable {
     /// 横方向の位置。左端が 0。
     public var x: Int
