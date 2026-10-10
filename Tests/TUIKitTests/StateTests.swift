@@ -1,23 +1,23 @@
 import XCTest
 @testable import TUIKit
 
-/// 測られた `Binding` を、測られた順に記録する。
+/// `BindingProbe.sizeThatFits(_:context:)` と `PrimitiveCounter.render(into:rect:context:)` が渡す `Binding` を、名前ごとに、渡された順に記録するクラス。
 @MainActor
 private final class BindingLog {
-    /// 名前ごとに、測られた順に並べた `Binding`。
+    /// 名前ごとに、記録された順に並べた `Binding`。
     var bindings: [String: [Binding<Int>]] = [:]
 
-    /// `name` の、最後に測られた `Binding`。
+    /// `name` で最後に記録された `Binding` を返す。
     ///
     /// - Parameters:
     ///   - name: 記録に使った名前。
-    /// - Returns: 最後に測られた `Binding`。測られていなければ `nil`。
+    /// - Returns: 最後に記録された `Binding`。記録されていなければ `nil`。
     func last(_ name: String) -> Binding<Int>? {
         bindings[name]?.last
     }
 }
 
-/// 渡された `Binding` を、測られたときに記録するビュー。
+/// `BindingProbe.sizeThatFits(_:context:)` が呼び出されたときに、渡された `binding` を記録する `View`。
 private struct BindingProbe: PrimitiveView {
     /// 記録に使う名前。
     let name: String
@@ -29,8 +29,8 @@ private struct BindingProbe: PrimitiveView {
     /// `binding` を記録し、大きさを持たないことを返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: 常に `.zero`。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         log.bindings[name, default: []].append(binding)
@@ -40,13 +40,13 @@ private struct BindingProbe: PrimitiveView {
     /// 何も描画しない。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
 }
 
-/// 数を `State` に持ち、表示する合成ビュー。
+/// 数を `State` に持ち、`View.body` で表示する `View`。
 private struct Counter: View {
     let name: String
     let log: BindingLog
@@ -60,7 +60,7 @@ private struct Counter: View {
     }
 }
 
-/// `State` を持つプリミティブ。
+/// `State` を持つ `PrimitiveView`。
 private struct PrimitiveCounter: PrimitiveView {
     let log: BindingLog
     @State var count = 0
@@ -68,9 +68,9 @@ private struct PrimitiveCounter: PrimitiveView {
     /// 数の表示に要る大きさを返す。
     ///
     /// - Parameters:
-    ///   - proposal: 親から提案された領域の大きさ。
-    ///   - context: ライブラリから渡される文脈。
-    /// - Returns: 数の桁数の幅と、1 行の高さ。
+    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    /// - Returns: 幅が数の桁数、高さが 1 の `Size`。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         Size(width: "\(count)".count, height: 1)
     }
@@ -78,16 +78,16 @@ private struct PrimitiveCounter: PrimitiveView {
     /// 数を描き、`$count` を記録する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先のバッファ。
+    ///   - buffer: 描画先の `Buffer`。
     ///   - rect: 描画する矩形。
-    ///   - context: ライブラリから渡される文脈。
+    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         buffer.write("\(count)", at: rect.origin, clippedTo: rect)
         log.bindings["primitive", default: []].append($count)
     }
 }
 
-/// `State` の値で、伸びるかどうかが変わる合成ビュー。
+/// `State` の値で、`LayoutTraits.flex(on:)` が 1 以上かどうかが変わる、`View.body` を持つ `View`。
 private struct Expander: View {
     let log: BindingLog
     @State var level = 0
@@ -104,7 +104,7 @@ private struct Expander: View {
     }
 }
 
-/// `nil` を取りうる値を `State` に持つ合成ビュー。
+/// `nil` を取りうる値を `State` に持ち、`View.body` で `Text` を返す `View`。
 private struct OptionalHolder: View {
     let log: OptionalLog
     @State var text: String? = "initial"
@@ -115,10 +115,10 @@ private struct OptionalHolder: View {
     }
 }
 
-/// `OptionalHolder` の `Binding` を記録する。
+/// `OptionalHolder` の `Binding` を記録するクラス。
 @MainActor
 private final class OptionalLog {
-    /// 最後に評価された `body` の `Binding`。
+    /// 最後に評価された `View.body` の `Binding`。
     var binding: Binding<String?>?
 }
 

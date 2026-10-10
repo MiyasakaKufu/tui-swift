@@ -24,7 +24,7 @@ final class MouseTrackingTests: XCTestCase {
         XCTAssertTrue(CrashRestorer.restoreSequence.contains(ANSI.disableMouseTracking))
     }
 
-    /// 範囲ごとに対応するシーケンスを送り、同じ範囲を選び直しても送り直さない。
+    /// 範囲ごとに `ANSI` の対応する定数を書き出し、同じ範囲を選び直しても書き出し直さない。
     func testTerminalSendsTheSequenceForEachRange() async throws {
         var descriptors: [Int32] = [-1, -1]
         guard pipe(&descriptors) == 0 else { throw Failure.pipeUnavailable(errno: errno) }

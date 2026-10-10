@@ -29,8 +29,10 @@ final class TabExpansionTests: XCTestCase {
 
     func testStartColumnShiftsTabStops() async {
         XCTAssertEqual(TabExpansion.expand("\ta", tabSize: 4, startColumn: 1), "   a")
-        // 3 桁目から始まるので "a" で 4 桁目（タブストップ上）に達し、タブは 4 桁進む。
-        XCTAssertEqual(TabExpansion.expand("a\tb", tabSize: 4, startColumn: 3), "a    b")
+        XCTAssertEqual(
+            TabExpansion.expand("a\tb", tabSize: 4, startColumn: 3),
+            "a" + String(repeating: " ", count: 4) + "b"
+        )
     }
 
     func testZeroTabSizeRemovesTabs() async {
