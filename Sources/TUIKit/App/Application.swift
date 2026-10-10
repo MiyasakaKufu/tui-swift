@@ -6,8 +6,8 @@ import Darwin
 import Glibc
 #endif
 
-/// 端末デバイスを raw モードにし、`InputReader` が端末デバイスから受け取ったバイト列を `InputEvent` にすることと
-/// `Buffer` を端末デバイスへ書き出すことを繰り返す型。
+/// 端末デバイスを raw モードにし、``InputReader`` が端末デバイスから受け取ったバイト列を ``InputEvent`` にすることと
+/// ``Buffer`` を端末デバイスへ書き出すことを繰り返す型。
 @MainActor
 public final class Application<Root: Component> {
 
@@ -19,16 +19,16 @@ public final class Application<Root: Component> {
     private let eventQueue: LoopEventQueue<Root.Message>
     private let graph = ViewGraph()
 
-    /// 別スレッドや `Task` から、`Component.Message` の値をイベントループへ届ける `MessageSender`。
+    /// 別スレッドや `Task` から、``Component/Message`` の値をイベントループへ届ける ``MessageSender``。
     ///
     /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
-    /// - Note: `TerminalApp` に準拠する型からは、このプロパティを取得できない。
+    /// - Note: ``TerminalApp`` に準拠する型からは、このプロパティを取得できない。
     nonisolated public let sender: MessageSender<Root.Message>
 
     private var buffer: Buffer
     /// 最後に `.resize` として通知したサイズ。
     private var reportedSize = Size.zero
-    /// `Component.update(elapsed:)` の `elapsed` 引数を測り始めた時刻。
+    /// ``Component/update(elapsed:)`` の `elapsed` 引数を測り始めた時刻。
     private var lastFrameTime = 0.0
     private var isRunning = false
     private var hasRun = false
@@ -38,10 +38,10 @@ public final class Application<Root: Component> {
     /// - Note: 実際に止めるとテストプロセスまで止まるため、テストでは差し替える。
     var stopProcess: () -> Void = { SignalWatcher.stopProcess() }
 
-    /// `Component` に準拠する型のインスタンスと `ApplicationOptions` を指定して `Application` を作る。
+    /// ``Component`` に準拠する型のインスタンスと ``ApplicationOptions`` を指定して ``Application`` を作る。
     ///
     /// - Parameters:
-    ///   - root: 画面を組み立て、イベントを受け取る、`Component` に準拠する型のインスタンス。
+    ///   - root: 画面を組み立て、イベントを受け取る、``Component`` に準拠する型のインスタンス。
     ///   - options: 起動時の設定。
     ///   - terminal: 使用する `Terminal`。省略すると標準入出力の記述子で作る。テストでは差し替える。
     public init(
@@ -92,11 +92,11 @@ public final class Application<Root: Component> {
     /// 再開したら設定し直す。
     ///
     /// raw モードでは `ISIG` を無効にしているため、Ctrl+Z はシグナルにならずキーとして届く。
-    /// 一時停止したい `Component` に準拠する型は、そのキーを受け取ったときにこのメソッドを呼び出す。
+    /// 一時停止したい ``Component`` に準拠する型は、そのキーを受け取ったときにこのメソッドを呼び出す。
     ///
     /// - Postcondition: 再開したら画面全体を描き直し、改めて `.resize` を通知する。
     /// - Note: `ApplicationOptions.suspendsOnControlZ` が有効なら、
-    ///   `Component.handle(_:)` が `.ignored` を返した Ctrl+Z で自動的に呼び出される。
+    ///   ``Component/handle(_:)`` が `.ignored` を返した Ctrl+Z で自動的に呼び出される。
     public func suspend() {
         terminal.deactivate()
         stopProcess()
@@ -124,11 +124,11 @@ public final class Application<Root: Component> {
 
     /// 端末デバイスを raw モードにし、端末エミュレータへ送るモードを切り替えて、終了するまでイベントループを回す。
     ///
-    /// - Throws: 入出力が端末デバイスでなければ `TerminalError.notATerminal`、
+    /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、
     ///   raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの端末デバイスのウィンドウサイズで `.resize` を通知する。
     ///   戻るときは端末デバイスの termios と、端末エミュレータへ送ったモードを起動前へ戻し、カーソルを表示に戻す。
-    /// - Precondition: 1 つの `Application` で呼び出せるのは 1 回だけ。
+    /// - Precondition: 1 つの ``Application`` で呼び出せるのは 1 回だけ。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
     public func run() async throws {
@@ -238,7 +238,7 @@ public final class Application<Root: Component> {
         terminal.setCursorVisible(true)
     }
 
-    /// 端末デバイスからバイト列を読み、組み立てた `InputEvent` を `LoopEventQueue` へ入れるスレッドを作る。
+    /// 端末デバイスからバイト列を読み、組み立てた ``InputEvent`` を `LoopEventQueue` へ入れるスレッドを作る。
     ///
     /// - Returns: スレッドが終わったときに終了する `AsyncStream`。
     private func startReadingInput() -> AsyncStream<Void> {
@@ -293,10 +293,10 @@ public final class Application<Root: Component> {
         }
     }
 
-    /// `InputEvent` を `Component.handle(_:)` へ渡す。
+    /// ``InputEvent`` を ``Component/handle(_:)`` へ渡す。
     ///
     /// - Parameters:
-    ///   - event: `Component.handle(_:)` へ渡す `InputEvent`。
+    ///   - event: ``Component/handle(_:)`` へ渡す ``InputEvent``。
     /// - Returns: ループを続けるなら `true`。
     private func deliver(_ event: InputEvent) -> Bool {
         switch root.handle(event) {
@@ -319,8 +319,8 @@ public final class Application<Root: Component> {
     /// 一時停止から戻り、端末デバイスの termios と、端末エミュレータへ送ったモードを設定し直す。
     ///
     /// - Postcondition: 画面全体を描き直し、改めて `.resize` を通知する。
-    ///   止まっていた時間は `Component.update(elapsed:)` の `elapsed` 引数に含めない。
-    ///   `Terminal.reactivate()` がエラーを投げたらループを終える。
+    ///   止まっていた時間は ``Component/update(elapsed:)`` の `elapsed` 引数に含めない。
+    ///   ``Terminal/reactivate()`` がエラーを投げたらループを終える。
     private func resumeTerminal() {
         do {
             try terminal.reactivate()
@@ -337,7 +337,7 @@ public final class Application<Root: Component> {
         lastFrameTime = monotonicSeconds()
     }
 
-    /// 端末デバイスのウィンドウサイズの変化を検出し、`Buffer` を作り直して `.resize` を通知する。
+    /// 端末デバイスのウィンドウサイズの変化を検出し、``Buffer`` を作り直して `.resize` を通知する。
     ///
     /// - Returns: ループを続けるなら `true`。
     /// - Postcondition: 同じサイズについて `.resize` が二重に通知されることはない。
@@ -353,9 +353,9 @@ public final class Application<Root: Component> {
         return root.handle(.resize(size)) != .quit
     }
 
-    /// `Component.body` を `Buffer` に書き込み、`Renderer` で端末デバイスへ書き出す。
+    /// ``Component/body`` を ``Buffer`` に書き込み、``Renderer`` で端末デバイスへ書き出す。
     ///
-    /// - Precondition: `Application.synchronizeSize()` によって `Buffer` が端末デバイスのウィンドウサイズに追従している。
+    /// - Precondition: `Application.synchronizeSize()` によって ``Buffer`` が端末デバイスのウィンドウサイズに追従している。
     private func draw() {
         buffer.clear()
 
@@ -374,7 +374,7 @@ private let wakeupFallbackInterval = 0.1
 private let queryTimeout = 0.25
 
 extension Application where Root: TerminalApp {
-    /// `TerminalApp` に準拠する型のインスタンスと `TerminalApp.options` から `Application` を作り、`Application.run()` を呼び出す。
+    /// ``TerminalApp`` に準拠する型のインスタンスと ``TerminalApp/options`` から ``Application`` を作り、``Application/run()`` を呼び出す。
     ///
     /// - Throws: `run()` が投げるもの。
     static func start() async throws {

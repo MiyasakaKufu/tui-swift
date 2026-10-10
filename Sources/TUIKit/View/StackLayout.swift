@@ -1,16 +1,16 @@
-/// `VStack`・`HStack` の主軸方向のサイズ配分。
+/// ``VStack``・``HStack`` の主軸方向のサイズ配分。
 @MainActor
 enum StackLayout {
 
-    /// 中の `View` それぞれに割り当てる主軸方向のサイズを求める。
+    /// 中の ``View`` それぞれに割り当てる主軸方向のサイズを求める。
     ///
     /// - Parameters:
-    ///   - children: 並べる `View`。
+    ///   - children: 並べる ``View``。
     ///   - axis: 主軸の方向。
     ///   - available: 主軸方向に使える長さ。
     ///   - crossAvailable: 交差軸方向に使える長さ。
-    ///   - spacing: 中の `View` の間隔。
-    ///   - context: `VStack`・`HStack` が `context` 引数で受け取った `RenderContext`。
+    ///   - spacing: 中の ``View`` の間隔。
+    ///   - context: ``VStack``・``HStack`` が `context` 引数で受け取った ``RenderContext``。
     /// - Returns: `children` と同じ順序・同じ個数の、主軸方向のサイズ。
     /// - Postcondition: 間隔を含めた合計は `available` を超えない。
     static func mainAxisSizes(
@@ -60,15 +60,15 @@ enum StackLayout {
         return sizes
     }
 
-    /// `VStack`・`HStack` が配ったあとに残る `Size` の主軸方向の長さを、`LayoutTraits.flex(on:)` の値に応じて配る。
+    /// ``VStack``・``HStack`` が配ったあとに残る ``Size`` の主軸方向の長さを、``LayoutTraits/flex(on:)`` の値に応じて配る。
     ///
     /// - Parameters:
     ///   - extra: 配る長さ。
-    ///   - sizes: 配り先のサイズ。`LayoutTraits.flex(on:)` の値が 1 以上の `View` の分だけが増える。
-    ///   - children: `sizes` に対応する、中の `View`。
-    ///   - axis: `LayoutTraits.flex(on:)` に渡す軸。
-    ///   - context: `VStack`・`HStack` が `context` 引数で受け取った `RenderContext`。
-    /// - Postcondition: `LayoutTraits.flex(on:)` の値が 1 以上の `View` が 1 つ以上あれば、`extra` をすべて配り切る。
+    ///   - sizes: 配り先のサイズ。``LayoutTraits/flex(on:)`` の値が 1 以上の ``View`` の分だけが増える。
+    ///   - children: `sizes` に対応する、中の ``View``。
+    ///   - axis: ``LayoutTraits/flex(on:)`` に渡す軸。
+    ///   - context: ``VStack``・``HStack`` が `context` 引数で受け取った ``RenderContext``。
+    /// - Postcondition: ``LayoutTraits/flex(on:)`` の値が 1 以上の ``View`` が 1 つ以上あれば、`extra` をすべて配り切る。
     private static func distribute(
         extra: Int,
         to sizes: inout [Int],
@@ -98,7 +98,7 @@ enum StackLayout {
         }
     }
 
-    /// 領域が足りない場合、後ろの `View` の分から削る。
+    /// 領域が足りない場合、後ろの ``View`` の分から削る。
     ///
     /// - Parameters:
     ///   - amount: 削る長さ。
@@ -115,21 +115,21 @@ enum StackLayout {
     }
 }
 
-/// 中の `View` を縦に並べる `View`。
+/// 中の ``View`` を縦に並べる ``View``。
 public struct VStack: PrimitiveView {
-    /// 並べる `View`。
+    /// 並べる ``View``。
     public var children: [any View]
-    /// 中の `View` の間隔。負の値は 0 に丸められる。
+    /// 中の ``View`` の間隔。負の値は 0 に丸められる。
     public var spacing: Int
-    /// 中の `View` の水平方向の揃え。
+    /// 中の ``View`` の水平方向の揃え。
     public var alignment: HorizontalAlignment
 
-    /// 間隔と揃えと、中の `View` を返すクロージャから `VStack` を作る。
+    /// 間隔と揃えと、中の ``View`` を返すクロージャから ``VStack`` を作る。
     ///
     /// - Parameters:
-    ///   - spacing: 中の `View` の間隔。
-    ///   - alignment: 中の `View` の水平方向の揃え。
-    ///   - content: 並べる `View` を返すクロージャ。
+    ///   - spacing: 中の ``View`` の間隔。
+    ///   - alignment: 中の ``View`` の水平方向の揃え。
+    ///   - content: 並べる ``View`` を返すクロージャ。
     public init(
         spacing: Int = 0,
         alignment: HorizontalAlignment = .leading,
@@ -140,24 +140,24 @@ public struct VStack: PrimitiveView {
         self.alignment = alignment
     }
 
-    /// 中の `View` の配列と、間隔と揃えから `VStack` を作る。
+    /// 中の ``View`` の配列と、間隔と揃えから ``VStack`` を作る。
     ///
     /// - Parameters:
-    ///   - children: 並べる `View`。
-    ///   - spacing: 中の `View` の間隔。
-    ///   - alignment: 中の `View` の水平方向の揃え。
+    ///   - children: 並べる ``View``。
+    ///   - spacing: 中の ``View`` の間隔。
+    ///   - alignment: 中の ``View`` の水平方向の揃え。
     public init(children: [any View], spacing: Int = 0, alignment: HorizontalAlignment = .leading) {
         self.children = children
         self.spacing = max(0, spacing)
         self.alignment = alignment
     }
 
-    /// 中の `View` の `LayoutTraits` を、方向ごとに最大をとって返す。
+    /// 中の ``View`` の ``LayoutTraits`` を、方向ごとに最大をとって返す。
     ///
     /// - Parameters:
-    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `LayoutTraits.horizontalFlex`・`LayoutTraits.verticalFlex` のそれぞれに、中の `View` での最大をとった
-    ///   `LayoutTraits`。
+    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    /// - Returns: ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` のそれぞれに、中の ``View`` での最大をとった
+    ///   ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         let traits = children.enumerated().map { context.layoutTraits(of: $1, index: $0) }
         return LayoutTraits(
@@ -166,12 +166,12 @@ public struct VStack: PrimitiveView {
         )
     }
 
-    /// 中の `View` を縦に積んだときのサイズを返す。
+    /// 中の ``View`` を縦に積んだときのサイズを返す。
     ///
     /// - Parameters:
-    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
-    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: 間隔を含めた高さの合計と、中の `View` のうち最も広いものの幅から決まるサイズ。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    /// - Returns: 間隔を含めた高さの合計と、中の ``View`` のうち最も広いものの幅から決まるサイズ。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         guard !children.isEmpty else { return .zero }
         var width = 0
@@ -191,12 +191,12 @@ public struct VStack: PrimitiveView {
         return Size(width: min(width, proposal.width), height: min(height, proposal.height))
     }
 
-    /// 中の `View` を縦に並べて描画する。
+    /// 中の ``View`` を縦に並べて描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先の `Buffer`。
-    ///   - rect: 描画する矩形。はみ出す `View` は描画されない。
-    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    ///   - buffer: 描画先の ``Buffer``。
+    ///   - rect: 描画する矩形。はみ出す ``View`` は描画されない。
+    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         let sizes = StackLayout.mainAxisSizes(
@@ -230,21 +230,21 @@ public struct VStack: PrimitiveView {
     }
 }
 
-/// 中の `View` を横に並べる `View`。
+/// 中の ``View`` を横に並べる ``View``。
 public struct HStack: PrimitiveView {
-    /// 並べる `View`。
+    /// 並べる ``View``。
     public var children: [any View]
-    /// 中の `View` の間隔。負の値は 0 に丸められる。
+    /// 中の ``View`` の間隔。負の値は 0 に丸められる。
     public var spacing: Int
-    /// 中の `View` の垂直方向の揃え。
+    /// 中の ``View`` の垂直方向の揃え。
     public var alignment: VerticalAlignment
 
-    /// 間隔と揃えと、中の `View` を返すクロージャから `HStack` を作る。
+    /// 間隔と揃えと、中の ``View`` を返すクロージャから ``HStack`` を作る。
     ///
     /// - Parameters:
-    ///   - spacing: 中の `View` の間隔。
-    ///   - alignment: 中の `View` の垂直方向の揃え。
-    ///   - content: 並べる `View` を返すクロージャ。
+    ///   - spacing: 中の ``View`` の間隔。
+    ///   - alignment: 中の ``View`` の垂直方向の揃え。
+    ///   - content: 並べる ``View`` を返すクロージャ。
     public init(
         spacing: Int = 0,
         alignment: VerticalAlignment = .top,
@@ -255,24 +255,24 @@ public struct HStack: PrimitiveView {
         self.alignment = alignment
     }
 
-    /// 中の `View` の配列と、間隔と揃えから `HStack` を作る。
+    /// 中の ``View`` の配列と、間隔と揃えから ``HStack`` を作る。
     ///
     /// - Parameters:
-    ///   - children: 並べる `View`。
-    ///   - spacing: 中の `View` の間隔。
-    ///   - alignment: 中の `View` の垂直方向の揃え。
+    ///   - children: 並べる ``View``。
+    ///   - spacing: 中の ``View`` の間隔。
+    ///   - alignment: 中の ``View`` の垂直方向の揃え。
     public init(children: [any View], spacing: Int = 0, alignment: VerticalAlignment = .top) {
         self.children = children
         self.spacing = max(0, spacing)
         self.alignment = alignment
     }
 
-    /// 中の `View` の `LayoutTraits` を、方向ごとに最大をとって返す。
+    /// 中の ``View`` の ``LayoutTraits`` を、方向ごとに最大をとって返す。
     ///
     /// - Parameters:
-    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `LayoutTraits.horizontalFlex`・`LayoutTraits.verticalFlex` のそれぞれに、中の `View` での最大をとった
-    ///   `LayoutTraits`。
+    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    /// - Returns: ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` のそれぞれに、中の ``View`` での最大をとった
+    ///   ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         let traits = children.enumerated().map { context.layoutTraits(of: $1, index: $0) }
         return LayoutTraits(
@@ -281,12 +281,12 @@ public struct HStack: PrimitiveView {
         )
     }
 
-    /// 中の `View` を横に積んだときのサイズを返す。
+    /// 中の ``View`` を横に積んだときのサイズを返す。
     ///
     /// - Parameters:
-    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
-    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: 間隔を含めた幅の合計と、中の `View` のうち最も高いものの高さから決まるサイズ。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    /// - Returns: 間隔を含めた幅の合計と、中の ``View`` のうち最も高いものの高さから決まるサイズ。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         guard !children.isEmpty else { return .zero }
         var height = 0
@@ -306,12 +306,12 @@ public struct HStack: PrimitiveView {
         return Size(width: min(width, proposal.width), height: min(height, proposal.height))
     }
 
-    /// 中の `View` を横に並べて描画する。
+    /// 中の ``View`` を横に並べて描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先の `Buffer`。
-    ///   - rect: 描画する矩形。はみ出す `View` は描画されない。
-    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
+    ///   - buffer: 描画先の ``Buffer``。
+    ///   - rect: 描画する矩形。はみ出す ``View`` は描画されない。
+    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         let sizes = StackLayout.mainAxisSizes(

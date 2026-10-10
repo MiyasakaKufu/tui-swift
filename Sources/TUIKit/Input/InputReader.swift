@@ -129,7 +129,7 @@ public final class InputReader {
     /// 端末エミュレータへ送った問い合わせの応答を、装置属性の応答が届くまで待つ。
     ///
     /// 装置属性（`CSI c`）の応答は、それより前に送った問い合わせの応答が出揃った目印になる。
-    /// 呼び出す前に、確かめたい問い合わせと続けて `ANSI.queryDeviceAttributes` も送っておく。
+    /// 呼び出す前に、確かめたい問い合わせと続けて ``ANSI/queryDeviceAttributes`` も送っておく。
     ///
     /// - Parameters:
     ///   - timeout: 待ち時間（秒）。

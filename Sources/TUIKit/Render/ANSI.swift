@@ -12,7 +12,7 @@ public enum ANSI {
     /// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/)
     ///   の「OSC - OPERATING SYSTEM COMMAND」。
     public static let osc = "\u{1B}]"
-    /// `ANSI.osc` で始めた `String` を終える `BEL`。
+    /// ``ANSI/osc`` で始めた `String` を終える `BEL`。
     public static let bell = "\u{07}"
 
     /// 文字色・背景色・装飾をすべて解除する。
@@ -41,7 +41,7 @@ public enum ANSI {
     /// マウスの通知（1000 / 1002 / 1003 / 1006）をすべて止める。
     ///
     /// - Note: それぞれ独立した DECSET モードなので、一部を送り直しても他は落ちない。
-    ///   範囲を狭めるときは、`ANSI.disableMouseTracking` を送ってから入れ直す。
+    ///   範囲を狭めるときは、``ANSI/disableMouseTracking`` を送ってから入れ直す。
     /// - See: [XTerm Control Sequences](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) の「Mouse Tracking」。
     public static let disableMouseTracking = "\u{1B}[?1006l\u{1B}[?1003l\u{1B}[?1002l\u{1B}[?1000l"
 
@@ -52,7 +52,7 @@ public enum ANSI {
 
     /// 同期出力（DECSET 2026）を開始し、終了するまで画面の更新を保留させる。
     ///
-    /// - Note: 対応しない端末エミュレータは `ANSI.beginSynchronizedUpdate` を読み飛ばすため、
+    /// - Note: 対応しない端末エミュレータは ``ANSI/beginSynchronizedUpdate`` を読み飛ばすため、
     ///   送っても表示は変わらない。
     public static let beginSynchronizedUpdate = "\u{1B}[?2026h"
     /// 同期出力を終了し、保留していた更新をまとめて表示させる。
@@ -60,7 +60,7 @@ public enum ANSI {
 
     /// 今のウィンドウタイトルとアイコン名を端末エミュレータのスタックへ積む。
     ///
-    /// - Note: タイトルのスタックに対応しない端末エミュレータは `ANSI.saveWindowTitle` を
+    /// - Note: タイトルのスタックに対応しない端末エミュレータは ``ANSI/saveWindowTitle`` を
     ///   読み飛ばすため、積まれない。
     public static let saveWindowTitle = "\u{1B}[22;0t"
     /// 端末エミュレータのスタックからウィンドウタイトルとアイコン名を戻す。
@@ -118,7 +118,7 @@ public enum ANSI {
     ///
     /// - Parameters:
     ///   - row: 移動先の行。1 起点。1 未満は 1 に丸める。
-    ///   - column: 移動先の列。左端が 1（`Point.x` に 1 を足した値）。1 未満は 1 に丸める。
+    ///   - column: 移動先の列。左端が 1（``Point/x`` に 1 を足した値）。1 未満は 1 に丸める。
     /// - Returns: カーソルを移動する `String`。
     public static func moveCursor(row: Int, column: Int) -> String {
         "\u{1B}[\(max(1, row));\(max(1, column))H"

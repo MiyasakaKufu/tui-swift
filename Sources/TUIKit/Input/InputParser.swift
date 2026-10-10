@@ -1,4 +1,4 @@
-/// 端末デバイスから読み取ったバイト列を `InputEvent` へ変換する増分パーサ。
+/// 端末デバイスから読み取ったバイト列を ``InputEvent`` へ変換する増分パーサ。
 ///
 /// ESC で始まるバイト列が途中までしか届いていない場合は内部に保持し、
 /// 続きが来たときに解釈する。
@@ -70,7 +70,7 @@ public struct InputParser: Sendable {
 
     /// 未解釈のバイトの続きを待つ時間（秒）。
     ///
-    /// この時間が過ぎても続きが届かなければ `InputParser.flush()` を呼び出してよい。
+    /// この時間が過ぎても続きが届かなければ ``InputParser/flush()`` を呼び出してよい。
     /// 待っても確定できるものがないときは `nil`。
     public var pendingWaitDuration: Double? {
         guard !isInPaste, let first = pending.first, first == ControlByte.escape else { return nil }

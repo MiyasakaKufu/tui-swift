@@ -1,4 +1,4 @@
-/// `Cell` の位置を表す座標。原点は左上、`Point.x` は横方向の位置、`Point.y` は行を表す。
+/// ``Cell`` の位置を表す座標。原点は左上、``Point/x`` は横方向の位置、``Point/y`` は行を表す。
 public struct Point: Hashable, Sendable {
     /// 横方向の位置。左端が 0。
     public var x: Int
@@ -29,9 +29,9 @@ public struct Point: Hashable, Sendable {
     }
 }
 
-/// 横に並ぶ `Cell` の数と行数で表したサイズ。負の値は 0 に丸められる。
+/// 横に並ぶ ``Cell`` の数と行数で表したサイズ。負の値は 0 に丸められる。
 public struct Size: Hashable, Sendable {
-    /// 横に並ぶ `Cell` の数。負の値は 0 に丸められる。
+    /// 横に並ぶ ``Cell`` の数。負の値は 0 に丸められる。
     public var width: Int {
         didSet { width = max(0, width) }
     }
@@ -43,7 +43,7 @@ public struct Size: Hashable, Sendable {
     /// サイズを作る。
     ///
     /// - Parameters:
-    ///   - width: 横に並ぶ `Cell` の数。
+    ///   - width: 横に並ぶ ``Cell`` の数。
     ///   - height: 行数。
     public init(width: Int, height: Int) {
         self.width = max(0, width)
@@ -86,9 +86,9 @@ public struct Rect: Hashable, Sendable {
     /// 座標とサイズの成分から矩形を作る。
     ///
     /// - Parameters:
-    ///   - x: 左端の `Point.x`。
+    ///   - x: 左端の ``Point/x``。
     ///   - y: 上端の行。
-    ///   - width: 横に並ぶ `Cell` の数。
+    ///   - width: 横に並ぶ ``Cell`` の数。
     ///   - height: 行数。
     public init(x: Int, y: Int, width: Int, height: Int) {
         self.init(origin: Point(x: x, y: y), size: Size(width: width, height: height))
@@ -97,15 +97,15 @@ public struct Rect: Hashable, Sendable {
     /// 原点にある、幅・高さが 0 の矩形。
     public static let zero = Rect(x: 0, y: 0, width: 0, height: 0)
 
-    /// 横に並ぶ `Cell` の数。
+    /// 横に並ぶ ``Cell`` の数。
     public var width: Int { size.width }
     /// 行数。
     public var height: Int { size.height }
-    /// 左端の `Point.x`。
+    /// 左端の ``Point/x``。
     public var minX: Int { origin.x }
     /// 上端の行。
     public var minY: Int { origin.y }
-    /// 領域の右隣の `Point.x`。この位置の `Cell` は領域に含まれない。
+    /// 領域の右隣の ``Point/x``。この位置の ``Cell`` は領域に含まれない。
     public var maxX: Int { origin.x + size.width }
     /// 下端の行。この行は領域に含まれない。
     public var maxY: Int { origin.y + size.height }
@@ -142,7 +142,7 @@ public struct Rect: Hashable, Sendable {
     /// - Parameters:
     ///   - insets: 上下左右に空ける長さ。
     /// - Returns: `insets` の分だけ狭めた矩形。`insets` が大きすぎる場合は幅・高さが 0 になる。
-    /// - Postcondition: `EdgeInsets` の各辺は負にならないため、矩形が広がることはない。
+    /// - Postcondition: ``EdgeInsets`` の各辺は負にならないため、矩形が広がることはない。
     public func inset(by insets: EdgeInsets) -> Rect {
         Rect(
             x: minX + insets.leading,
@@ -155,14 +155,14 @@ public struct Rect: Hashable, Sendable {
     /// 四辺に同じ長さを空けた矩形を返す。
     ///
     /// - Parameters:
-    ///   - amount: 各辺に空ける長さ（`Cell` の数で表す）。
+    ///   - amount: 各辺に空ける長さ（``Cell`` の数で表す）。
     /// - Returns: `amount` の分だけ狭めた矩形。
     public func inset(by amount: Int) -> Rect {
         inset(by: EdgeInsets(all: amount))
     }
 }
 
-/// 上下左右に空ける長さ（`Cell` の数で表す）。負の値は 0 に丸められる。
+/// 上下左右に空ける長さ（``Cell`` の数で表す）。負の値は 0 に丸められる。
 public struct EdgeInsets: Hashable, Sendable {
     /// 上に空ける長さ。負の値は 0 に丸められる。
     public var top: Int {
@@ -181,7 +181,7 @@ public struct EdgeInsets: Hashable, Sendable {
         didSet { trailing = max(0, trailing) }
     }
 
-    /// 四辺に空ける長さを個別に指定して `EdgeInsets` を作る。
+    /// 四辺に空ける長さを個別に指定して ``EdgeInsets`` を作る。
     ///
     /// - Parameters:
     ///   - top: 上に空ける長さ。
@@ -195,7 +195,7 @@ public struct EdgeInsets: Hashable, Sendable {
         self.trailing = max(0, trailing)
     }
 
-    /// 四辺に同じ長さを空ける `EdgeInsets` を作る。
+    /// 四辺に同じ長さを空ける ``EdgeInsets`` を作る。
     ///
     /// - Parameters:
     ///   - all: 各辺に空ける長さ。
@@ -203,7 +203,7 @@ public struct EdgeInsets: Hashable, Sendable {
         self.init(top: all, leading: all, bottom: all, trailing: all)
     }
 
-    /// 左右と上下で空ける長さを分けた `EdgeInsets` を作る。
+    /// 左右と上下で空ける長さを分けた ``EdgeInsets`` を作る。
     ///
     /// - Parameters:
     ///   - horizontal: 左右に空ける長さ。
@@ -212,7 +212,7 @@ public struct EdgeInsets: Hashable, Sendable {
         self.init(top: vertical, leading: horizontal, bottom: vertical, trailing: horizontal)
     }
 
-    /// どの辺にも空けない `EdgeInsets`。
+    /// どの辺にも空けない ``EdgeInsets``。
     public static let zero = EdgeInsets()
 
     /// 左右に空ける長さの合計。

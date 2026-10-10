@@ -6,9 +6,9 @@ import Glibc
 
 import CTUIShim
 
-/// `Terminal` が端末デバイスを操作できなかったときのエラー。
+/// ``Terminal`` が端末デバイスを操作できなかったときのエラー。
 public enum TerminalError: Error, Equatable {
-    /// `Terminal.inputDescriptor` か `Terminal.outputDescriptor` が端末デバイスでない。
+    /// ``Terminal/inputDescriptor`` か ``Terminal/outputDescriptor`` が端末デバイスでない。
     case notATerminal
     /// 端末デバイスの termios の取得・設定に失敗した。
     case termiosFailed(errno: Int32)
@@ -38,7 +38,7 @@ public final class Terminal: TerminalOutput {
     private var windowTitle: String?
     private var cursorShape: CursorShape?
 
-    /// 入出力のファイル記述子を指定して `Terminal` を作る。
+    /// 入出力のファイル記述子を指定して ``Terminal`` を作る。
     ///
     /// - Parameters:
     ///   - input: 入力を読み取るファイル記述子。
@@ -89,18 +89,18 @@ public final class Terminal: TerminalOutput {
 
     /// canonical モードとエコーを無効にし、1 バイトずつ入力を受け取れるようにする。
     ///
-    /// - Throws: 入出力が端末デバイスでなければ `TerminalError.notATerminal`、
+    /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、
     ///   termios の取得・設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
-    /// - Postcondition: raw モードへ入る前の termios を覚えるため、`Terminal.disableRawMode()` で戻せる。
+    /// - Postcondition: raw モードへ入る前の termios を覚えるため、``Terminal/disableRawMode()`` で戻せる。
     ///   すでに raw モードなら何もしない。
     /// - Note: クラッシュしても端末デバイスの termios と、端末エミュレータへ送ったモードが戻るよう、
     ///   シグナルハンドラを仕掛ける。
-    /// - Note: `Terminal.restore()` を呼び出さずにこの `Terminal` を捨てた場合、
+    /// - Note: ``Terminal/restore()`` を呼び出さずにこの ``Terminal`` を捨てた場合、
     ///   端末デバイスの termios が戻り、端末エミュレータへ送ったモードを戻す `String` が書き出されるのは、
     ///   プロセスが終わるときになる。その前に別の `Terminal` が raw モードへ入るか、
-    ///   `Terminal.disableRawMode()`（`Terminal.restore()` からも呼び出される）を呼び出すと戻らない。
-    ///   戻す先は 1 組しか覚えておけないため。捨てる前に `Terminal.restore()` を呼び出すこと。
-    ///   入出力のファイル記述子を閉じる前にも `Terminal.restore()` を呼び出すこと。呼び出さずに閉じると、
+    ///   ``Terminal/disableRawMode()``（``Terminal/restore()`` からも呼び出される）を呼び出すと戻らない。
+    ///   戻す先は 1 組しか覚えておけないため。捨てる前に ``Terminal/restore()`` を呼び出すこと。
+    ///   入出力のファイル記述子を閉じる前にも ``Terminal/restore()`` を呼び出すこと。呼び出さずに閉じると、
     ///   プロセスが終わるときに、同じ番号を割り当てられた別のファイルへ
     ///   モードを戻す `String` を書き込み、termios を設定しようとする。
     public func enableRawMode() throws {
@@ -157,7 +157,7 @@ public final class Terminal: TerminalOutput {
 
     /// 覚えている termios を端末デバイスへ書き戻す。
     ///
-    /// - Postcondition: 覚えた termios は残るので、`Terminal.reactivate()` で raw モードへ戻せる。
+    /// - Postcondition: 覚えた termios は残るので、``Terminal/reactivate()`` で raw モードへ戻せる。
     private func applyOriginalAttributes() {
         guard isRawModeActive, var attributes = originalAttributes else { return }
         _ = tcsetattr(inputDescriptor, TCSAFLUSH, &attributes)
@@ -209,7 +209,7 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Parameters:
     ///   - shape: 設定する形。
-    /// - Postcondition: `Terminal.restore()` / `Terminal.deactivate()` で端末エミュレータの設定どおりの形へ戻る。
+    /// - Postcondition: ``Terminal/restore()`` / ``Terminal/deactivate()`` で端末エミュレータの設定どおりの形へ戻る。
     /// - Note: `DECSCUSR` に対応しない端末エミュレータでは何も変わらない。
     public func setCursorShape(_ shape: CursorShape) {
         guard shape != cursorShape else { return }
@@ -233,11 +233,11 @@ public final class Terminal: TerminalOutput {
         flush()
     }
 
-    /// マウスイベントを受け取る範囲を端末エミュレータへ伝える `ANSI` の定数を返す。
+    /// マウスイベントを受け取る範囲を端末エミュレータへ伝える ``ANSI`` の定数を返す。
     ///
     /// - Parameters:
     ///   - tracking: 受け取る範囲。
-    /// - Returns: `tracking` の範囲を有効にする `ANSI` の定数。`.disabled` なら `nil`。
+    /// - Returns: `tracking` の範囲を有効にする ``ANSI`` の定数。`.disabled` なら `nil`。
     private static func enableSequence(for tracking: MouseTracking) -> String? {
         switch tracking {
         case .disabled: return nil
@@ -262,7 +262,7 @@ public final class Terminal: TerminalOutput {
     /// - Parameters:
     ///   - enabled: 受け取るなら `true`。
     /// - Note: 有効にすると、端末エミュレータがフォーカスを得たとき `ESC [ I`、失ったとき
-    ///   `ESC [ O` のバイト列を送ってくる。`InputParser` はこれらを `.focus` として解釈する。
+    ///   `ESC [ O` のバイト列を送ってくる。``InputParser`` はこれらを `.focus` として解釈する。
     public func setFocusReportingEnabled(_ enabled: Bool) {
         guard enabled != isFocusReportingEnabled else { return }
         isFocusReportingEnabled = enabled
@@ -277,7 +277,7 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Parameters:
     ///   - enabled: 有効にするなら `true`。
-    /// - Note: 対応しない端末エミュレータは `ANSI.enableKeyboardProtocol` を読み飛ばすため、
+    /// - Note: 対応しない端末エミュレータは ``ANSI/enableKeyboardProtocol`` を読み飛ばすため、
     ///   有効にしても何も変わらない。
     ///   対応しているかは `ANSI.queryKeyboardProtocol` で問い合わせる。
     public func setKeyboardProtocolEnabled(_ enabled: Bool) {
@@ -306,7 +306,7 @@ public final class Terminal: TerminalOutput {
     ///
     /// 一時停止のように、端末デバイスをいったんシェルに使わせてから戻ってくる場合に使う。
     ///
-    /// - Postcondition: `Terminal.reactivate()` で raw モードと、端末エミュレータへ送ったモードへ戻せる。二重に呼び出しても安全。
+    /// - Postcondition: ``Terminal/reactivate()`` で raw モードと、端末エミュレータへ送ったモードへ戻せる。二重に呼び出しても安全。
     public func deactivate() {
         // 同期出力を開くのは `Renderer` で、この型は開いているかを知らない。開いたまま
         // 抜けると、後ろに続く復元が画面へ出ない。
@@ -326,7 +326,7 @@ public final class Terminal: TerminalOutput {
 
     /// 覚えている termios をもとに端末デバイスを raw モードへ戻し、覚えているモードを端末エミュレータへ送り直す。
     ///
-    /// - Throws: 入出力が端末デバイスでなければ `TerminalError.notATerminal`、
+    /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、
     ///   termios の設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
     /// - Note: `deactivate()` の後だけでなく、捕まえられない SIGSTOP で止められた後のように、
     ///   端末デバイスの termios や端末エミュレータのモードだけが失われた場合にも使える。
@@ -361,7 +361,7 @@ public final class Terminal: TerminalOutput {
     /// - Parameters:
     ///   - text: クリップボードへ渡す文字列。空文字列を渡すとクリップボードを空にする。
     ///   - limit: Base64 に変換した後の長さの上限（バイト）。
-    /// - Returns: `ANSI.setClipboard(_:limit:)` の戻り値を端末デバイスへ書き出したなら `true`。
+    /// - Returns: ``ANSI/setClipboard(_:limit:)`` の戻り値を端末デバイスへ書き出したなら `true`。
     ///   上限を超えて書き出さなかったなら `false`。
     /// - Note: 端末エミュレータが OSC 52 を拒否していれば、書き出してもクリップボードは変わらない。
     ///   端末エミュレータは応答を送ってこないため、戻り値では区別できない。
@@ -375,7 +375,7 @@ public final class Terminal: TerminalOutput {
 
     // MARK: - 出力
 
-    /// 文字列を、`Terminal.flush()` で端末デバイスへ書き出すまで溜めておく。
+    /// 文字列を、``Terminal/flush()`` で端末デバイスへ書き出すまで溜めておく。
     ///
     /// - Parameters:
     ///   - text: 溜めておく文字列。
