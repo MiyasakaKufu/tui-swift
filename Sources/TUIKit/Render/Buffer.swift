@@ -1,17 +1,17 @@
-/// 端末エミュレータが表示する全体を表す `Cell` の二次元配列。描画はすべてこの `Buffer` に対して行う。
+/// 端末エミュレータが表示する全体を表す ``Cell`` の二次元配列。描画はすべてこの ``Buffer`` に対して行う。
 public struct Buffer: Hashable, Sendable {
-    /// `Buffer` の大きさ。
+    /// ``Buffer`` の大きさ。
     public private(set) var size: Size
-    /// East Asian Width が Ambiguous の文字を `Cell` 何個分として置くか。
+    /// East Asian Width が Ambiguous の文字を ``Cell`` 何個分として置くか。
     public let ambiguousWidth: DisplayWidth.AmbiguousWidth
     private var cells: [Cell]
 
-    /// 指定したサイズの `Buffer` を作る。
+    /// 指定したサイズの ``Buffer`` を作る。
     ///
     /// - Parameters:
-    ///   - size: `Buffer` の大きさ。
-    ///   - cell: 全体を埋める `Cell`。
-    ///   - ambiguousWidth: East Asian Width が Ambiguous の文字を `Cell` 何個分として扱うか。
+    ///   - size: ``Buffer`` の大きさ。
+    ///   - cell: 全体を埋める ``Cell``。
+    ///   - ambiguousWidth: East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。
     ///     端末エミュレータの設定に合わせる。
     public init(
         size: Size,
@@ -23,18 +23,18 @@ public struct Buffer: Hashable, Sendable {
         self.cells = [Cell](repeating: cell, count: size.width * size.height)
     }
 
-    /// `Buffer` 全体を覆う矩形。
+    /// ``Buffer`` 全体を覆う矩形。
     public var bounds: Rect {
         Rect(x: 0, y: 0, width: size.width, height: size.height)
     }
 
-    /// 指定した位置の `Cell` へアクセスする。
+    /// 指定した位置の ``Cell`` へアクセスする。
     ///
     /// - Parameters:
     ///   - x: 横方向の位置。左端が 0。
     ///   - y: 行。上端が 0。
-    /// - Postcondition: 全角文字が占める `Cell` 2 個のうち片方だけを書き換えたとき、対にならなくなった
-    ///   残りの `Cell` は空白になる。
+    /// - Postcondition: 全角文字が占める ``Cell`` 2 個のうち片方だけを書き換えたとき、対にならなくなった
+    ///   残りの ``Cell`` は空白になる。
     /// - Note: 範囲外の読み取りは `.empty` を返し、範囲外への書き込みは無視される。
     public subscript(x: Int, y: Int) -> Cell {
         get {
@@ -57,21 +57,21 @@ public struct Buffer: Hashable, Sendable {
         }
     }
 
-    /// 右隣の `Cell` まで占める `Cell` か。
+    /// 右隣の ``Cell`` まで占める ``Cell`` か。
     ///
     /// - Parameters:
-    ///   - cell: 調べる `Cell`。
+    ///   - cell: 調べる ``Cell``。
     /// - Returns: `DisplayWidth.width(of: Character, ambiguous: AmbiguousWidth)` の戻り値が 2 以上なら `true`。
     private func coversNextColumn(_ cell: Cell) -> Bool {
         DisplayWidth.width(of: cell.character, ambiguous: ambiguousWidth) > 1
     }
 
-    /// `Cell` 1 個を、`Cell.style` を保ったまま空白へ戻す。
+    /// ``Cell`` 1 個を、``Cell/style`` を保ったまま空白へ戻す。
     ///
     /// - Parameters:
     ///   - x: 横方向の位置。左端が 0。
     ///   - y: 行。上端が 0。
-    /// - Precondition: `x` と `y` が `Buffer` の範囲内にある。
+    /// - Precondition: `x` と `y` が ``Buffer`` の範囲内にある。
     private mutating func blankCell(atColumn x: Int, row y: Int) {
         let index = y * size.width + x
         cells[index] = Cell(character: " ", style: cells[index].style)
@@ -81,7 +81,7 @@ public struct Buffer: Hashable, Sendable {
     ///
     /// - Parameters:
     ///   - newSize: 変更後の大きさ。
-    ///   - cell: 全体を埋める `Cell`。
+    ///   - cell: 全体を埋める ``Cell``。
     public mutating func resize(to newSize: Size, filledWith cell: Cell = .empty) {
         size = newSize
         cells = [Cell](repeating: cell, count: newSize.width * newSize.height)
@@ -101,8 +101,8 @@ public struct Buffer: Hashable, Sendable {
     /// 矩形領域を塗りつぶす。
     ///
     /// - Parameters:
-    ///   - rect: 塗りつぶす矩形。`Buffer` の外へはみ出した部分は無視される。
-    ///   - cell: 埋める `Cell`。
+    ///   - rect: 塗りつぶす矩形。``Buffer`` の外へはみ出した部分は無視される。
+    ///   - cell: 埋める ``Cell``。
     public mutating func fill(_ rect: Rect, with cell: Cell) {
         let region = rect.intersection(bounds)
         guard !region.isEmpty else { return }
@@ -116,7 +116,7 @@ public struct Buffer: Hashable, Sendable {
     /// 矩形領域の背景スタイルだけを差し替える。
     ///
     /// - Parameters:
-    ///   - rect: 差し替える矩形。`Buffer` の外へはみ出した部分は無視される。
+    ///   - rect: 差し替える矩形。``Buffer`` の外へはみ出した部分は無視される。
     ///   - style: 塗るスタイル。
     public mutating func fill(_ rect: Rect, style: Style) {
         fill(rect, with: Cell(character: " ", style: style))
@@ -125,10 +125,10 @@ public struct Buffer: Hashable, Sendable {
     /// 矩形領域を 1 文字の繰り返しで埋める。
     ///
     /// - Parameters:
-    ///   - rect: 埋める矩形。`Buffer` の外へはみ出した部分は無視される。
+    ///   - rect: 埋める矩形。``Buffer`` の外へはみ出した部分は無視される。
     ///   - character: 繰り返す文字。表示幅が 0 の文字は繰り返せないため、領域全体を空白で埋める。
     ///   - style: 文字に付けるスタイル。
-    /// - Postcondition: 領域の幅が文字の表示幅で割り切れないとき、行末に残った `Cell` は空白になる。
+    /// - Postcondition: 領域の幅が文字の表示幅で割り切れないとき、行末に残った ``Cell`` は空白になる。
     public mutating func fill(_ rect: Rect, repeating character: Character, style: Style = .plain) {
         let region = rect.intersection(bounds)
         guard !region.isEmpty else { return }
@@ -170,8 +170,8 @@ public struct Buffer: Hashable, Sendable {
     ///   - text: 描画する文字列。最初の改行以降は無視される。
     ///   - position: 開始位置。
     ///   - style: 文字のスタイル。
-    ///   - clip: 描画を制限する矩形。省くと `Buffer` 全体。
-    /// - Returns: 進んだ `Cell` の数（クリップされた分も含む）。
+    ///   - clip: 描画を制限する矩形。省くと ``Buffer`` 全体。
+    /// - Returns: 進んだ ``Cell`` の数（クリップされた分も含む）。
     /// - Postcondition: 領域の端に半分だけかかる全角文字は、空白に置き換わる。
     /// - Note: タブなどの幅を持たない制御文字は描画されない。タブを表示したい場合は、
     ///   呼び出す前に `TabExpansion.expand(_:tabSize:)` で空白へ展開しておく。
@@ -255,7 +255,7 @@ public struct Buffer: Hashable, Sendable {
     ///
     /// - Parameters:
     ///   - y: 取り出す行。上端が 0。
-    /// - Returns: その行の文字を並べた文字列。`Cell.isContinuation` が `true` の `Cell` は含まない。
+    /// - Returns: その行の文字を並べた文字列。``Cell/isContinuation`` が `true` の ``Cell`` は含まない。
     ///   範囲外の行を指定すると空文字列。
     public func text(ofRow y: Int) -> String {
         guard y >= 0, y < size.height else { return "" }

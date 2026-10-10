@@ -6,7 +6,7 @@ import Darwin
 import Glibc
 #endif
 
-/// `@main` を付けるだけで `Application` を起動できる型が準拠するプロトコル。
+/// `@main` を付けるだけで ``Application`` を起動できる型が準拠するプロトコル。
 ///
 ///     @main
 ///     final class Counter: TerminalApp {
@@ -32,9 +32,9 @@ extension TerminalApp {
     /// すべて既定値の設定。
     public static var options: ApplicationOptions { .default }
 
-    /// `Application` を作って起動する。
+    /// ``Application`` を作って起動する。
     ///
-    /// - Note: `Application.run()` がエラーを投げた場合は、標準エラー出力へ理由を書き、
+    /// - Note: ``Application/run()`` がエラーを投げた場合は、標準エラー出力へ理由を書き、
     ///   終了コード 1 で抜ける。
     public static func main() async {
         do {

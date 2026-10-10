@@ -1,13 +1,13 @@
-/// 直前に書き出した `Buffer` と比べ、変わった `Cell` だけを端末デバイスへ書き出す型。
+/// 直前に書き出した ``Buffer`` と比べ、変わった ``Cell`` だけを端末デバイスへ書き出す型。
 @MainActor
 public final class Renderer {
     private let output: TerminalOutput
     private var previous: Buffer?
 
-    /// 書き出し先を指定して `Renderer` を作る。
+    /// 書き出し先を指定して ``Renderer`` を作る。
     ///
     /// - Parameters:
-    ///   - output: 変わった `Cell` を書き出す先。
+    ///   - output: 変わった ``Cell`` を書き出す先。
     public init(output: TerminalOutput) {
         self.output = output
     }
@@ -17,7 +17,7 @@ public final class Renderer {
         previous = nil
     }
 
-    /// `buffer` を直前に書き出した `Buffer` と比べ、変わった `Cell` だけを書き出す。
+    /// `buffer` を直前に書き出した ``Buffer`` と比べ、変わった ``Cell`` だけを書き出す。
     ///
     /// - Parameters:
     ///   - buffer: 描画したい画面内容。

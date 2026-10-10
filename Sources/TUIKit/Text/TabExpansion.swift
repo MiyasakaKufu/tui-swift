@@ -1,7 +1,7 @@
 /// タブ文字を、次のタブストップまでの空白へ展開する。
 ///
-/// `DisplayWidth` はタブを `Cell` 0 個分の制御文字として数え、端末エミュレータはタブを受け取るとカーソルを
-/// 自身のタブストップまで動かすため、`Cell` に書き込む前に空白へ置き換える。
+/// ``DisplayWidth`` はタブを ``Cell`` 0 個分の制御文字として数え、端末エミュレータはタブを受け取るとカーソルを
+/// 自身のタブストップまで動かすため、``Cell`` に書き込む前に空白へ置き換える。
 public enum TabExpansion {
 
     /// タブ幅の既定値。
@@ -10,12 +10,12 @@ public enum TabExpansion {
     /// `text` のタブを、次のタブストップまでの空白に置き換える。
     ///
     /// - Parameters:
-    ///   - text: 展開する文字列。改行を含む場合、2 行目以降は前に並ぶ `Cell` の数を 0 としてタブストップを決める
+    ///   - text: 展開する文字列。改行を含む場合、2 行目以降は前に並ぶ ``Cell`` の数を 0 としてタブストップを決める
     ///     （`startColumn` は 1 行目にだけ効く）。
     ///   - tabSize: タブストップの間隔。0 以下ならタブを取り除く。
-    ///   - startColumn: `text` の前に、同じ行へすでに並んでいる `Cell` の数。行の途中から展開する場合に指定する。
-    ///   - ambiguous: `Cell` の数を数えるときに使う `DisplayWidth.AmbiguousWidth`。
-    ///     省略すると `DisplayWidth.defaultAmbiguousWidth` に従う。
+    ///   - startColumn: `text` の前に、同じ行へすでに並んでいる ``Cell`` の数。行の途中から展開する場合に指定する。
+    ///   - ambiguous: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
+    ///     省略すると ``DisplayWidth/defaultAmbiguousWidth`` に従う。
     /// - Returns: タブを含まない文字列。
     public static func expand(
         _ text: String,

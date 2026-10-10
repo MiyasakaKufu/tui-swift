@@ -1,4 +1,4 @@
-/// `Cell` 1 個分の見た目（文字色・背景色・装飾）。
+/// ``Cell`` 1 個分の見た目（文字色・背景色・装飾）。
 public struct Style: Hashable, Sendable {
     /// 文字色。
     public var foreground: Color

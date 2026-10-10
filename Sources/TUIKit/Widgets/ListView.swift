@@ -1,7 +1,7 @@
-/// 選択位置とスクロール位置を扱う、`ListView` が使うクラス。
+/// 選択位置とスクロール位置を扱う、``ListView`` が使うクラス。
 ///
 /// 選択位置は自分で持つか、`ListView(items:selection:state:style:selectedStyle:selectionMarker:marginMarker:)` に
-/// `Binding` で渡すプロパティを読み書きする。スクロール位置（`ListState.scrollOffset`）はどちらの場合もここに置く。
+/// ``Binding`` で渡すプロパティを読み書きする。スクロール位置（``ListState/scrollOffset``）はどちらの場合もここに置く。
 @MainActor
 public final class ListState {
     private var ownedSelection: Int = 0
@@ -9,7 +9,7 @@ public final class ListState {
 
     /// 選択している項目の位置。
     ///
-    /// - Note: `Binding` で渡すプロパティの値が項目の範囲を外れていれば、端へ丸めた値を返す。
+    /// - Note: ``Binding`` で渡すプロパティの値が項目の範囲を外れていれば、端へ丸めた値を返す。
     ///   丸めた値は書き戻さない。書き戻すのは選択を動かす操作をしたときだけ。
     public var selectedIndex: Int {
         let raw = selectionBinding?.wrappedValue ?? ownedSelection
@@ -40,7 +40,7 @@ public final class ListState {
         }
     }
 
-    /// 項目数を指定して `ListState` を作る。
+    /// 項目数を指定して ``ListState`` を作る。
     ///
     /// - Parameters:
     ///   - itemCount: 項目の総数。
@@ -51,7 +51,7 @@ public final class ListState {
     /// 選択位置の読み書きを `selection` へ向ける。
     ///
     /// - Parameters:
-    ///   - selection: 選択位置を持つプロパティを読み書きする `Binding`。
+    ///   - selection: 選択位置を持つプロパティを読み書きする ``Binding``。
     func bind(_ selection: Binding<Int>) {
         selectionBinding = selection
     }
@@ -125,7 +125,7 @@ public final class ListState {
     /// 上下キー・PageUp/PageDown・Home/End と縦方向のホイール、左ボタンの押下を処理する。
     ///
     /// - Parameters:
-    ///   - event: 処理する `InputEvent`。
+    ///   - event: 処理する ``InputEvent``。
     /// - Returns: 選択または表示位置を動かしたら `true`。
     /// - Note: ホイールは選択ではなく表示位置を `wheelScrollRows` 行動かす。
     ///   左ボタンの押下は、その位置にある項目を選択する。表示位置は動かさない。
@@ -247,7 +247,7 @@ public final class ListState {
 public struct ListView: PrimitiveView {
     /// 各行に表示する文字列。
     public var items: [String]
-    /// スクロール位置を持つ `ListState`。`Binding` を渡さずに作った場合は選択位置も持つ。
+    /// スクロール位置を持つ ``ListState``。``Binding`` を渡さずに作った場合は選択位置も持つ。
     public var state: ListState
     /// 非選択行のスタイル。
     public var style: Style
@@ -258,12 +258,12 @@ public struct ListView: PrimitiveView {
     /// 非選択行の先頭に入れる字下げ。既定では `selectionMarker` と同じ幅の空白。
     public var marginMarker: String?
 
-    /// `Binding` で渡すプロパティに選択位置を持たせる `ListView` を作る。
+    /// ``Binding`` で渡すプロパティに選択位置を持たせる ``ListView`` を作る。
     ///
     /// - Parameters:
     ///   - items: 各行に表示する文字列。
-    ///   - selection: 選択位置を持つプロパティを読み書きする `Binding`。
-    ///   - state: スクロール位置を持つ `ListState`。選択位置は持たず、`selection` を読み書きする。
+    ///   - selection: 選択位置を持つプロパティを読み書きする ``Binding``。
+    ///   - state: スクロール位置を持つ ``ListState``。選択位置は持たず、`selection` を読み書きする。
     ///   - style: 非選択行のスタイル。
     ///   - selectedStyle: 選択行のスタイル。
     ///   - selectionMarker: 選択行の先頭に付ける印。
@@ -291,11 +291,11 @@ public struct ListView: PrimitiveView {
         )
     }
 
-    /// 選択位置も持つ `ListState` と項目を指定して `ListView` を作る。
+    /// 選択位置も持つ ``ListState`` と項目を指定して ``ListView`` を作る。
     ///
     /// - Parameters:
     ///   - items: 各行に表示する文字列。
-    ///   - state: 選択位置とスクロール位置を持つ `ListState`。
+    ///   - state: 選択位置とスクロール位置を持つ ``ListState``。
     ///   - style: 非選択行のスタイル。
     ///   - selectedStyle: 選択行のスタイル。
     ///   - selectionMarker: 選択行の先頭に付ける印。
@@ -318,20 +318,20 @@ public struct ListView: PrimitiveView {
         state.itemCount = items.count
     }
 
-    /// `LayoutTraits.horizontalFlex` と `LayoutTraits.verticalFlex` をともに 1 にした `LayoutTraits` を返す。
+    /// ``LayoutTraits/horizontalFlex`` と ``LayoutTraits/verticalFlex`` をともに 1 にした ``LayoutTraits`` を返す。
     ///
     /// - Parameters:
-    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: 常に `LayoutTraits.flexible`。
+    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    /// - Returns: 常に ``LayoutTraits/flexible``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits { .flexible }
 
-    /// すべての項目を並べられる `Size` を、`proposal` の範囲で返す。
+    /// すべての項目を並べられる ``Size`` を、`proposal` の範囲で返す。
     ///
     /// - Parameters:
-    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
-    ///   - context: 文字列の幅を測るときに `RenderContext.ambiguousWidth` を読む `RenderContext`。
-    /// - Returns: 最も長い項目の `Cell` の数に `ListView.selectionMarker` の `Cell` の数を足した幅と、項目数を、
-    ///   それぞれ `proposal` の幅と高さで切り詰めた `Size`。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読む ``RenderContext``。
+    /// - Returns: 最も長い項目の ``Cell`` の数に ``ListView/selectionMarker`` の ``Cell`` の数を足した幅と、項目数を、
+    ///   それぞれ `proposal` の幅と高さで切り詰めた ``Size``。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let ambiguous = context.ambiguousWidth
         let width = items.reduce(0) { max($0, DisplayWidth.width(of: $1, ambiguous: ambiguous)) }
@@ -345,9 +345,9 @@ public struct ListView: PrimitiveView {
     /// 表示範囲の項目を上から並べて描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先の `Buffer`。
+    ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。
-    ///   - context: 文字列の幅を測るときに `RenderContext.ambiguousWidth` を読む `RenderContext`。
+    ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読む ``RenderContext``。
     /// - Postcondition: `state.renderedRect` が `rect` に更新され、
     ///   スクロール位置が項目の範囲へ収められる。直前の描画から選択位置が変わっていれば、
     ///   選択が表示範囲に入るようスクロールする。

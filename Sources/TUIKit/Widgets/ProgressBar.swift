@@ -42,21 +42,21 @@ public struct ProgressBar: PrimitiveView {
         self.showsPercentage = showsPercentage
     }
 
-    /// `LayoutTraits.horizontalFlex` だけを 1 にした `LayoutTraits` を返す。
+    /// ``LayoutTraits/horizontalFlex`` だけを 1 にした ``LayoutTraits`` を返す。
     ///
     /// - Parameters:
-    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `LayoutTraits.horizontalFlex` が 1、`LayoutTraits.verticalFlex` が 0 の `LayoutTraits`。
+    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    /// - Returns: ``LayoutTraits/horizontalFlex`` が 1、``LayoutTraits/verticalFlex`` が 0 の ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         LayoutTraits(horizontalFlex: 1, verticalFlex: 0)
     }
 
-    /// `proposal` の幅いっぱいで、高さが 1 を超えない `Size` を返す。
+    /// `proposal` の幅いっぱいで、高さが 1 を超えない ``Size`` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
-    ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
-    /// - Returns: `proposal` の幅と、1 と `proposal.height` の小さい方を高さにした `Size`。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    /// - Returns: `proposal` の幅と、1 と `proposal.height` の小さい方を高さにした ``Size``。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         Size(width: proposal.width, height: min(1, proposal.height))
     }
@@ -64,9 +64,9 @@ public struct ProgressBar: PrimitiveView {
     /// バーと、必要なら百分率を描画する。
     ///
     /// - Parameters:
-    ///   - buffer: 描画先の `Buffer`。
+    ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。使うのは最初の 1 行だけ。
-    ///   - context: 文字列の幅を測るときに `RenderContext.ambiguousWidth` を読む `RenderContext`。
+    ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読む ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width > 0, rect.height > 0 else { return }
 
