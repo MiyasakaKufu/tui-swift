@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "swift-tui",
+    name: "tui-swift",
     platforms: [
         .macOS(.v15)
     ],
