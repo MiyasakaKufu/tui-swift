@@ -1,9 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-/// `Cell` 1 個ずつ書き込む描画（`Fill`・`Divider`・`ProgressBar`・`View.border(_:style:title:titleStyle:)` など）に
-/// 全角文字を渡しても、`Buffer.text(ofRow:)` を
-/// `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` に渡した戻り値が、どの行でも `Buffer.size.width` を超えないことを確かめる。
+/// `Cell` 1 個ずつ書き込む描画（`Fill`・`Divider`・`ProgressBar`・`View.border(_:style:title:titleStyle:)` など）に全角文字を渡しても、`Buffer.text(ofRow:)` を `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` に渡した戻り値が、どの行でも `Buffer.size.width` を超えないことを確かめる。
 @MainActor
 final class WideCharacterFillTests: XCTestCase {
 
@@ -14,8 +12,7 @@ final class WideCharacterFillTests: XCTestCase {
         return buffer
     }
 
-    /// `Buffer.text(ofRow:)` を `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` に渡した戻り値が、
-    /// どの行でも `Buffer.size.width` と一致することを確かめる。
+    /// `Buffer.text(ofRow:)` を `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` に渡した戻り値が、どの行でも `Buffer.size.width` と一致することを確かめる。
     private func assertRowsFit(_ buffer: Buffer, file: StaticString = #filePath, line: UInt = #line) {
         for y in 0..<buffer.size.height {
             XCTAssertEqual(

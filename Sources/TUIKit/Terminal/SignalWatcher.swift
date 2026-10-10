@@ -36,8 +36,7 @@ public enum SignalWatcher {
 
     /// SIGWINCH、終了シグナル、SIGTSTP / SIGCONT のハンドラを登録する。
     ///
-    /// 終了シグナルは SIGTERM / SIGHUP / SIGINT / SIGQUIT。既定の動作のまま受けると、
-    /// ``Application`` が ``Terminal/restore()`` を呼び出さず、端末デバイスが raw モードのまま残る。
+    /// 終了シグナルは SIGTERM / SIGHUP / SIGINT / SIGQUIT。既定の動作のまま受けると、``Application`` が ``Terminal/restore()`` を呼び出さず、端末デバイスが raw モードのまま残る。
     ///
     /// - Postcondition: `wakeupDescriptor` が使えるようになる。SIGPIPE は無視される。
     public static func install() {
@@ -57,8 +56,7 @@ public enum SignalWatcher {
 
     /// 自分自身を止め、再開されるまで戻らない。
     ///
-    /// - Precondition: 呼び出す前に ``Terminal/deactivate()`` などで、端末デバイスの termios と、
-    ///   端末エミュレータへ送ったモードを元へ戻しておく。
+    /// - Precondition: 呼び出す前に ``Terminal/deactivate()`` などで、端末デバイスの termios と、端末エミュレータへ送ったモードを元へ戻しておく。
     /// - Postcondition: 戻るときに SIGTSTP のハンドラを登録し直す。
     public static func stopProcess() {
         #if canImport(Darwin) || canImport(Glibc)

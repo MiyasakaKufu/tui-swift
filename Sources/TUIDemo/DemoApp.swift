@@ -128,8 +128,7 @@ final class DemoApp: TerminalApp {
             return parts.joined(separator: "+")
         case .mouse(let mouseEvent):
             var parts = ["マウス", "\(mouseEvent.action)"]
-            // `MouseEvent.button` を出すのをやめると、拡張ボタン（戻る・進む）の押下が左ボタンの押下と
-            // 同じ表示になり見分けられない。
+            // `MouseEvent.button` を出すのをやめると、拡張ボタン（戻る・進む）の押下が左ボタンの押下と同じ表示になり見分けられない。
             if mouseEvent.button != .none { parts.append("\(mouseEvent.button)") }
             parts.append("(\(mouseEvent.position.x), \(mouseEvent.position.y))")
             return parts.joined(separator: " ")

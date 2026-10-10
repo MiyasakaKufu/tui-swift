@@ -1,8 +1,6 @@
-/// ``Application`` が最初にメソッドを呼び出す ``View`` から、``RenderContext`` のメソッドに `child` 引数として渡された
-/// ``View`` を順にたどったときの、`ViewPath.Component` の並び。
+/// ``Application`` が最初にメソッドを呼び出す ``View`` から、``RenderContext`` のメソッドに `child` 引数として渡された ``View`` を順にたどったときの、`ViewPath.Component` の並び。
 ///
-/// - Invariant: ``RenderContext`` のメソッドに `child` 引数として渡した ``View`` の `ViewPath` は、その ``RenderContext`` の
-///   `ViewPath` と、`index:` 引数（`child` が ``View/id(_:)`` で作った ``View`` なら ``View/id(_:)`` の引数）だけで決まる。
+/// - Invariant: ``RenderContext`` のメソッドに `child` 引数として渡した ``View`` の `ViewPath` は、その ``RenderContext`` の `ViewPath` と、`index:` 引数（`child` が ``View/id(_:)`` で作った ``View`` なら ``View/id(_:)`` の引数）だけで決まる。
 ///   同じ ``View`` を何度測っても、測っただけで描かなくても、描く途中で測り直しても、同じ ``View`` には同じ `ViewPath` が振られる。
 struct ViewPath: Hashable {
     /// `ViewPath` の 1 段。
@@ -18,8 +16,7 @@ struct ViewPath: Hashable {
 
     /// `ViewPath.Component` を 1 つも持たない `ViewPath`。
     ///
-    /// `ViewGraph.renderFrame(_:into:ambiguousWidth:)` の `view` 引数と、``RenderContext/init(screen:ambiguousWidth:)`` で
-    /// 作った ``RenderContext`` を受け取る ``View`` に使う。
+    /// `ViewGraph.renderFrame(_:into:ambiguousWidth:)` の `view` 引数と、``RenderContext/init(screen:ambiguousWidth:)`` で作った ``RenderContext`` を受け取る ``View`` に使う。
     static var root: ViewPath { ViewPath(components: []) }
 
     /// 末尾に `component` を足した `ViewPath` を返す。
@@ -41,11 +38,9 @@ struct ViewPath: Hashable {
     }
 }
 
-/// 別の ``View`` の ``View/sizeThatFits(_:context:)``・``View/layoutTraits(context:)``・``View/render(into:rect:context:)`` を
-/// 呼び出すために、``View`` が `context` 引数で受け取る型。
+/// 別の ``View`` の ``View/sizeThatFits(_:context:)``・``View/layoutTraits(context:)``・``View/render(into:rect:context:)`` を呼び出すために、``View`` が `context` 引数で受け取る型。
 ///
-/// 別の ``View`` のこれらのメソッドは直接呼び出さず、``RenderContext/sizeThatFits(of:index:proposal:)``・
-/// ``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` に `child` 引数として渡して呼び出す。
+/// 別の ``View`` のこれらのメソッドは直接呼び出さず、``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` に `child` 引数として渡して呼び出す。
 ///
 /// ```swift
 /// func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
@@ -53,10 +48,7 @@ struct ViewPath: Hashable {
 /// }
 /// ```
 ///
-/// - Note: `index` は、`child` 引数として渡す ``View`` どうしを区別する番号で、同じ ``View`` には
-///   ``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・
-///   ``RenderContext/render(_:index:into:rect:)`` で同じ番号を渡す。``VStack/children`` の並びのように、
-///   ``View`` の並びの中の位置で決まる値を使う。
+/// - Note: `index` は、`child` 引数として渡す ``View`` どうしを区別する番号で、同じ ``View`` には ``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` で同じ番号を渡す。``VStack/children`` の並びのように、``View`` の並びの中の位置で決まる値を使う。
 @MainActor
 public struct RenderContext {
     /// この ``RenderContext`` を受け取る ``View`` の `ViewNode`。
@@ -75,9 +67,7 @@ public struct RenderContext {
 
     /// East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。
     ///
-    /// - Note: `DisplayWidth` の各関数は、`ambiguous` を省くと `DisplayWidth.defaultAmbiguousWidth`
-    ///   で測る。文字列の幅を測るときはこの値を渡す。渡さないと、TUIKit を使う開発者が指定した扱いと測った幅が
-    ///   食い違い、その行の文字の ``Point/x`` がずれる。
+    /// - Note: `DisplayWidth` の各関数は、`ambiguous` を省くと `DisplayWidth.defaultAmbiguousWidth` で測る。文字列の幅を測るときはこの値を渡す。渡さないと、TUIKit を使う開発者が指定した扱いと測った幅が食い違い、その行の文字の ``Point/x`` がずれる。
     public let ambiguousWidth: DisplayWidth.AmbiguousWidth
 
     /// ``View`` のメソッドを直接呼び出すときに渡す ``RenderContext`` を作る。
@@ -87,11 +77,9 @@ public struct RenderContext {
     ///   - ambiguousWidth: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
     /// - Precondition: `ambiguousWidth` が描画先の ``Buffer`` の ``Buffer/ambiguousWidth`` と同じ。
     ///   違うと、``View`` が測った幅と、``Buffer`` に置かれる ``Cell`` の数が食い違う。
-    /// - Note: 作るたびに新しい記憶域を使う。前に作った ``RenderContext`` で辿った ``View`` とは、
-    ///   同じ `index:` 引数の並びで渡しても同一性を共有せず、``State`` の記憶域も共有しない。
+    /// - Note: 作るたびに新しい記憶域を使う。前に作った ``RenderContext`` で辿った ``View`` とは、同じ `index:` 引数の並びで渡しても同一性を共有せず、``State`` の記憶域も共有しない。
     /// - Note: この ``RenderContext`` を直接渡した ``View`` 自身の ``State`` は、記憶域に結び付かず初期値のままになる。
-    ///   結び付くのは、この ``RenderContext`` のメソッドに `child` 引数として渡した ``View`` と、その先で
-    ///   ``RenderContext`` のメソッドに `child` 引数として渡された ``View``。
+    ///   結び付くのは、この ``RenderContext`` のメソッドに `child` 引数として渡した ``View`` と、その先で ``RenderContext`` のメソッドに `child` 引数として渡された ``View``。
     public init(
         screen: Rect,
         ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
@@ -124,8 +112,7 @@ public struct RenderContext {
     /// - Parameters:
     ///   - child: ``RenderContext`` を `context` 引数で受け取る ``View``。
     ///   - index: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``View`` と `child` を区別する番号。
-    /// - Returns: `child` の `ViewNode` を持つ ``RenderContext``。`child` が ``View/id(_:)`` で作った ``View`` なら、
-    ///   `ViewPath` には `index` の代わりに ``View/id(_:)`` の引数を `.key(_:)` として足す。
+    /// - Returns: `child` の `ViewNode` を持つ ``RenderContext``。`child` が ``View/id(_:)`` で作った ``View`` なら、`ViewPath` には `index` の代わりに ``View/id(_:)`` の引数を `.key(_:)` として足す。
     /// - Postcondition: `child` の ``State`` が、`child` の `ViewNode` の記憶域へ結び付いている。
     func context(for child: some View, index: Int) -> RenderContext {
         let component: ViewPath.Component

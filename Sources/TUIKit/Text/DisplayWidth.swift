@@ -7,8 +7,7 @@ import Glibc
 /// 文字が端末エミュレータで占める ``Cell`` の数の計算。
 ///
 /// 東アジアの全角文字と絵文字は ``Cell`` 2 個分、結合文字や制御文字は ``Cell`` 0 個分として扱う。
-/// East Asian Width が Ambiguous の文字（罫線素片、`…`、`█`、矢印など）は
-/// 端末エミュレータの設定によって ``Cell`` 1 個分にも 2 個分にも表示されるため、各関数の `ambiguous` 引数で切り替える。
+/// East Asian Width が Ambiguous の文字（罫線素片、`…`、`█`、矢印など）は端末エミュレータの設定によって ``Cell`` 1 個分にも 2 個分にも表示されるため、各関数の `ambiguous` 引数で切り替える。
 public enum DisplayWidth {
 
     /// East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。
@@ -27,8 +26,7 @@ public enum DisplayWidth {
     /// ``DisplayWidth/AmbiguousWidth`` を指定しなかったときの既定値。
     ///
     /// - Note: 最初に参照した時点で `resolveAmbiguousWidth()` から一度だけ決まる。
-    ///   あとから環境変数を変えても反映されない。TUIKit アプリごとに変えるには
-    ///   `ApplicationOptions.ambiguousWidth` を、呼び出しごとに変えるには各関数の `ambiguous` を指定する。
+    ///   あとから環境変数を変えても反映されない。TUIKit アプリごとに変えるには `ApplicationOptions.ambiguousWidth` を、呼び出しごとに変えるには各関数の `ambiguous` を指定する。
     public static let defaultAmbiguousWidth: AmbiguousWidth = resolveAmbiguousWidth()
 
     // MARK: - 設定の解決
@@ -98,9 +96,7 @@ public enum DisplayWidth {
         let language = (territory.split(separator: "_").first ?? "").lowercased()
         let codeset = parts.count > 1 ? normalizedCodeset(parts[1]) : ""
 
-        // 文字集合を見ずに言語だけで決めてはいけない。C や eucJP のロケールで端末エミュレータが
-        // どちらの幅を選ぶかは決まっておらず、推測が外れれば、端末エミュレータが文字を表示する位置が
-        // `Buffer` に置いた `Cell` の `Point.x` とずれたまま描き続けることになる。
+        // 文字集合を見ずに言語だけで決めてはいけない。C や eucJP のロケールで端末エミュレータがどちらの幅を選ぶかは決まっておらず、推測が外れれば、端末エミュレータが文字を表示する位置が `Buffer` に置いた `Cell` の `Point.x` とずれたまま描き続けることになる。
         guard codeset == "utf8" else { return .narrow }
         return eastAsianLanguages.contains(language) ? .wide : .narrow
     }

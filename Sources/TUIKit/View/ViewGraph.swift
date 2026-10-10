@@ -1,7 +1,6 @@
 /// `Application.draw()` をまたいで保持される、``View`` 1 つ分の記録。
 ///
-/// - Invariant: `ViewNode.path` と `ViewNode.viewType` が同じ ``View`` が `Application.draw()` のたびに辿られる間は、同じ `ViewNode` が
-///   使われ続ける。`ViewNode` が持つ ``State`` の記憶域も同じものが使われ続ける。
+/// - Invariant: `ViewNode.path` と `ViewNode.viewType` が同じ ``View`` が `Application.draw()` のたびに辿られる間は、同じ `ViewNode` が使われ続ける。`ViewNode` が持つ ``State`` の記憶域も同じものが使われ続ける。
 @MainActor
 final class ViewNode {
     /// ``View`` の同一性。`ViewNode` を作り直すと別の値になる。
@@ -47,8 +46,7 @@ final class ViewNode {
 
 /// `ViewNode` を、`ViewPath` ごとに `Application.draw()` をまたいで保持するもの。
 ///
-/// `Application.draw()` の 1 回分は `ViewGraph.renderFrame(_:into:ambiguousWidth:)` で描く。その呼び出しで辿られた `ViewPath` の
-/// `ViewNode` は次の呼び出しへ持ち越し、辿られなかった `ViewNode` は、持っている ``State`` の記憶域ごと捨てる。
+/// `Application.draw()` の 1 回分は `ViewGraph.renderFrame(_:into:ambiguousWidth:)` で描く。その呼び出しで辿られた `ViewPath` の `ViewNode` は次の呼び出しへ持ち越し、辿られなかった `ViewNode` は、持っている ``State`` の記憶域ごと捨てる。
 @MainActor
 final class ViewGraph {
     /// `ViewPath` ごとの `ViewNode`。
@@ -68,8 +66,7 @@ final class ViewGraph {
     /// - Parameters:
     ///   - path: ``View`` の `ViewPath`。
     ///   - viewType: ``View`` の型。`nil` なら型を知らない `ViewNode` として扱う。
-    /// - Returns: `path` の `ViewNode`。前の `ViewGraph.renderFrame(_:into:ambiguousWidth:)` の呼び出しで同じ `ViewPath` に
-    ///   別の型の ``View`` があったなら、その `ViewNode` と、`path` で始まる `ViewPath` の `ViewNode` を捨てて作り直したもの。
+    /// - Returns: `path` の `ViewNode`。前の `ViewGraph.renderFrame(_:into:ambiguousWidth:)` の呼び出しで同じ `ViewPath` に別の型の ``View`` があったなら、その `ViewNode` と、`path` で始まる `ViewPath` の `ViewNode` を捨てて作り直したもの。
     func node(at path: ViewPath, viewType: (any View.Type)?) -> ViewNode {
         let type = viewType.map { ObjectIdentifier($0) }
         if let node = nodes[path], node.viewType == type {
@@ -77,9 +74,7 @@ final class ViewGraph {
             return node
         }
 
-        // `path` で始まる `ViewPath` の `ViewNode` を残してはいけない。残すと、`path` に別の型の `View` が来ても、
-        // その `View` が `child` 引数として渡す `View` が、前の型のときに作った `ViewNode`（と `State` の記憶域）を
-        // そのまま使ってしまう。
+        // `path` で始まる `ViewPath` の `ViewNode` を残してはいけない。残すと、`path` に別の型の `View` が来ても、その `View` が `child` 引数として渡す `View` が、前の型のときに作った `ViewNode`（と `State` の記憶域）をそのまま使ってしまう。
         if nodes[path] != nil {
             nodes = nodes.filter { !path.contains($0.key) }
         }

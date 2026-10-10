@@ -34,9 +34,7 @@ public protocol Component: AnyObject {
     /// - Parameters:
     ///   - message: 送られた値。
     /// - Returns: 処理したかどうかを表す ``EventResult``。`.quit` を返すと ``Application`` が終了する。
-    /// - Note: 送られた順に呼び出される。``Component/handle(_:)`` との前後は、``InputReader`` が端末デバイスから
-    ///   キーのバイト列を読んだ時点で決まる。キーが端末デバイスに届いた時点ではないので、
-    ///   届いてから読むまでの間に送られた値は、そのキーより先に渡る。
+    /// - Note: 送られた順に呼び出される。``Component/handle(_:)`` との前後は、``InputReader`` が端末デバイスからキーのバイト列を読んだ時点で決まる。キーが端末デバイスに届いた時点ではないので、届いてから読むまでの間に送られた値は、そのキーより先に渡る。
     func receive(_ message: Message) -> EventResult
 
     /// 端末エミュレータのカーソルを表示したい位置。`nil` ならカーソルを隠す。
@@ -47,8 +45,7 @@ public protocol Component: AnyObject {
     /// - Parameters:
     ///   - elapsed: 前に ``Component/update(elapsed:)`` を呼び出してからの経過秒数。
     ///     初回は ``Application/run()`` が最初の `.resize` を通知した時点から測り、一時停止していた時間は含めない。
-    /// - Note: ``InputEvent``・``Component/Message`` を処理するたびに呼び出され、``ApplicationOptions/frameInterval`` を
-    ///   設定したときは、入力が無くてもその間隔で呼び出される。最初の `Application.draw()` の前には呼び出されない。
+    /// - Note: ``InputEvent``・``Component/Message`` を処理するたびに呼び出され、``ApplicationOptions/frameInterval`` を設定したときは、入力が無くてもその間隔で呼び出される。最初の `Application.draw()` の前には呼び出されない。
     func update(elapsed: Double)
 }
 

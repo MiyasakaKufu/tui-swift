@@ -22,8 +22,7 @@ final class ApplicationSignalTests: XCTestCase {
         XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 20, 5), 0, "初期サイズを設定できない")
 
         // サイズの変更と SIGWINCH を、`ResizeProbe` に渡すクロージャの外へ移してはいけない。
-        // `ResizeProbe.body` の値は、端末デバイスのウィンドウサイズを確かめた後・次の `LoopEvent` を待つ前に
-        // 取得されるので、外で送ると、待つ直前に届く SIGWINCH を再現できない。
+        // `ResizeProbe.body` の値は、端末デバイスのウィンドウサイズを確かめた後・次の `LoopEvent` を待つ前に取得されるので、外で送ると、待つ直前に届く SIGWINCH を再現できない。
         let probe = ResizeProbe {
             XCTAssertEqual(ctui_test_set_terminal_size(pty.master, 30, 8), 0, "サイズを変更できない")
             kill(getpid(), SIGWINCH)
@@ -209,8 +208,7 @@ private final class TerminationProbe: Component, @unchecked Sendable {
 /// master を読み続けるスレッドを持つ。
 ///
 /// - Warning: 読み捨てをやめてはいけない。
-///   読まずに溜まったバイト列がカーネルの上限に達すると、slave への `write(2)` や、出力の掃き出しを待つ
-///   `tcsetattr(TCSAFLUSH)` が戻らなくなる。
+///   読まずに溜まったバイト列がカーネルの上限に達すると、slave への `write(2)` や、出力の掃き出しを待つ `tcsetattr(TCSAFLUSH)` が戻らなくなる。
 private final class PseudoTerminal {
     enum Failure: Error {
         case unavailable(errno: Int32)

@@ -1,7 +1,6 @@
 /// 端末デバイスから読み取ったバイト列を ``InputEvent`` へ変換する増分パーサ。
 ///
-/// ESC で始まるバイト列が途中までしか届いていない場合は内部に保持し、
-/// 続きが来たときに解釈する。
+/// ESC で始まるバイト列が途中までしか届いていない場合は内部に保持し、続きが来たときに解釈する。
 public struct InputParser: Sendable {
     private var pending: [UInt8] = []
     private var isInPaste = false
@@ -560,8 +559,7 @@ public struct InputParser: Sendable {
 
 /// 端末デバイスから受け取るバイト列を解釈するときに見分けるバイトの値。
 ///
-/// `privatePrefixes` `parameterBytes` `intermediateBytes` `finalBytes` の区分は、
-/// ECMA-48 の control sequence の構文が定める。
+/// `privatePrefixes` `parameterBytes` `intermediateBytes` `finalBytes` の区分は、ECMA-48 の control sequence の構文が定める。
 ///
 /// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/)
 ///   の「Control sequences」。

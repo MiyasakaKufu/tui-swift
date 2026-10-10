@@ -30,8 +30,7 @@ public struct BorderStyle: Hashable, Sendable {
     ///   - bottomLeft: 左下の角に置く文字。
     ///   - bottom: 下辺に並べる文字。
     ///   - bottomRight: 右下の角に置く文字。
-    /// - Postcondition: ``DisplayWidth/AmbiguousWidth`` が `.narrow` でも ``Cell`` 1 個分にならない文字（全角文字や絵文字）は、
-    ///   その位置の既定の文字（``BorderStyle/single`` と同じ細い実線）へ置き換わる。
+    /// - Postcondition: ``DisplayWidth/AmbiguousWidth`` が `.narrow` でも ``Cell`` 1 個分にならない文字（全角文字や絵文字）は、その位置の既定の文字（``BorderStyle/single`` と同じ細い実線）へ置き換わる。
     public init(
         topLeft: Character,
         top: Character,
@@ -63,8 +62,7 @@ public struct BorderStyle: Hashable, Sendable {
     /// - Parameters:
     ///   - ambiguous: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。省略すると ``DisplayWidth/defaultAmbiguousWidth`` に従う。
     /// - Returns: すべて ``Cell`` 1 個分なら `true`。
-    /// - Note: 罫線素片は East Asian Width が Ambiguous なので、`ambiguous` が `.wide` のときは
-    ///   ``Cell`` 2 個分になる。``BorderStyle/ascii`` 以外の組み込みの文字組みは、どれも ``Cell`` 1 個分に収まらない。
+    /// - Note: 罫線素片は East Asian Width が Ambiguous なので、`ambiguous` が `.wide` のときは ``Cell`` 2 個分になる。``BorderStyle/ascii`` 以外の組み込みの文字組みは、どれも ``Cell`` 1 個分に収まらない。
     public func fitsInSingleColumn(
         ambiguous: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
     ) -> Bool {

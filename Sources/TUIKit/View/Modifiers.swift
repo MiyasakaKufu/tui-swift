@@ -278,13 +278,11 @@ public struct FrameView<Content: View>: PrimitiveView {
         self.verticalAlignment = verticalAlignment
     }
 
-    /// ``FrameView/width`` を固定していれば ``LayoutTraits/horizontalFlex``、``FrameView/height`` を固定していれば ``LayoutTraits/verticalFlex`` を 0 にし、ほかは
-    /// ``FrameView/content`` の ``View/layoutTraits(context:)`` の戻り値のままにした ``LayoutTraits`` を返す。
+    /// ``FrameView/width`` を固定していれば ``LayoutTraits/horizontalFlex``、``FrameView/height`` を固定していれば ``LayoutTraits/verticalFlex`` を 0 にし、ほかは ``FrameView/content`` の ``View/layoutTraits(context:)`` の戻り値のままにした ``LayoutTraits`` を返す。
     ///
     /// - Parameters:
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
-    /// - Returns: ``FrameView/content`` の ``View/layoutTraits(context:)`` の戻り値の、``FrameView/width`` を固定していれば
-    ///   ``LayoutTraits/horizontalFlex``、``FrameView/height`` を固定していれば ``LayoutTraits/verticalFlex`` を 0 にした ``LayoutTraits``。
+    /// - Returns: ``FrameView/content`` の ``View/layoutTraits(context:)`` の戻り値の、``FrameView/width`` を固定していれば ``LayoutTraits/horizontalFlex``、``FrameView/height`` を固定していれば ``LayoutTraits/verticalFlex`` を 0 にした ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         let traits = context.layoutTraits(of: content, index: 0)
         return LayoutTraits(

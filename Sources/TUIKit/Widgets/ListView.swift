@@ -1,7 +1,6 @@
 /// 選択位置とスクロール位置を扱う、``ListView`` が使うクラス。
 ///
-/// 選択位置は自分で持つか、`ListView(items:selection:state:style:selectedStyle:selectionMarker:marginMarker:)` に
-/// ``Binding`` で渡すプロパティを読み書きする。スクロール位置（``ListState/scrollOffset``）はどちらの場合もここに置く。
+/// 選択位置は自分で持つか、`ListView(items:selection:state:style:selectedStyle:selectionMarker:marginMarker:)` に ``Binding`` で渡すプロパティを読み書きする。スクロール位置（``ListState/scrollOffset``）はどちらの場合もここに置く。
 @MainActor
 public final class ListState {
     private var ownedSelection: Int = 0
@@ -33,8 +32,7 @@ public final class ListState {
     public var itemCount: Int {
         didSet {
             // 同じ値の代入で表示位置を選択へ戻してはいけない。
-            // `ListView` は `Application.draw()` のたびに作られ、同じ項目数が入り直すので、
-            // ホイールで動かした表示位置が次の `Application.draw()` で消える。
+            // `ListView` は `Application.draw()` のたびに作られ、同じ項目数が入り直すので、ホイールで動かした表示位置が次の `Application.draw()` で消える。
             guard itemCount != oldValue else { return }
             scrollToSelection()
         }
@@ -66,10 +64,7 @@ public final class ListState {
             ownedSelection = clamped
             return
         }
-        // 比べずに書き戻したくなるが、端で ↑ を押したときのように選択が動かない操作でも
-        // `Binding` で渡すプロパティへ代入される。TUIKit を使う開発者が、`Binding(_:_:)` にキーパスで
-        // 渡したプロパティや、`Binding(get:set:)` の `set` で代入するプロパティに `didSet` を書いていれば、
-        // 値が変わらないのに `didSet` が呼び出される。
+        // 比べずに書き戻したくなるが、端で ↑ を押したときのように選択が動かない操作でも `Binding` で渡すプロパティへ代入される。TUIKit を使う開発者が、`Binding(_:_:)` にキーパスで渡したプロパティや、`Binding(get:set:)` の `set` で代入するプロパティに `didSet` を書いていれば、値が変わらないのに `didSet` が呼び出される。
         guard selectionBinding.wrappedValue != clamped else { return }
         selectionBinding.wrappedValue = clamped
     }
@@ -135,13 +130,10 @@ public final class ListState {
     public func handle(_ event: InputEvent) -> Bool {
         guard case .key(let keyEvent) = event else {
             if case .mouse(let mouseEvent) = event {
-                // 横ホイールも縦と同じように扱いたくなるが、そうすると `true` が返る。戻り値が `false` の
-                // ときだけ `InputEvent` を別のコードへ渡すように `ListState.handle(_:)` を呼び出していると、
-                // 横ホイールがそのコードへ届かなくなる。
+                // 横ホイールも縦と同じように扱いたくなるが、そうすると `true` が返る。戻り値が `false` のときだけ `InputEvent` を別のコードへ渡すように `ListState.handle(_:)` を呼び出していると、横ホイールがそのコードへ届かなくなる。
                 //
                 // `default` を置かずに `MouseAction` のすべての `case` を列挙している。
-                // `MouseAction` の `case` が増えたときにコンパイルエラーとなり、この場で
-                // 方針を決めることを強制するため。
+                // `MouseAction` の `case` が増えたときにコンパイルエラーとなり、この場で方針を決めることを強制するため。
                 switch mouseEvent.action {
                 case .scrollUp:
                     return scrollByWheel(at: mouseEvent.position, rows: -wheelScrollRows)
@@ -150,8 +142,7 @@ public final class ListState {
                 case .scrollLeft, .scrollRight:
                     return false
                 case .press:
-                    // ボタンを問わず選択したくなるが、右ボタンや拡張ボタンに別の操作を
-                    // 割り当てた TUIKit アプリで、その操作のたびに選択が動いてしまう。
+                    // ボタンを問わず選択したくなるが、右ボタンや拡張ボタンに別の操作を割り当てた TUIKit アプリで、その操作のたびに選択が動いてしまう。
                     guard mouseEvent.button == .left else { return false }
                     return selectItem(at: mouseEvent.position)
                 case .release, .drag, .move:
@@ -196,8 +187,7 @@ public final class ListState {
         return true
     }
 
-    // 座標から項目を求める式を公開したくなるが、`ListView.render(into:rect:context:)` が
-    // 行の並べ方を変えたときに、式を写した TUIKit アプリのコードが黙って壊れる。
+    // 座標から項目を求める式を公開したくなるが、`ListView.render(into:rect:context:)` が行の並べ方を変えたときに、式を写した TUIKit アプリのコードが黙って壊れる。
     /// 矩形の中で起きた押下として、その位置の項目を選択する。
     ///
     /// - Parameters:
@@ -330,8 +320,7 @@ public struct ListView: PrimitiveView {
     /// - Parameters:
     ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読む ``RenderContext``。
-    /// - Returns: 最も長い項目の ``Cell`` の数に ``ListView/selectionMarker`` の ``Cell`` の数を足した幅と、項目数を、
-    ///   それぞれ `proposal` の幅と高さで切り詰めた ``Size``。
+    /// - Returns: 最も長い項目の ``Cell`` の数に ``ListView/selectionMarker`` の ``Cell`` の数を足した幅と、項目数を、それぞれ `proposal` の幅と高さで切り詰めた ``Size``。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let ambiguous = context.ambiguousWidth
         let width = items.reduce(0) { max($0, DisplayWidth.width(of: $1, ambiguous: ambiguous)) }
@@ -356,9 +345,7 @@ public struct ListView: PrimitiveView {
 
         // 描画のたびに選択へ戻すと、ホイールで動かした表示位置が元に戻る。
         let rowsChanged = state.visibleRows != rect.height
-        // 選択を動かす操作がスクロールも済ませるので、ここでは選択の変化を見なくてよいと
-        // 考えたくなるが、TUIKit を使う開発者のコードが `Binding` で渡すプロパティを直接
-        // 書き換えると操作を通らず、選択が表示範囲の外に残る。
+        // 選択を動かす操作がスクロールも済ませるので、ここでは選択の変化を見なくてよいと考えたくなるが、TUIKit を使う開発者のコードが `Binding` で渡すプロパティを直接書き換えると操作を通らず、選択が表示範囲の外に残る。
         let selectionChanged = state.renderedSelection != state.selectedIndex
         state.renderedRect = rect
         state.renderedSelection = state.selectedIndex

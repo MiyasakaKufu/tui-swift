@@ -4,13 +4,11 @@ public enum ANSI {
     public static let escape = "\u{1B}"
     /// CSI（Control Sequence Introducer）の `ESC [`。
     ///
-    /// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/)
-    ///   の「CSI - CONTROL SEQUENCE INTRODUCER」。
+    /// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/) の「CSI - CONTROL SEQUENCE INTRODUCER」。
     public static let csi = "\u{1B}["
     /// OSC（Operating System Command）の `ESC ]`。
     ///
-    /// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/)
-    ///   の「OSC - OPERATING SYSTEM COMMAND」。
+    /// - See: [ECMA-48: Control Functions for Coded Character Sets](https://ecma-international.org/publications-and-standards/standards/ecma-48/) の「OSC - OPERATING SYSTEM COMMAND」。
     public static let osc = "\u{1B}]"
     /// ``ANSI/osc`` で始めた `String` を終える `BEL`。
     public static let bell = "\u{07}"
@@ -52,16 +50,14 @@ public enum ANSI {
 
     /// 同期出力（DECSET 2026）を開始し、終了するまで画面の更新を保留させる。
     ///
-    /// - Note: 対応しない端末エミュレータは ``ANSI/beginSynchronizedUpdate`` を読み飛ばすため、
-    ///   送っても表示は変わらない。
+    /// - Note: 対応しない端末エミュレータは ``ANSI/beginSynchronizedUpdate`` を読み飛ばすため、送っても表示は変わらない。
     public static let beginSynchronizedUpdate = "\u{1B}[?2026h"
     /// 同期出力を終了し、保留していた更新をまとめて表示させる。
     public static let endSynchronizedUpdate = "\u{1B}[?2026l"
 
     /// 今のウィンドウタイトルとアイコン名を端末エミュレータのスタックへ積む。
     ///
-    /// - Note: タイトルのスタックに対応しない端末エミュレータは ``ANSI/saveWindowTitle`` を
-    ///   読み飛ばすため、積まれない。
+    /// - Note: タイトルのスタックに対応しない端末エミュレータは ``ANSI/saveWindowTitle`` を読み飛ばすため、積まれない。
     public static let saveWindowTitle = "\u{1B}[22;0t"
     /// 端末エミュレータのスタックからウィンドウタイトルとアイコン名を戻す。
     ///
@@ -80,8 +76,7 @@ public enum ANSI {
     public static let queryKeyboardProtocol = "\u{1B}[?u"
     /// 端末エミュレータの種別を問い合わせる。
     ///
-    /// - Note: どの端末エミュレータも `CSI ? <params> c` のバイト列を送ってくるため、
-    ///   先に送った問い合わせの応答が出揃ったことを知る目印に使える。
+    /// - Note: どの端末エミュレータも `CSI ? <params> c` のバイト列を送ってくるため、先に送った問い合わせの応答が出揃ったことを知る目印に使える。
     public static let queryDeviceAttributes = "\u{1B}[c"
 
     /// キーの曖昧さを解消する形式（kitty keyboard protocol の flag 1）でキーを受け取る。
@@ -130,9 +125,7 @@ public enum ANSI {
     ///   - text: クリップボードへ渡す文字列。空文字列を渡すとクリップボードを空にする。
     ///   - limit: Base64 に変換した後の長さの上限（バイト）。
     /// - Returns: クリップボードへ書き込む `String`。上限を超えるなら `nil`。
-    /// - Note: OSC 52 を既定で拒否する端末エミュレータがある（xterm の `allowWindowOps`、
-    ///   tmux の `set-clipboard`）。端末エミュレータは応答を送ってこないため、書き込めたかは
-    ///   TUIKit アプリから判別できない。
+    /// - Note: OSC 52 を既定で拒否する端末エミュレータがある（xterm の `allowWindowOps`、tmux の `set-clipboard`）。端末エミュレータは応答を送ってこないため、書き込めたかは TUIKit アプリから判別できない。
     public static func setClipboard(_ text: String, limit: Int = ANSI.clipboardLimit) -> String? {
         let encoded = Base64.encode(text)
         guard encoded.utf8.count <= limit else { return nil }

@@ -34,8 +34,7 @@ extension TerminalApp {
 
     /// ``Application`` を作って起動する。
     ///
-    /// - Note: ``Application/run()`` がエラーを投げた場合は、標準エラー出力へ理由を書き、
-    ///   終了コード 1 で抜ける。
+    /// - Note: ``Application/run()`` がエラーを投げた場合は、標準エラー出力へ理由を書き、終了コード 1 で抜ける。
     public static func main() async {
         do {
             try await Application<Self>.start()

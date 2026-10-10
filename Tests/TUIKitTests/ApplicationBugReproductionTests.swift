@@ -119,8 +119,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
     /// `ApplicationOptions.ambiguousWidth` が `.narrow` なら `BorderStyle.rounded` のまま、`.wide` なら `BorderStyle.ascii` で枠線が描かれる。
     func testApplicationDrawsBorderWithTheAmbiguousWidthOption() async throws {
-        // 枠全体（`╭──╮`）を探してはいけない。`Application` が最初にメソッドを呼び出す `View` は
-        // `Buffer` 全体に広がるので、角と角の間は `Buffer` の幅いっぱいまで続き、その並びは出力に現れない。
+        // 枠全体（`╭──╮`）を探してはいけない。`Application` が最初にメソッドを呼び出す `View` は `Buffer` 全体に広がるので、角と角の間は `Buffer` の幅いっぱいまで続き、その並びは出力に現れない。
         let cases: [(DisplayWidth.AmbiguousWidth, [String])] = [
             (.narrow, ["╭──", "│ab"]),
             (.wide, ["+--", "|ab"]),
@@ -415,8 +414,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         XCTAssertFalse(isCanonicalMode(slave), "raw モードになっていない")
 
-        // クラッシュのシグナルを送るとテストプロセスごと落ちるため、
-        // ハンドラが呼び出す `ctui_crash_restorer_restore()` を、`CrashRestorer.restoreTerminal()` から直接呼び出して確かめる。
+        // クラッシュのシグナルを送るとテストプロセスごと落ちるため、ハンドラが呼び出す `ctui_crash_restorer_restore()` を、`CrashRestorer.restoreTerminal()` から直接呼び出して確かめる。
         CrashRestorer.restoreTerminal()
 
         XCTAssertTrue(isCanonicalMode(slave), "クラッシュしても端末デバイスの termios が戻らない")

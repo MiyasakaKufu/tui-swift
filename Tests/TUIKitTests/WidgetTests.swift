@@ -260,8 +260,7 @@ final class WidgetTests: XCTestCase {
         XCTAssertTrue(state.handle(.mouse(down)))
         XCTAssertEqual(state.scrollOffset, 2)
 
-        // 同じ `ListView` を使い回して描画し直してはいけない。`ListState.itemCount` への代入が起きず、
-        // `Application.draw()` のたびに `ListView` を作る使い方で `ListState.scrollOffset` が保たれるかを試せなくなる。
+        // 同じ `ListView` を使い回して描画し直してはいけない。`ListState.itemCount` への代入が起きず、`Application.draw()` のたびに `ListView` を作る使い方で `ListState.scrollOffset` が保たれるかを試せなくなる。
         XCTAssertEqual(render(ListView(items: items, state: state), width: 5, height: 2), "  c  \n  d  ")
         XCTAssertEqual(state.scrollOffset, 2)
         XCTAssertEqual(state.selectedIndex, 0)

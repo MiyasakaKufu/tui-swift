@@ -179,9 +179,7 @@ final class AmbiguousWidthTests: XCTestCase {
         XCTAssertEqual(render(view, width: 4, height: 3, ambiguous: .wide), "+--+\n|ab|\n+--+")
     }
 
-    /// `ambiguous` 引数が `.wide` のとき、`ProgressBar.filledCharacter` の `█`（Ambiguous）は `Cell` 2 個分、
-    /// `ProgressBar.emptyCharacter` の `░`（Neutral）は `Cell` 1 個分になり、行の文字列の
-    /// `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` の戻り値は 10 のまま保たれる。
+    /// `ambiguous` 引数が `.wide` のとき、`ProgressBar.filledCharacter` の `█`（Ambiguous）は `Cell` 2 個分、`ProgressBar.emptyCharacter` の `░`（Neutral）は `Cell` 1 個分になり、行の文字列の `DisplayWidth.width(of: String, ambiguous: AmbiguousWidth)` の戻り値は 10 のまま保たれる。
     func testProgressBarKeepsRowWidthWhenAmbiguousIsWide() async {
         let bar = ProgressBar(value: 0.5)
         XCTAssertEqual(render(bar, width: 10, height: 1, ambiguous: .narrow), "█████░░░░░")

@@ -13,7 +13,6 @@ enum LoopEvent<Message: Sendable>: Sendable {
     case wake
     /// 自己パイプが無いときに、`poll(2)` の待ちを一定の間隔で切り上げたことを伝える合図。
     ///
-    /// シグナルのフラグとウィンドウサイズを読み直す。どちらも変わっていなければ、
-    /// ``Component/update(elapsed:)`` を呼び出さず、描き直さずに次を待つ。
+    /// シグナルのフラグとウィンドウサイズを読み直す。どちらも変わっていなければ、``Component/update(elapsed:)`` を呼び出さず、描き直さずに次を待つ。
     case idle
 }

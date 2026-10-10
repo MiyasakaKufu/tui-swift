@@ -33,15 +33,13 @@ public struct ApplicationOptions: Sendable {
     /// ``Component/handle(_:)`` が `.ignored` を返した Ctrl+C で ``Application`` を終了する。
     ///
     /// - Note: raw モードでは `ISIG` を無効にしているため Ctrl+C は SIGINT にならない。
-    ///   この設定がなければ、``Component/handle(_:)`` が `.quit` を返さない TUIKit アプリを
-    ///   端末エミュレータから止められなくなる。
+    ///   この設定がなければ、``Component/handle(_:)`` が `.quit` を返さない TUIKit アプリを端末エミュレータから止められなくなる。
     ///   ``Component/handle(_:)`` で Ctrl+C を扱う TUIKit アプリだけ `false` にする。
     public var quitsOnControlC: Bool
     /// ``Component/handle(_:)`` が `.ignored` を返した Ctrl+Z で TUIKit アプリを一時停止する。
     ///
     /// - Note: raw モードでは `ISIG` を無効にしているため Ctrl+Z は SIGTSTP にならない。
-    ///   この設定がなければ、端末デバイスの termios と、端末エミュレータへ送ったモードを戻さないまま止まるか、
-    ///   そもそも止まらない。``Component/handle(_:)`` で Ctrl+Z を扱う TUIKit アプリだけ `false` にする。
+    ///   この設定がなければ、端末デバイスの termios と、端末エミュレータへ送ったモードを戻さないまま止まるか、そもそも止まらない。``Component/handle(_:)`` で Ctrl+Z を扱う TUIKit アプリだけ `false` にする。
     public var suspendsOnControlZ: Bool
     /// East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。
     ///

@@ -11,8 +11,7 @@ enum OverlayLayout {
     ///   - horizontal: 横に寄せる向き。
     ///   - vertical: 縦に寄せる向き。
     ///   - context: ``ZStack`` などが `context` 引数で受け取った ``RenderContext``。
-    /// - Returns: `rect` に収まる、`child` の矩形。`child` の ``LayoutTraits/horizontalFlex``・
-    ///   ``LayoutTraits/verticalFlex`` が 1 以上の方向では `rect` いっぱいになる。
+    /// - Returns: `rect` に収まる、`child` の矩形。`child` の ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` が 1 以上の方向では `rect` いっぱいになる。
     static func childRect(
         for child: any View,
         index: Int,
@@ -36,8 +35,7 @@ enum OverlayLayout {
 
 /// 中の ``View`` を同じ矩形へ重ねて描く ``View``。
 ///
-/// ``ZStack/children`` の後ろにある ``View`` ほど手前に描かれる。下の ``View`` を確実に覆うには、重ねる ``View`` に
-/// ``View/background(style:)`` や ``Fill`` を使って領域を塗る。
+/// ``ZStack/children`` の後ろにある ``View`` ほど手前に描かれる。下の ``View`` を確実に覆うには、重ねる ``View`` に ``View/background(style:)`` や ``Fill`` を使って領域を塗る。
 public struct ZStack: PrimitiveView {
     /// 重ねる ``View``。先頭が最背面。
     public var children: [any View]
@@ -82,8 +80,7 @@ public struct ZStack: PrimitiveView {
     ///
     /// - Parameters:
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
-    /// - Returns: ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` のそれぞれに、中の ``View`` での最大をとった
-    ///   ``LayoutTraits``。
+    /// - Returns: ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` のそれぞれに、中の ``View`` での最大をとった ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         let traits = children.enumerated().map { context.layoutTraits(of: $1, index: $0) }
         return LayoutTraits(
@@ -135,8 +132,7 @@ public struct ZStack: PrimitiveView {
 
 /// ``OverlayView/content`` の上へ、レイアウトに加わらない ``OverlayView/overlay`` を重ねる ``View``。
 ///
-/// ``OverlayView/overlay`` は ``View/sizeThatFits(_:context:)`` の戻り値にも ``LayoutTraits`` にも加わらないため、
-/// ``OverlayView`` を ``RenderContext`` のメソッドに渡す ``View`` のレイアウトは、``OverlayView`` を挟んでも変わらない。
+/// ``OverlayView/overlay`` は ``View/sizeThatFits(_:context:)`` の戻り値にも ``LayoutTraits`` にも加わらないため、``OverlayView`` を ``RenderContext`` のメソッドに渡す ``View`` のレイアウトは、``OverlayView`` を挟んでも変わらない。
 public struct OverlayView<Content: View, Overlay: View>: PrimitiveView {
     /// 下に敷く ``View``。
     public var content: Content
@@ -208,14 +204,11 @@ public struct OverlayView<Content: View, Overlay: View>: PrimitiveView {
 
 /// ``ScreenOverlayView/content`` の上へ、画面全体を基準に置いた ``ScreenOverlayView/overlay`` を重ねる ``View``。
 ///
-/// ``ScreenOverlayView/overlay`` は ``View/render(into:rect:context:)`` の `rect` 引数の矩形ではなく ``RenderContext/screen`` を基準に配置されるため、
-/// 画面の中央へダイアログを出せる。
+/// ``ScreenOverlayView/overlay`` は ``View/render(into:rect:context:)`` の `rect` 引数の矩形ではなく ``RenderContext/screen`` を基準に配置されるため、画面の中央へダイアログを出せる。
 ///
 /// - Warning: ``ScreenOverlayView/overlay`` は ``View/render(into:rect:context:)`` に渡された矩形の外へも描く。
 ///   ``View`` が約束する「`rect` の外の ``Cell`` は書き換えない」から外れる唯一の ``View``。
-/// - Note: ``ScreenOverlayView/overlay`` が描かれるのは、``ScreenOverlayView`` が描かれた時点。後から描かれる ``View`` には
-///   上書きされるので、``ScreenOverlayView`` を、``Application`` が最初にメソッドを呼び出す ``View`` にする
-///   （``Component/body`` が ``View/screenOverlay(_:horizontal:vertical:)`` の戻り値を返すようにする）。
+/// - Note: ``ScreenOverlayView/overlay`` が描かれるのは、``ScreenOverlayView`` が描かれた時点。後から描かれる ``View`` には上書きされるので、``ScreenOverlayView`` を、``Application`` が最初にメソッドを呼び出す ``View`` にする（``Component/body`` が ``View/screenOverlay(_:horizontal:vertical:)`` の戻り値を返すようにする）。
 public struct ScreenOverlayView<Content: View, Overlay: View>: PrimitiveView {
     /// 下に敷く ``View``。
     public var content: Content
@@ -309,8 +302,7 @@ extension View {
     ///   - horizontal: `overlay` を画面の横方向で寄せる向き。
     ///   - vertical: `overlay` を画面の縦方向で寄せる向き。
     /// - Returns: 画面全体を基準に `overlay` を重ねた ``ScreenOverlayView``。
-    /// - Note: `overlay` が後から描かれる ``View`` に隠れないよう、``ScreenOverlayView`` を、``Application`` が最初にメソッドを
-    ///   呼び出す ``View`` にする（``Component/body`` がこのメソッドの戻り値を返すようにする）。
+    /// - Note: `overlay` が後から描かれる ``View`` に隠れないよう、``ScreenOverlayView`` を、``Application`` が最初にメソッドを呼び出す ``View`` にする（``Component/body`` がこのメソッドの戻り値を返すようにする）。
     public func screenOverlay<Overlay: View>(
         _ overlay: Overlay,
         horizontal: HorizontalAlignment = .center,

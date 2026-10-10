@@ -62,8 +62,7 @@ public final class Terminal: TerminalOutput {
 
     /// 端末デバイスの現在のウィンドウサイズを問い合わせる。
     ///
-    /// - Returns: 端末デバイスのウィンドウサイズ。問い合わせに失敗した場合は環境変数 `COLUMNS` / `LINES`、
-    ///   それも無ければ 80x24。
+    /// - Returns: 端末デバイスのウィンドウサイズ。問い合わせに失敗した場合は環境変数 `COLUMNS` / `LINES`、それも無ければ 80x24。
     public func size() -> Size {
         var columns: Int32 = 0
         var rows: Int32 = 0
@@ -89,20 +88,13 @@ public final class Terminal: TerminalOutput {
 
     /// canonical モードとエコーを無効にし、1 バイトずつ入力を受け取れるようにする。
     ///
-    /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、
-    ///   termios の取得・設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
+    /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、termios の取得・設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: raw モードへ入る前の termios を覚えるため、``Terminal/disableRawMode()`` で戻せる。
     ///   すでに raw モードなら何もしない。
-    /// - Note: クラッシュしても端末デバイスの termios と、端末エミュレータへ送ったモードが戻るよう、
-    ///   シグナルハンドラを仕掛ける。
-    /// - Note: ``Terminal/restore()`` を呼び出さずにこの ``Terminal`` を捨てた場合、
-    ///   端末デバイスの termios が戻り、端末エミュレータへ送ったモードを戻す `String` が書き出されるのは、
-    ///   プロセスが終わるときになる。その前に別の `Terminal` が raw モードへ入るか、
-    ///   ``Terminal/disableRawMode()``（``Terminal/restore()`` からも呼び出される）を呼び出すと戻らない。
+    /// - Note: クラッシュしても端末デバイスの termios と、端末エミュレータへ送ったモードが戻るよう、シグナルハンドラを仕掛ける。
+    /// - Note: ``Terminal/restore()`` を呼び出さずにこの ``Terminal`` を捨てた場合、端末デバイスの termios が戻り、端末エミュレータへ送ったモードを戻す `String` が書き出されるのは、プロセスが終わるときになる。その前に別の `Terminal` が raw モードへ入るか、``Terminal/disableRawMode()``（``Terminal/restore()`` からも呼び出される）を呼び出すと戻らない。
     ///   戻す先は 1 組しか覚えておけないため。捨てる前に ``Terminal/restore()`` を呼び出すこと。
-    ///   入出力のファイル記述子を閉じる前にも ``Terminal/restore()`` を呼び出すこと。呼び出さずに閉じると、
-    ///   プロセスが終わるときに、同じ番号を割り当てられた別のファイルへ
-    ///   モードを戻す `String` を書き込み、termios を設定しようとする。
+    ///   入出力のファイル記述子を閉じる前にも ``Terminal/restore()`` を呼び出すこと。呼び出さずに閉じると、プロセスが終わるときに、同じ番号を割り当てられた別のファイルへモードを戻す `String` を書き込み、termios を設定しようとする。
     public func enableRawMode() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
         guard !isRawModeActive else { return }
@@ -261,8 +253,7 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Parameters:
     ///   - enabled: 受け取るなら `true`。
-    /// - Note: 有効にすると、端末エミュレータがフォーカスを得たとき `ESC [ I`、失ったとき
-    ///   `ESC [ O` のバイト列を送ってくる。``InputParser`` はこれらを `.focus` として解釈する。
+    /// - Note: 有効にすると、端末エミュレータがフォーカスを得たとき `ESC [ I`、失ったとき `ESC [ O` のバイト列を送ってくる。``InputParser`` はこれらを `.focus` として解釈する。
     public func setFocusReportingEnabled(_ enabled: Bool) {
         guard enabled != isFocusReportingEnabled else { return }
         isFocusReportingEnabled = enabled
@@ -277,8 +268,7 @@ public final class Terminal: TerminalOutput {
     ///
     /// - Parameters:
     ///   - enabled: 有効にするなら `true`。
-    /// - Note: 対応しない端末エミュレータは ``ANSI/enableKeyboardProtocol`` を読み飛ばすため、
-    ///   有効にしても何も変わらない。
+    /// - Note: 対応しない端末エミュレータは ``ANSI/enableKeyboardProtocol`` を読み飛ばすため、有効にしても何も変わらない。
     ///   対応しているかは `ANSI.queryKeyboardProtocol` で問い合わせる。
     public func setKeyboardProtocolEnabled(_ enabled: Bool) {
         guard enabled != isKeyboardProtocolEnabled else { return }
@@ -326,12 +316,9 @@ public final class Terminal: TerminalOutput {
 
     /// 覚えている termios をもとに端末デバイスを raw モードへ戻し、覚えているモードを端末エミュレータへ送り直す。
     ///
-    /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、
-    ///   termios の設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
-    /// - Note: `deactivate()` の後だけでなく、捕まえられない SIGSTOP で止められた後のように、
-    ///   端末デバイスの termios や端末エミュレータのモードだけが失われた場合にも使える。
-    ///   端末デバイスの termios や端末エミュレータのモードが今どうなっているかは見ずに、毎回 termios を
-    ///   書き換え、モードを送り直す。
+    /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、termios の設定に失敗すれば `TerminalError.termiosFailed(errno:)`。
+    /// - Note: `deactivate()` の後だけでなく、捕まえられない SIGSTOP で止められた後のように、端末デバイスの termios や端末エミュレータのモードだけが失われた場合にも使える。
+    ///   端末デバイスの termios や端末エミュレータのモードが今どうなっているかは見ずに、毎回 termios を書き換え、モードを送り直す。
     public func reactivate() throws {
         guard isTerminal else { throw TerminalError.notATerminal }
 
@@ -392,8 +379,7 @@ public final class Terminal: TerminalOutput {
     }
 }
 
-// `Terminal` のメソッドにしてはいけない。`Terminal.write(_:)` が先に見つかり、
-// 自分自身を呼び出し続ける。
+// `Terminal` のメソッドにしてはいけない。`Terminal.write(_:)` が先に見つかり、自分自身を呼び出し続ける。
 
 /// `write(2)` を最後まで書き切るまで繰り返す。
 ///

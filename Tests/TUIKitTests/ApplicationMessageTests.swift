@@ -9,8 +9,7 @@ import XCTest
 import CTUITestSupport
 @testable import TUIKit
 
-/// `MessageSender` で送った値と、ループの外から呼び出した `Application.stop()`・`Application.suspend()` がループへ渡るかを、
-/// 疑似端末（pty）の上で確かめる。
+/// `MessageSender` で送った値と、ループの外から呼び出した `Application.stop()`・`Application.suspend()` がループへ渡るかを、疑似端末（pty）の上で確かめる。
 @MainActor
 final class ApplicationMessageTests: XCTestCase {
 
@@ -31,8 +30,7 @@ final class ApplicationMessageTests: XCTestCase {
         let sender = application.sender
         let loop = Task { try await application.run() }
 
-        // 最初の描画より前に送ってはいけない。`Application.run()` が始まる前に送ることになり、ループは待たずに
-        // 溜まった値を受け取るので、待っているループを起こせるのかを確かめられない。
+        // 最初の描画より前に送ってはいけない。`Application.run()` が始まる前に送ることになり、ループは待たずに溜まった値を受け取るので、待っているループを起こせるのかを確かめられない。
         let drewBeforeSending = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
 
@@ -294,8 +292,7 @@ final class ApplicationMessageTests: XCTestCase {
         let application = Application(root: component, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
-        // `Application.stop()` を最初の描画より前に呼び出してはいけない。`Application.run()` が始まる前に呼び出すことになり、
-        // `Application.run()` が `Application.isRunning` を立て直すので、ループが終わらない。
+        // `Application.stop()` を最初の描画より前に呼び出してはいけない。`Application.run()` が始まる前に呼び出すことになり、`Application.run()` が `Application.isRunning` を立て直すので、ループが終わらない。
         let drew = await waitUntil(timeout: 5) { component.hasDrawnOnce }
         XCTAssertTrue(drew, "最初の描画が終わらない")
 
@@ -493,8 +490,7 @@ private final class SlowUpdatingComponent: Component {
             keyWritten = Date()
             writeByte(master, UInt8(ascii: "a"))
         }
-        // `Thread.sleep` を外してはいけない。1 周が `ApplicationOptions.frameInterval` より短くなり、
-        // `.wake` が溜まる条件にならない。
+        // `Thread.sleep` を外してはいけない。1 周が `ApplicationOptions.frameInterval` より短くなり、`.wake` が溜まる条件にならない。
         Thread.sleep(forTimeInterval: updateDuration)
     }
 
@@ -511,8 +507,7 @@ private final class SlowUpdatingComponent: Component {
 
 /// テスト用の疑似端末。
 ///
-/// - Warning: master は `OutputReader` で読み続ける。読まずに溜まったバイト列がカーネルの上限に達すると、
-///   slave への `write(2)` や、出力の掃き出しを待つ `tcsetattr(TCSAFLUSH)` が戻らなくなる。
+/// - Warning: master は `OutputReader` で読み続ける。読まずに溜まったバイト列がカーネルの上限に達すると、slave への `write(2)` や、出力の掃き出しを待つ `tcsetattr(TCSAFLUSH)` が戻らなくなる。
 private final class PseudoTerminal {
     enum Failure: Error {
         case unavailable(errno: Int32)

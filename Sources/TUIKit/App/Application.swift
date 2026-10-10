@@ -6,8 +6,7 @@ import Darwin
 import Glibc
 #endif
 
-/// 端末デバイスを raw モードにし、``InputReader`` が端末デバイスから受け取ったバイト列を ``InputEvent`` にすることと
-/// ``Buffer`` を端末デバイスへ書き出すことを繰り返す型。
+/// 端末デバイスを raw モードにし、``InputReader`` が端末デバイスから受け取ったバイト列を ``InputEvent`` にすることと ``Buffer`` を端末デバイスへ書き出すことを繰り返す型。
 @MainActor
 public final class Application<Root: Component> {
 
@@ -63,8 +62,7 @@ public final class Application<Root: Component> {
     /// ループを終了させる。イベントハンドラの中からも呼び出せる。
     public func stop() {
         isRunning = false
-        // ループを起こさずに済ませてはいけない。`Task` から呼び出されたとき、ループは次の
-        // `LoopEvent` を待ったまま `isRunning` を読み直さず、キーが届くまで終わらない。
+        // ループを起こさずに済ませてはいけない。`Task` から呼び出されたとき、ループは次の `LoopEvent` を待ったまま `isRunning` を読み直さず、キーが届くまで終わらない。
         eventQueue.post(.wake)
     }
 
@@ -88,15 +86,13 @@ public final class Application<Root: Component> {
         terminal.setCursorShape(shape)
     }
 
-    /// 端末デバイスの termios と、端末エミュレータへ送ったモードを元に戻してプロセスを止め、
-    /// 再開したら設定し直す。
+    /// 端末デバイスの termios と、端末エミュレータへ送ったモードを元に戻してプロセスを止め、再開したら設定し直す。
     ///
     /// raw モードでは `ISIG` を無効にしているため、Ctrl+Z はシグナルにならずキーとして届く。
     /// 一時停止したい ``Component`` に準拠する型は、そのキーを受け取ったときにこのメソッドを呼び出す。
     ///
     /// - Postcondition: 再開したら画面全体を描き直し、改めて `.resize` を通知する。
-    /// - Note: `ApplicationOptions.suspendsOnControlZ` が有効なら、
-    ///   ``Component/handle(_:)`` が `.ignored` を返した Ctrl+Z で自動的に呼び出される。
+    /// - Note: `ApplicationOptions.suspendsOnControlZ` が有効なら、``Component/handle(_:)`` が `.ignored` を返した Ctrl+Z で自動的に呼び出される。
     public func suspend() {
         terminal.deactivate()
         stopProcess()
@@ -104,8 +100,7 @@ public final class Application<Root: Component> {
         _ = SignalWatcher.consumeSuspend()
         _ = SignalWatcher.consumeContinue()
         resumeTerminal()
-        // ループを起こさずに済ませてはいけない。`Task` から呼び出されたとき、次の `LoopEvent` が
-        // 届くまで描き直されず、再開した後の画面が空のまま残る。
+        // ループを起こさずに済ませてはいけない。`Task` から呼び出されたとき、次の `LoopEvent` が届くまで描き直されず、再開した後の画面が空のまま残る。
         eventQueue.post(.wake)
     }
 
@@ -124,8 +119,7 @@ public final class Application<Root: Component> {
 
     /// 端末デバイスを raw モードにし、端末エミュレータへ送るモードを切り替えて、終了するまでイベントループを回す。
     ///
-    /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、
-    ///   raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
+    /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの端末デバイスのウィンドウサイズで `.resize` を通知する。
     ///   戻るときは端末デバイスの termios と、端末エミュレータへ送ったモードを起動前へ戻し、カーソルを表示に戻す。
     /// - Precondition: 1 つの ``Application`` で呼び出せるのは 1 回だけ。
@@ -197,9 +191,7 @@ public final class Application<Root: Component> {
             }
 
             // SIGCONT の確認を消したり、`SignalWatcher.consumeSuspend()` の分岐の中へまとめたりしてはいけない。
-            // 捕まえられない SIGSTOP で止められたときは SIGTSTP のハンドラが動かず、
-            // `SignalWatcher.consumeSuspend()` が `true` にならない。再開しても `Application.resumeTerminal()` が呼び出されず、
-            // 端末デバイスの termios と、端末エミュレータへ送ったモードを設定し直さないまま描き続ける。
+            // 捕まえられない SIGSTOP で止められたときは SIGTSTP のハンドラが動かず、`SignalWatcher.consumeSuspend()` が `true` にならない。再開しても `Application.resumeTerminal()` が呼び出されず、端末デバイスの termios と、端末エミュレータへ送ったモードを設定し直さないまま描き続ける。
             if SignalWatcher.consumeContinue() {
                 isIdle = false
                 resumeTerminal()
@@ -210,9 +202,7 @@ public final class Application<Root: Component> {
             let sizeBeforeSynchronizing = reportedSize
             if !synchronizeSize() { break loop }
 
-            // 何も起きていない `.idle` で先へ進んではいけない。`ApplicationOptions.frameInterval` が `nil` でも
-            // `Component.update(elapsed:)` が一定の間隔で呼び出され、描き直すたびに `ANSI.beginSynchronizedUpdate` などが
-            // 端末デバイスへ書き出される。
+            // 何も起きていない `.idle` で先へ進んではいけない。`ApplicationOptions.frameInterval` が `nil` でも `Component.update(elapsed:)` が一定の間隔で呼び出され、描き直すたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
             if isIdle, reportedSize == sizeBeforeSynchronizing { continue loop }
 
             let now = monotonicSeconds()
@@ -252,12 +242,10 @@ public final class Application<Root: Component> {
         let emptyEvent: LoopEvent<Root.Message> = isFallingBack ? .idle : .wake
         let eventQueue = self.eventQueue
 
-        // まだ返していない分を引き渡さないと、`Application.supportsKeyboardProtocol()` の待ちの間に
-        // 届いたキーが落ちる。待ちの間に読んだ分は、`Application.supportsKeyboardProtocol()` が使った `Application.reader` が抱えている。
+        // まだ返していない分を引き渡さないと、`Application.supportsKeyboardProtocol()` の待ちの間に届いたキーが落ちる。待ちの間に読んだ分は、`Application.supportsKeyboardProtocol()` が使った `Application.reader` が抱えている。
         let unread = reader.takeUnreadState()
 
-        // `poll(2)` をアクタの上で呼び出してはいけない。キーが届くまでループが進まず、
-        // `MessageSender` で送られた値が処理されない。
+        // `poll(2)` をアクタの上で呼び出してはいけない。キーが届くまでループが進まず、`MessageSender` で送られた値が処理されない。
         // `InputReader` を外で作って渡すと、非 Sendable の参照がスレッドを跨ぐ。
         Thread.detachNewThread {
             let reader = InputReader(descriptor: descriptor)
@@ -309,9 +297,7 @@ public final class Application<Root: Component> {
                 suspend()
                 return isRunning
             }
-            // `ApplicationOptions.quits(onUnhandled:)` を見ずにループを続けてはいけない。raw モードでは `ISIG` を
-            // 切っているので、Ctrl+C は SIGINT にならずこの `InputEvent` として届く。`Component.handle(_:)` が
-            // Ctrl+C を扱わない TUIKit アプリを、`ApplicationOptions.quitsOnControlC` が `true` でも Ctrl+C で止められなくなる。
+            // `ApplicationOptions.quits(onUnhandled:)` を見ずにループを続けてはいけない。raw モードでは `ISIG` を切っているので、Ctrl+C は SIGINT にならずこの `InputEvent` として届く。`Component.handle(_:)` が Ctrl+C を扱わない TUIKit アプリを、`ApplicationOptions.quitsOnControlC` が `true` でも Ctrl+C で止められなくなる。
             return !options.quits(onUnhandled: event)
         }
     }

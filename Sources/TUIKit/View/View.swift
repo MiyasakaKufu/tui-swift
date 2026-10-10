@@ -1,7 +1,6 @@
 /// ``VStack``・``HStack`` が配ったあとに残る ``Size`` を引き取る割合を、横と縦の方向ごとに持つ型。
 ///
-/// ``LayoutTraits/flex(on:)`` が 0 の ``View`` は ``View/sizeThatFits(_:context:)`` の戻り値のまま配置され、
-/// 1 以上の ``View`` が、``VStack``・``HStack`` が配ったあとに残る ``Size`` を ``LayoutTraits/flex(on:)`` の値に応じて分け合う。
+/// ``LayoutTraits/flex(on:)`` が 0 の ``View`` は ``View/sizeThatFits(_:context:)`` の戻り値のまま配置され、1 以上の ``View`` が、``VStack``・``HStack`` が配ったあとに残る ``Size`` を ``LayoutTraits/flex(on:)`` の値に応じて分け合う。
 public struct LayoutTraits: Hashable, Sendable {
     /// 横方向の、``HStack`` が配ったあとに残る ``Size`` の幅を引き取る割合を表す整数。
     ///
@@ -44,8 +43,7 @@ public struct LayoutTraits: Hashable, Sendable {
 
 /// 画面へ描画できるもの。
 ///
-/// ``View`` に準拠する型には 2 種類ある。``View/body`` を持つ ``View``（``View/body`` で別の ``View`` を返す）と、
-/// ``PrimitiveView``（``View/body`` を持たず、``View/sizeThatFits(_:context:)`` と ``View/render(into:rect:context:)`` を自分で書く）。
+/// ``View`` に準拠する型には 2 種類ある。``View/body`` を持つ ``View``（``View/body`` で別の ``View`` を返す）と、``PrimitiveView``（``View/body`` を持たず、``View/sizeThatFits(_:context:)`` と ``View/render(into:rect:context:)`` を自分で書く）。
 ///
 /// ```swift
 /// struct Greeting: View {
@@ -57,14 +55,9 @@ public struct LayoutTraits: Hashable, Sendable {
 /// }
 /// ```
 ///
-/// ``View/body`` を持つ ``View`` は ``View/body`` だけを書けばよい。``View/sizeThatFits(_:context:)``・``View/render(into:rect:context:)``・
-/// ``View/layoutTraits(context:)`` のデフォルトの実装は、``View/body`` を `child` 引数として ``RenderContext`` の同じ名前のメソッド
-/// （``RenderContext/sizeThatFits(of:index:proposal:)`` など）に渡す。
+/// ``View/body`` を持つ ``View`` は ``View/body`` だけを書けばよい。``View/sizeThatFits(_:context:)``・``View/render(into:rect:context:)``・``View/layoutTraits(context:)`` のデフォルトの実装は、``View/body`` を `child` 引数として ``RenderContext`` の同じ名前のメソッド（``RenderContext/sizeThatFits(of:index:proposal:)`` など）に渡す。
 ///
-/// 別の ``View`` の ``View/sizeThatFits(_:context:)``・``View/render(into:rect:context:)``・``View/layoutTraits(context:)`` は
-/// 直接呼び出さない。`context` 引数で受け取った ``RenderContext`` の ``RenderContext/sizeThatFits(of:index:proposal:)``・
-/// ``RenderContext/render(_:index:into:rect:)``・``RenderContext/layoutTraits(of:index:)`` に、その ``View`` を
-/// `child` 引数として渡して呼び出す。
+/// 別の ``View`` の ``View/sizeThatFits(_:context:)``・``View/render(into:rect:context:)``・``View/layoutTraits(context:)`` は直接呼び出さない。`context` 引数で受け取った ``RenderContext`` の ``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/render(_:index:into:rect:)``・``RenderContext/layoutTraits(of:index:)`` に、その ``View`` を `child` 引数として渡して呼び出す。
 @MainActor
 public protocol View {
     /// ``View/body`` が返す ``View`` の型。``View`` に準拠する型が `some View` で書けば推論される。``PrimitiveView`` では `Never`。
@@ -72,9 +65,7 @@ public protocol View {
 
     /// この ``View`` を組み立てる ``View``。
     ///
-    /// - Note: `Application.draw()` の 1 回のうちに、``View/sizeThatFits(_:context:)`` と ``View/render(into:rect:context:)`` で
-    ///   何度も値を取得される。取得するたびに違う ``View`` を返すと、``View/sizeThatFits(_:context:)`` で測った ``View`` と
-    ///   ``View/render(into:rect:context:)`` で描いた ``View`` が食い違う。
+    /// - Note: `Application.draw()` の 1 回のうちに、``View/sizeThatFits(_:context:)`` と ``View/render(into:rect:context:)`` で何度も値を取得される。取得するたびに違う ``View`` を返すと、``View/sizeThatFits(_:context:)`` で測った ``View`` と ``View/render(into:rect:context:)`` で描いた ``View`` が食い違う。
     var body: Body { get }
 
     /// `proposal` の範囲で、この ``View`` の ``Size`` を返す。
@@ -83,9 +74,7 @@ public protocol View {
     ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: この ``View`` の ``Size``。
-    /// - Note: 戻り値は `proposal` を超えてもよい。超えた分は、``VStack``・``HStack``・``ZStack``・``AlignedView`` などが、
-    ///   この ``View`` の ``View/render(into:rect:context:)`` に渡す `rect` 引数の矩形を、自分の `rect` 引数の矩形に
-    ///   収めるときに切り詰める。
+    /// - Note: 戻り値は `proposal` を超えてもよい。超えた分は、``VStack``・``HStack``・``ZStack``・``AlignedView`` などが、この ``View`` の ``View/render(into:rect:context:)`` に渡す `rect` 引数の矩形を、自分の `rect` 引数の矩形に収めるときに切り詰める。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size
 
     /// `rect` の領域へ描画する。
@@ -94,8 +83,7 @@ public protocol View {
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
-    /// - Postcondition: `rect` の外の ``Cell`` は書き換えない。`context.screen` を基準に重ねる
-    ///   `ScreenOverlayView` だけが、この約束から外れる。
+    /// - Postcondition: `rect` の外の ``Cell`` は書き換えない。`context.screen` を基準に重ねる `ScreenOverlayView` だけが、この約束から外れる。
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext)
 
     /// この ``View`` の ``LayoutTraits`` を返す。
@@ -311,13 +299,11 @@ public struct Divider: PrimitiveView {
         self.style = style
     }
 
-    /// ``Divider/axis`` が `.horizontal` なら ``LayoutTraits/horizontalFlex`` だけが 1、`.vertical` なら ``LayoutTraits/verticalFlex`` だけが 1 の
-    /// ``LayoutTraits`` を返す。
+    /// ``Divider/axis`` が `.horizontal` なら ``LayoutTraits/horizontalFlex`` だけが 1、`.vertical` なら ``LayoutTraits/verticalFlex`` だけが 1 の ``LayoutTraits`` を返す。
     ///
     /// - Parameters:
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
-    /// - Returns: ``Divider/axis`` が `.horizontal` なら ``LayoutTraits/horizontalFlex`` だけが 1、`.vertical` なら ``LayoutTraits/verticalFlex`` だけが 1 の
-    ///   ``LayoutTraits``。
+    /// - Returns: ``Divider/axis`` が `.horizontal` なら ``LayoutTraits/horizontalFlex`` だけが 1、`.vertical` なら ``LayoutTraits/verticalFlex`` だけが 1 の ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         switch axis {
         case .horizontal: return LayoutTraits(horizontalFlex: 1, verticalFlex: 0)
@@ -330,8 +316,7 @@ public struct Divider: PrimitiveView {
     /// - Parameters:
     ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
-    /// - Returns: ``Divider/axis`` が `.horizontal` なら幅が `proposal.width` で高さが 1、
-    ///   `.vertical` なら幅が 1 で高さが `proposal.height` の ``Size``。
+    /// - Returns: ``Divider/axis`` が `.horizontal` なら幅が `proposal.width` で高さが 1、`.vertical` なら幅が 1 で高さが `proposal.height` の ``Size``。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         switch axis {
         case .horizontal: return Size(width: proposal.width, height: 1)

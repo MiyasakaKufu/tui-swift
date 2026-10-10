@@ -54,8 +54,7 @@ int ctui_restore_signal_handler(int signal_number, const struct sigaction *previ
 ///   - sequence: 端末エミュレータへ送ったモードを戻すために書き出すバイト列。
 ///   - length: `sequence` のバイト数。
 /// - Returns: 成功なら 0、`sequence` を写す領域を確保できなければ -1。
-/// - Note: 仕掛けられるのは一組だけ。二度目からは記述子と termios が上書きされ、
-///   `sequence` は初めに渡したものが使われ続ける。
+/// - Note: 仕掛けられるのは一組だけ。二度目からは記述子と termios が上書きされ、`sequence` は初めに渡したものが使われ続ける。
 int ctui_crash_restorer_arm(int input,
                             int output,
                             const struct termios *attributes,

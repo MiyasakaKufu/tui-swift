@@ -37,9 +37,7 @@ enum StackLayout {
             minimumProposal = Size(width: 0, height: crossAvailable)
         }
 
-        // `LayoutTraits.flex(on:)` の値が 1 以上の `View` にも `proposal` を渡してはいけない。`proposal` の主軸方向の
-        // 長さをそのまま返す `View`（`HStack` の中の `TextField` など）が `content` を使い切り、後ろの `View` は
-        // `StackLayout.shrink(by:sizes:)` で 0 まで削られる。
+        // `LayoutTraits.flex(on:)` の値が 1 以上の `View` にも `proposal` を渡してはいけない。`proposal` の主軸方向の長さをそのまま返す `View`（`HStack` の中の `TextField` など）が `content` を使い切り、後ろの `View` は `StackLayout.shrink(by:sizes:)` で 0 まで削られる。
         var sizes = children.enumerated().map { (index, child) -> Int in
             let isFlexible = context.layoutTraits(of: child, index: index).flex(on: axis) > 0
             let desired = context.sizeThatFits(
@@ -156,8 +154,7 @@ public struct VStack: PrimitiveView {
     ///
     /// - Parameters:
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
-    /// - Returns: ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` のそれぞれに、中の ``View`` での最大をとった
-    ///   ``LayoutTraits``。
+    /// - Returns: ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` のそれぞれに、中の ``View`` での最大をとった ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         let traits = children.enumerated().map { context.layoutTraits(of: $1, index: $0) }
         return LayoutTraits(
@@ -271,8 +268,7 @@ public struct HStack: PrimitiveView {
     ///
     /// - Parameters:
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
-    /// - Returns: ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` のそれぞれに、中の ``View`` での最大をとった
-    ///   ``LayoutTraits``。
+    /// - Returns: ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` のそれぞれに、中の ``View`` での最大をとった ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
         let traits = children.enumerated().map { context.layoutTraits(of: $1, index: $0) }
         return LayoutTraits(

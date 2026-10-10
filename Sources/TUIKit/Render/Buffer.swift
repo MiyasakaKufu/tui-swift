@@ -33,8 +33,7 @@ public struct Buffer: Hashable, Sendable {
     /// - Parameters:
     ///   - x: 横方向の位置。左端が 0。
     ///   - y: 行。上端が 0。
-    /// - Postcondition: 全角文字が占める ``Cell`` 2 個のうち片方だけを書き換えたとき、対にならなくなった
-    ///   残りの ``Cell`` は空白になる。
+    /// - Postcondition: 全角文字が占める ``Cell`` 2 個のうち片方だけを書き換えたとき、対にならなくなった残りの ``Cell`` は空白になる。
     /// - Note: 範囲外の読み取りは `.empty` を返し、範囲外への書き込みは無視される。
     public subscript(x: Int, y: Int) -> Cell {
         get {
@@ -43,8 +42,7 @@ public struct Buffer: Hashable, Sendable {
         }
         set {
             guard x >= 0, y >= 0, x < size.width, y < size.height else { return }
-            // この 2 つの分岐を外して代入だけに戻してはいけない。全角文字の片方の `Cell` だけが残ると、
-            // 端末エミュレータはそれを `Cell` 2 個分で描くので、その行のそれより右の `Cell` がずれる。
+            // この 2 つの分岐を外して代入だけに戻してはいけない。全角文字の片方の `Cell` だけが残ると、端末エミュレータはそれを `Cell` 2 個分で描くので、その行のそれより右の `Cell` がずれる。
             if !newValue.isContinuation, x > 0, cells[y * size.width + x].isContinuation {
                 blankCell(atColumn: x - 1, row: y)
             }
@@ -201,8 +199,7 @@ public struct Buffer: Hashable, Sendable {
                 continue
             }
 
-            // 端末エミュレータは全角文字を半分だけ描けない。領域の端に半分だけかかる文字を、
-            // その文字で埋めてはいけない。
+            // 端末エミュレータは全角文字を半分だけ描けない。領域の端に半分だけかかる文字を、その文字で埋めてはいけない。
             if x >= region.minX {
                 if characterWidth == 2 {
                     if x + 1 < region.maxX {

@@ -13,8 +13,7 @@ int ctui_test_open_pty(int *master, int *slave);
 /// 端末デバイスのウィンドウサイズを設定する。
 ///
 /// - Parameters:
-///   - fd: pseudo-terminal の manager device か subsidiary device のファイル記述子。どちらを渡しても、
-///     subsidiary device（端末デバイス）のウィンドウサイズが変わる。
+///   - fd: pseudo-terminal の manager device か subsidiary device のファイル記述子。どちらを渡しても、subsidiary device（端末デバイス）のウィンドウサイズが変わる。
 ///   - columns: 横方向の `Cell` の数（`ws_col`）。
 ///   - rows: 行数。
 /// - Returns: 成功なら 0、失敗なら -1。

@@ -32,8 +32,7 @@ public final class Renderer {
             out += ANSI.clearScreen
         }
 
-        // 上の `ANSI.reset` を外すか、`currentStyle` の初期値を変えてはいけない。端末エミュレータの SGR と
-        // `currentStyle` が食い違い、`Style.sgrSequence(transitioningFrom:)` が最初の `Cell` の SGR を省く。
+        // 上の `ANSI.reset` を外すか、`currentStyle` の初期値を変えてはいけない。端末エミュレータの SGR と `currentStyle` が食い違い、`Style.sgrSequence(transitioningFrom:)` が最初の `Cell` の SGR を省く。
         var currentStyle = Style.plain
         var cursorRow = -1
         var cursorColumn = -1
@@ -74,8 +73,7 @@ public final class Renderer {
                 while column < width {
                     let cell = buffer[column, y]
                     if cell.isContinuation {
-                        // この `Cell` の `Cell.character` を書き出してはいけない。直前の全角文字で端末エミュレータの
-                        // カーソルはこの `Cell` の先へ進んでいるので、その行の右側の `Cell` がずれる。
+                        // この `Cell` の `Cell.character` を書き出してはいけない。直前の全角文字で端末エミュレータのカーソルはこの `Cell` の先へ進んでいるので、その行の右側の `Cell` がずれる。
                         column += 1
                         continue
                     }
@@ -105,8 +103,7 @@ public final class Renderer {
         out += ANSI.endSynchronizedUpdate
 
         previous = buffer
-        // `out` を分けて書き出してはいけない。`ANSI.endSynchronizedUpdate` を書き出す前に止まると、
-        // 端末エミュレータは更新を保留したまま待ち続ける。
+        // `out` を分けて書き出してはいけない。`ANSI.endSynchronizedUpdate` を書き出す前に止まると、端末エミュレータは更新を保留したまま待ち続ける。
         output.write(out)
         output.flush()
     }

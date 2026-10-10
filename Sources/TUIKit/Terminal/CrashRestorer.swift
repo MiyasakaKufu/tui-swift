@@ -22,19 +22,14 @@ enum CrashRestorer {
         + ANSI.disableBracketedPaste
         + ANSI.disableFocusReporting
         + ANSI.exitAlternateScreen
-        // `Terminal.deactivate()` のように、`Terminal.setCursorShape(_:)` や
-        // `Terminal.setWindowTitle(_:)` を呼び出したときだけ送る形にはできない。`CrashRestorer.restoreSequence` は
-        // 仕掛けるときに組み立てるので、後から呼び出されたかどうかを織り込めない。呼び出して
-        // いなければタイトルのスタックは空なので、`ANSI.restoreWindowTitle` を送っても何も起きない。
-        // `ANSI.setCursorShape(.default)` は、起動前に変えられていたカーソルの形も端末エミュレータの
-        // デフォルトへ戻す。
+        // `Terminal.deactivate()` のように、`Terminal.setCursorShape(_:)` や `Terminal.setWindowTitle(_:)` を呼び出したときだけ送る形にはできない。`CrashRestorer.restoreSequence` は仕掛けるときに組み立てるので、後から呼び出されたかどうかを織り込めない。呼び出していなければタイトルのスタックは空なので、`ANSI.restoreWindowTitle` を送っても何も起きない。
+        // `ANSI.setCursorShape(.default)` は、起動前に変えられていたカーソルの形も端末エミュレータのデフォルトへ戻す。
         + ANSI.setCursorShape(.default)
         + ANSI.restoreWindowTitle
         + ANSI.reset
         + ANSI.showCursor
 
-    /// クラッシュしたときとプロセスが終わるときに、端末デバイスの termios を戻し、
-    /// `CrashRestorer.restoreSequence` を書き出すよう仕掛ける。
+    /// クラッシュしたときとプロセスが終わるときに、端末デバイスの termios を戻し、`CrashRestorer.restoreSequence` を書き出すよう仕掛ける。
     ///
     /// - Parameters:
     ///   - input: 端末デバイスの termios を戻すファイル記述子。

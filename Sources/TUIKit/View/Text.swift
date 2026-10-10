@@ -10,8 +10,7 @@ public struct Text: PrimitiveView {
     public var alignment: HorizontalAlignment
     /// タブストップの間隔（``Cell`` の数）。
     ///
-    /// タブは、``Text/content`` を改行で区切った行の先頭から（折り返す前に）数えた ``Cell`` の数が、次にこの値の倍数になる
-    /// 位置まで空白で埋められる。0 以下なら、タブは取り除かれる。
+    /// タブは、``Text/content`` を改行で区切った行の先頭から（折り返す前に）数えた ``Cell`` の数が、次にこの値の倍数になる位置まで空白で埋められる。0 以下なら、タブは取り除かれる。
     public var tabSize: Int
 
     /// 文字列と見た目を指定して ``Text`` を作る。

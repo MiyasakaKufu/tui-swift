@@ -1,8 +1,6 @@
 /// 1 行のテキスト入力（``TextField``）が使うクラス。
 ///
-/// 内容（``TextFieldState/text``）とカーソル位置（``TextFieldState/cursor``）を扱う。内容は自分で持つか、
-/// `TextField(text:state:placeholder:style:placeholderStyle:showsCursor:)` に ``Binding`` で渡すプロパティを
-/// 読み書きする。カーソル位置はどちらの場合もここに置く。
+/// 内容（``TextFieldState/text``）とカーソル位置（``TextFieldState/cursor``）を扱う。内容は自分で持つか、`TextField(text:state:placeholder:style:placeholderStyle:showsCursor:)` に ``Binding`` で渡すプロパティを読み書きする。カーソル位置はどちらの場合もここに置く。
 ///
 /// - Invariant: 内容もカーソル位置も書記素クラスタ（`Character`）単位で、
 ///   国旗や ZWJ で結合した絵文字も 1 文字として数える。
@@ -24,10 +22,7 @@ public final class TextFieldState {
                 return
             }
             let text = String(newValue)
-            // 比べずに書き戻したくなるが、先頭での Ctrl+U のように何も変えない編集でも
-            // `Binding` で渡すプロパティへ代入される。TUIKit を使う開発者が、`Binding(_:_:)` にキーパスで
-            // 渡したプロパティや、`Binding(get:set:)` の `set` で代入するプロパティに `didSet` を書いていれば、
-            // 値が変わらないのに `didSet` が呼び出される。
+            // 比べずに書き戻したくなるが、先頭での Ctrl+U のように何も変えない編集でも `Binding` で渡すプロパティへ代入される。TUIKit を使う開発者が、`Binding(_:_:)` にキーパスで渡したプロパティや、`Binding(get:set:)` の `set` で代入するプロパティに `didSet` を書いていれば、値が変わらないのに `didSet` が呼び出される。
             guard text != textBinding.wrappedValue else { return }
             textBinding.wrappedValue = text
         }
@@ -35,8 +30,7 @@ public final class TextFieldState {
 
     /// カーソルの文字インデックス（0 〜 文字数）。
     ///
-    /// - Note: ``Binding`` で渡すプロパティが ``TextFieldState`` の外で書き換えられ、カーソル位置より
-    ///   短くなると、カーソルは末尾に来る。
+    /// - Note: ``Binding`` で渡すプロパティが ``TextFieldState`` の外で書き換えられ、カーソル位置より短くなると、カーソルは末尾に来る。
     public var cursor: Int {
         min(storedCursor, characters.count)
     }
@@ -44,8 +38,7 @@ public final class TextFieldState {
     /// 直前の描画でカーソルを置いた画面上の位置。まだ描画していなければ `nil`。
     ///
     /// - Note: IME の変換中の文字と変換候補の一覧は、端末エミュレータが本物のカーソル位置に表示する。
-    ///   入力欄にフォーカスがある間、`Component.cursorPosition` でこの値を返すと、
-    ///   変換中の文字が入力欄の上に出る。返さなければ ``Renderer`` が最後に書き込んだ位置に出る。
+    ///   入力欄にフォーカスがある間、`Component.cursorPosition` でこの値を返すと、変換中の文字が入力欄の上に出る。返さなければ ``Renderer`` が最後に書き込んだ位置に出る。
     public internal(set) var renderedCursorPoint: Point?
 
     /// 初期の文字列を指定して ``TextFieldState`` を作る。
@@ -310,8 +303,7 @@ public struct TextField: PrimitiveView {
     public var style: Style
     /// プレースホルダのスタイル。
     public var placeholderStyle: Style
-    /// カーソル位置を反転表示する（``TerminalApp`` に準拠する型が ``Component/cursorPosition`` で
-    /// 端末エミュレータのカーソルを出す場合は `false`）。
+    /// カーソル位置を反転表示する（``TerminalApp`` に準拠する型が ``Component/cursorPosition`` で端末エミュレータのカーソルを出す場合は `false`）。
     public var showsCursor: Bool
 
     /// ``Binding`` で渡すプロパティの文字列を編集する ``TextField`` を作る。
@@ -437,8 +429,7 @@ public struct TextField: PrimitiveView {
                 style: placeholderStyle,
                 clippedTo: row
             )
-            // プレースホルダを表示している間はカーソルを置かずに済ませたくなるが、置かないと
-            // 空の入力欄のどこに入力されるかが見えない。
+            // プレースホルダを表示している間はカーソルを置かずに済ませたくなるが、置かないと空の入力欄のどこに入力されるかが見えない。
             placeCursor(into: &buffer, at: Point(x: rect.minX, y: rect.minY), in: rect)
             return
         }
