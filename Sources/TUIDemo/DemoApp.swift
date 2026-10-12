@@ -22,47 +22,22 @@ final class DemoApp: TerminalApp {
         "枠線とタイトル",
         "ListView のスクロール",
         "TextField での入力",
+        "Tab とクリックによるフォーカスの移動",
         "ウィンドウサイズ変更への追従",
         "View の重ね描きとダイアログ",
     ]
 
-    private var selection = 0
-    private let listState = ListState()
-    private let inputState = TextFieldState()
     private var progress = 0.35
     private var lastEventDescription = "（まだ入力はありません）"
-    private var isEditing = false
-    private var isShowingDialog = false
     private var terminalSize = Size(width: 0, height: 0)
 
     var body: some View {
-        VStack(spacing: 0) {
-            Header()
-            HStack(spacing: 1) {
-                ListView(items: items, selection: Binding(self, \.selection), state: listState)
-                    .padding(horizontal: 1)
-                    .border(.rounded, title: "機能一覧")
-                    .flexible(horizontal: 2, vertical: 1)
-
-                Detail(
-                    selected: items.indices.contains(selection) ? items[selection] : "-",
-                    terminalSize: terminalSize,
-                    lastEventDescription: lastEventDescription,
-                    progress: progress,
-                    isEditing: isEditing,
-                    inputState: inputState
-                )
-                    .border(.rounded, title: "詳細")
-                    .flexible(horizontal: 3, vertical: 1)
-            }
-            .flexible(horizontal: 1, vertical: 1)
-            Footer()
-        }
-        .screenOverlay(Dialog(isShowing: isShowingDialog))
-    }
-
-    var cursorPosition: Point? {
-        isEditing ? inputState.renderedCursorPoint : nil
+        DemoScreen(
+            items: items,
+            progress: progress,
+            lastEventDescription: lastEventDescription,
+            terminalSize: terminalSize
+        )
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -73,48 +48,19 @@ final class DemoApp: TerminalApp {
             return .handled
         }
 
-        if isShowingDialog {
-            if case .key = event {
-                isShowingDialog = false
-                return .handled
-            }
+        guard case .key(let keyEvent) = event else { return .ignored }
+        switch keyEvent.key {
+        case .character("q"), .escape:
+            return .quit
+        case .character("+"):
+            progress = min(1.0, progress + 0.05)
+            return .handled
+        case .character("-"):
+            progress = max(0.0, progress - 0.05)
+            return .handled
+        default:
             return .ignored
         }
-
-        if case .key(let keyEvent) = event {
-            if keyEvent.key == .tab {
-                isEditing.toggle()
-                return .handled
-            }
-            if isEditing {
-                if keyEvent.key == .escape {
-                    isEditing = false
-                    return .handled
-                }
-                return inputState.handle(event) ? .handled : .ignored
-            }
-            switch keyEvent.key {
-            case .character("q"), .escape:
-                return .quit
-            case .character("d"):
-                isShowingDialog = true
-                return .handled
-            case .character("+"):
-                progress = min(1.0, progress + 0.05)
-                return .handled
-            case .character("-"):
-                progress = max(0.0, progress - 0.05)
-                return .handled
-            default:
-                break
-            }
-        }
-
-        if isEditing, case .paste = event {
-            return inputState.handle(event) ? .handled : .ignored
-        }
-
-        return listState.handle(event) ? .handled : .ignored
     }
 
     private func describe(_ event: InputEvent) -> String {
@@ -160,55 +106,114 @@ private struct Header: View {
     }
 }
 
-/// 選択中の項目と入力の状態を並べる欄。
-private struct Detail: View {
-    let selected: String
-    let terminalSize: Size
-    let lastEventDescription: String
+/// 機能一覧と詳細を並べ、ダイアログを重ねる画面。
+private struct DemoScreen: View {
+    enum Field: Hashable {
+        case list
+        case name
+        case note
+    }
+
+    let items: [String]
     let progress: Double
-    let isEditing: Bool
-    let inputState: TextFieldState
-    @State var name = ""
+    let lastEventDescription: String
+    let terminalSize: Size
+
+    @State private var selection = 0
+    @State private var name = ""
+    @State private var note = ""
+    @State private var listState = ListState()
+    @State private var nameState = TextFieldState()
+    @State private var noteState = TextFieldState()
+    @State private var isShowingDialog = false
+    @FocusState private var focusedField: Field?
 
     var body: some View {
+        VStack(spacing: 0) {
+            Header()
+            HStack(spacing: 1) {
+                ListView(items: items, selection: $selection, state: listState)
+                    .padding(horizontal: 1)
+                    .border(.rounded, style: borderStyle(for: .list), title: "機能一覧")
+                    .focused($focusedField, equals: .list)
+                    .onKeyPress(.character("d")) {
+                        isShowingDialog = true
+                        return .handled
+                    }
+                    .flexible(horizontal: 2, vertical: 1)
+
+                detail
+                    .border(.rounded, title: "詳細")
+                    .flexible(horizontal: 3, vertical: 1)
+            }
+            .flexible(horizontal: 1, vertical: 1)
+            Footer()
+        }
+        .sheet(isPresented: $isShowingDialog) {
+            Dialog(isShowing: $isShowingDialog)
+        }
+    }
+
+    /// 選択中の項目と入力の状態を並べる欄。
+    private var detail: some View {
         VStack(spacing: 1) {
-            Text("選択中: \(selected)", wrap: .word).bold()
+            Text("選択中: \(items.indices.contains(selection) ? items[selection] : "-")", wrap: .word).bold()
             Text("ウィンドウサイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
-            Text("直前のイベント: \(lastEventDescription)", wrap: .word)
+            Text("Component.handle(_:) に届いた入力: \(lastEventDescription)", wrap: .word)
 
             VStack(spacing: 0) {
-                Text("進捗（+ / - で増減）").dim()
+                Text("進捗（一覧で + / - を押すと増減）").dim()
                 ProgressBar(value: progress, showsPercentage: true)
             }
 
             VStack(spacing: 0) {
-                Text(isEditing ? "入力中（Tab で戻る）" : "Tab で入力に切り替え").dim()
-                Text("入力した文字数: \(name.count)").dim()
-                TextField(
-                    text: $name,
-                    state: inputState,
-                    placeholder: "ここに入力…",
-                    showsCursor: !isEditing
-                )
+                Text("名前（\(name.count) 文字）").dim()
+                TextField(text: $name, state: nameState, placeholder: "ここに入力…")
                     .padding(horizontal: 1)
-                    .border(.single, style: Style(foreground: isEditing ? .yellow : .brightBlack))
+                    .border(.single, style: borderStyle(for: .name))
+                    .focused($focusedField, equals: .name)
+                    .onKeyPress(.enter) {
+                        focusedField = .note
+                        return .handled
+                    }
+            }
+
+            VStack(spacing: 0) {
+                Text("メモ（Enter で一覧へ戻る）").dim()
+                TextField(text: $note, state: noteState, placeholder: "ここに入力…")
+                    .padding(horizontal: 1)
+                    .border(.single, style: borderStyle(for: .note))
+                    .focused($focusedField, equals: .note)
+                    .onKeyPress(.enter) {
+                        focusedField = .list
+                        return .handled
+                    }
             }
 
             Spacer()
         }
         .padding(horizontal: 1)
     }
+
+    /// `field` がフォーカスを持つ間だけ色を付けた、枠線の ``Style`` を返す。
+    ///
+    /// - Parameters:
+    ///   - field: 枠線で囲む欄。
+    /// - Returns: 枠線の ``Style``。
+    private func borderStyle(for field: Field) -> Style {
+        Style(foreground: focusedField == field ? .yellow : .brightBlack)
+    }
 }
 
 /// 画面下端の操作の一覧。
 private struct Footer: View {
     private let hints = [
+        "Tab / クリック 移動",
         "↑↓/jk 選択",
         "ホイール スクロール",
-        "Tab 切り替え",
-        "d ダイアログ",
+        "d ダイアログ（一覧で）",
         "Ctrl+Z 一時停止",
-        "q 終了",
+        "Esc 終了",
     ]
 
     var body: some View {
@@ -225,22 +230,28 @@ private struct Footer: View {
 
 /// 画面の中央に重ねるダイアログ。
 private struct Dialog: View {
-    let isShowing: Bool
+    let isShowing: Binding<Bool>
+    @State private var buttonState = ListState()
 
     var body: some View {
         let textStyle = Style(foreground: .brightWhite, background: .blue)
-        return ZStack {
-            if isShowing {
-                VStack(spacing: 1, alignment: .center) {
-                    Text("画面の中央に重ねたダイアログです。", style: textStyle, wrap: .word)
-                    Text("下に敷いた全角文字を覆っても、その右に続く文字の位置はずれません。", style: textStyle, wrap: .word)
-                    Text("Enter か Esc で閉じる", style: textStyle).dim()
+        return VStack(spacing: 1, alignment: .center) {
+            Text("View.sheet(isPresented:content:) で重ねたダイアログです。", style: textStyle, wrap: .word)
+            Text("表示している間、後ろの欄へは入力が渡りません。", style: textStyle, wrap: .word)
+            ListView(items: ["閉じる"], state: buttonState, selectionMarker: "")
+                .frame(width: 6, height: 1)
+                .onKeyPress(.enter) {
+                    isShowing.wrappedValue = false
+                    return .handled
                 }
-                .padding(horizontal: 2, vertical: 1)
-                .border(.double, style: Style(foreground: .yellow, background: .blue), title: "ダイアログ")
-                .background(style: Style(background: .blue))
-                .frame(width: 44, height: 9)
-            }
+                .onKeyPress(.escape) {
+                    isShowing.wrappedValue = false
+                    return .handled
+                }
         }
+        .padding(horizontal: 2, vertical: 1)
+        .border(.double, style: Style(foreground: .yellow, background: .blue), title: "ダイアログ")
+        .background(style: Style(background: .blue))
+        .frame(width: 48, height: 11)
     }
 }

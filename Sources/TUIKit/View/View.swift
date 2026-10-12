@@ -263,6 +263,7 @@ public struct Fill: PrimitiveView {
     ///   - rect: 描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
+        context.recordHitRegion(rect)
         buffer.fill(rect, repeating: character, style: style)
     }
 
@@ -371,6 +372,7 @@ public struct Divider: PrimitiveView {
     ///   - rect: 描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
+        context.recordHitRegion(rect)
         buffer.fill(rect, repeating: character, style: style)
     }
 
