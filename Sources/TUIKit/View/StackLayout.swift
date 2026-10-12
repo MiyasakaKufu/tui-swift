@@ -225,6 +225,16 @@ public struct VStack: PrimitiveView {
             y += sizes[index] + spacing
         }
     }
+
+    /// ``VStack/children`` の ``View`` を、並びの中の位置を `index:` 引数として、並びの順に `visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        for (index, child) in children.enumerated() {
+            visitor.visit(child, index: index)
+        }
+    }
 }
 
 /// 中の ``View`` を横に並べる ``View``。
@@ -337,6 +347,16 @@ public struct HStack: PrimitiveView {
                 context.render(child, index: index, into: &buffer, rect: childRect)
             }
             x += sizes[index] + spacing
+        }
+    }
+
+    /// ``HStack/children`` の ``View`` を、並びの中の位置を `index:` 引数として、並びの順に `visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        for (index, child) in children.enumerated() {
+            visitor.visit(child, index: index)
         }
     }
 }

@@ -65,7 +65,7 @@ public protocol View {
 
     /// この ``View`` を組み立てる ``View``。
     ///
-    /// - Note: `Application.draw()` の 1 回のうちに、``View/sizeThatFits(_:context:)`` と ``View/render(into:rect:context:)`` で何度も値を取得される。取得するたびに違う ``View`` を返すと、``View/sizeThatFits(_:context:)`` で測った ``View`` と ``View/render(into:rect:context:)`` で描いた ``View`` が食い違う。
+    /// - Note: `Application.draw()` の 1 回のうちに、レイアウトの計算と描画より前に 1 回値を取得され、その後も ``View/sizeThatFits(_:context:)`` と ``View/render(into:rect:context:)`` で何度も値を取得される。取得するたびに違う ``View`` を返すと、``View/sizeThatFits(_:context:)`` で測った ``View`` と ``View/render(into:rect:context:)`` で描いた ``View`` が食い違う。
     var body: Body { get }
 
     /// `proposal` の範囲で、この ``View`` の ``Size`` を返す。
@@ -125,14 +125,30 @@ extension View {
     }
 }
 
-/// ``View/body`` を持たず、``View/sizeThatFits(_:context:)`` と ``View/render(into:rect:context:)`` を自分で書く ``View``。
+/// ``View/body`` を持たず、``View/sizeThatFits(_:context:)``・``View/render(into:rect:context:)``・``PrimitiveView/visitChildren(_:)`` を自分で書く ``View``。
 ///
 /// ``Text`` や ``VStack`` のように、``View/body`` で別の ``View`` を返す形では書けない ``View`` がこれに準拠する。
 ///
 /// - Warning: ``View/sizeThatFits(_:context:)`` と ``View/render(into:rect:context:)`` を必ず書く。
 ///   書かないと、``View/body`` を持つ ``View`` 向けのデフォルトの実装が選ばれ、``View/body`` の値を取得したところでプロセスが終了する。
 @MainActor
-public protocol PrimitiveView: View where Body == Never {}
+public protocol PrimitiveView: View where Body == Never {
+    /// ``RenderContext`` のメソッドに `child` 引数として渡しうる ``View`` を、それぞれ `visitor` の ``ViewVisitor/visit(_:index:)`` に渡す。
+    ///
+    /// `Application.draw()` のたびに、``View/sizeThatFits(_:context:)``・``View/layoutTraits(context:)``・``View/render(into:rect:context:)`` より前に呼び出される。`rect` 引数によっては渡さない ``View`` も含めて、渡しうる ``View`` をすべて渡す。
+    /// ``View`` を 1 つも渡さない型では、何もしない。
+    ///
+    /// ```swift
+    /// func visitChildren(_ visitor: ViewVisitor) {
+    ///     visitor.visit(content, index: 0)
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    /// - Warning: `index:` 引数には、同じ ``View`` を ``RenderContext`` のメソッドに渡すときと同じ番号を渡す。番号が違うと、ここで渡した ``View`` と ``RenderContext`` のメソッドに渡した ``View`` とで、``State`` の記憶域が別になる。
+    func visitChildren(_ visitor: ViewVisitor)
+}
 
 extension PrimitiveView {
     /// ``PrimitiveView`` には無い ``View/body``。
@@ -172,6 +188,12 @@ extension Never: PrimitiveView {
     ///   - rect: 描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
+
+    /// `Never` のインスタンスは存在しないので呼び出されない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {}
 }
 
 /// 何も描画しない ``View``。
@@ -194,6 +216,12 @@ public struct EmptyView: PrimitiveView {
     ///   - rect: 描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
+
+    /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {}
 }
 
 /// 領域全体を 1 文字で塗りつぶす ``View``。
@@ -237,6 +265,12 @@ public struct Fill: PrimitiveView {
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         buffer.fill(rect, repeating: character, style: style)
     }
+
+    /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {}
 }
 
 /// ``VStack``・``HStack`` が配ったあとに残る ``Size`` を引き取る ``View``。
@@ -276,6 +310,12 @@ public struct Spacer: PrimitiveView {
     ///   - rect: 描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
+
+    /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {}
 }
 
 /// 1 本の罫線。
@@ -333,4 +373,10 @@ public struct Divider: PrimitiveView {
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         buffer.fill(rect, repeating: character, style: style)
     }
+
+    /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {}
 }

@@ -42,13 +42,15 @@
 |---|---|---|
 | `Text`・`VStack` などが準拠するプロトコル | `View` | |
 | `View.body` で別の `View` を返す `View` | `View.body` を持つ `View` | |
-| `View.body` を持たず、`View.sizeThatFits(_:context:)` と `View.render(into:rect:context:)` を自分で書く `View` | `PrimitiveView` | `View.layoutTraits(context:)` にはデフォルトの実装がある |
+| `View.body` を持たず、`View.sizeThatFits(_:context:)`・`View.render(into:rect:context:)`・`PrimitiveView.visitChildren(_:)` を自分で書く `View` | `PrimitiveView` | `View.layoutTraits(context:)` にはデフォルトの実装がある。`PrimitiveView.visitChildren(_:)` には無い |
 | `proposal` 引数に渡された `Size` の範囲で、自分の `Size` を返すメソッド | `View.sizeThatFits(_:context:)` | 戻り値は「`View.sizeThatFits(_:context:)` の戻り値」と書く |
 | 自分の `LayoutTraits` を返すメソッド | `View.layoutTraits(context:)` | |
 | `Buffer` の `Cell` に文字と `Style` を書き込むメソッド | `View.render(into:rect:context:)` | |
 | 別の `View` の `View.sizeThatFits(_:context:)`・`View.layoutTraits(context:)`・`View.render(into:rect:context:)` を呼び出すために、`View` が `context` 引数で受け取る型 | `RenderContext` | `View` は、この引数の `RenderContext.sizeThatFits(of:index:proposal:)`・`RenderContext.layoutTraits(of:index:)`・`RenderContext.render(_:index:into:rect:)` に別の `View` を `child` 引数として渡して呼び出す |
-| `Application` が最初にメソッドを呼び出す `View` から、`RenderContext` のメソッドに `child` 引数として渡された `View` を順にたどったときの、`ViewPath.Component` の並び | `ViewPath` | internal |
-| `RenderContext` のメソッドに渡された `index:` 引数（`.index(_:)`）か、`View.id(_:)` の引数（`.key(_:)`） | `ViewPath.Component` | internal。プロトコル `Component` とは別物 |
+| `Application` が最初にメソッドを呼び出す `View` から、`RenderContext` のメソッドに `child` 引数として渡された `View` か、`ViewVisitor.visit(_:index:)` に渡された `View` を順にたどったときの、`ViewPath.Component` の並び | `ViewPath` | internal。`View.body` の値の `View` には `index:` 引数 0 を使う |
+| `RenderContext` のメソッドか `ViewVisitor.visit(_:index:)` に渡された `index:` 引数（`.index(_:)`）か、`View.id(_:)` の引数（`.key(_:)`） | `ViewPath.Component` | internal。プロトコル `Component` とは別物 |
+| `RenderContext` のメソッドに `child` 引数として渡しうる `View` を、`index:` 引数とともに `ViewVisitor` に渡す、`PrimitiveView` の要件のメソッド | `PrimitiveView.visitChildren(_:)` | `Application.draw()` のたびに、レイアウトの計算と描画より前に呼び出される |
+| `PrimitiveView.visitChildren(_:)` で `View` を受け取る型 | `ViewVisitor` | 受け取るメソッドは `ViewVisitor.visit(_:index:)` |
 | `ViewPath` と型が同じ `View` に、`Application.draw()` をまたいで使われ続けるクラス | `ViewNode` | internal。`ViewNode.id` が同じなら、同じ `View` として扱われる |
 | `View.id(_:)` に渡した引数。`ViewPath.Component` の `.key(_:)` になる | `View.id(_:)` の引数 | |
 | `View` に準拠する型の格納プロパティに `@State` として付け、そのプロパティを `Application.draw()` をまたいで残す型 | `State` | プロパティは `ViewNode` が持つ。`$` で得る `Binding` は `State.projectedValue` |

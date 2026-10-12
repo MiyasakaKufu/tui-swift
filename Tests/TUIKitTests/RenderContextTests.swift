@@ -51,6 +51,12 @@ private struct PathProbe: PrimitiveView {
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         log.rendered[name, default: []].append(context.path)
     }
+
+    /// `RenderContext` のメソッドに `View` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる `View` を受け取る `ViewVisitor`。
+    func visitChildren(_ visitor: ViewVisitor) {}
 }
 
 @MainActor

@@ -44,6 +44,12 @@ private struct BindingProbe: PrimitiveView {
     ///   - rect: 描画する矩形。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {}
+
+    /// `RenderContext` のメソッドに `View` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる `View` を受け取る `ViewVisitor`。
+    func visitChildren(_ visitor: ViewVisitor) {}
 }
 
 /// 数を `State` に持ち、`View.body` で表示する `View`。
@@ -85,6 +91,12 @@ private struct PrimitiveCounter: PrimitiveView {
         buffer.write("\(count)", at: rect.origin, clippedTo: rect)
         log.bindings["primitive", default: []].append($count)
     }
+
+    /// `RenderContext` のメソッドに `View` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる `View` を受け取る `ViewVisitor`。
+    func visitChildren(_ visitor: ViewVisitor) {}
 }
 
 /// `State` の値で、`LayoutTraits.flex(on:)` が 1 以上かどうかが変わる、`View.body` を持つ `View`。

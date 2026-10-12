@@ -14,11 +14,13 @@
 /// }
 /// ```
 ///
-/// 値は ``View`` の構造体の外にある記憶域に置かれる。``View`` は `Application.draw()` のたびに作り直されるが、前の `Application.draw()` と同じ記憶域が結び付くので、値は引き継がれる。どの記憶域が結び付くかは、``Application`` が最初にメソッドを呼び出す ``View`` からその ``View`` まで、``RenderContext`` のメソッドに `child` 引数として渡したときの `index:` 引数（``View/id(_:)`` で作った ``View`` を渡したときは ``View/id(_:)`` の引数）の並びと、``View`` の型で決まる。
+/// 値は ``View`` の構造体の外にある記憶域に置かれる。``View`` は `Application.draw()` のたびに作り直されるが、前の `Application.draw()` と同じ記憶域が結び付くので、値は引き継がれる。どの記憶域が結び付くかは、``Application`` が最初にメソッドを呼び出す ``View`` からその ``View`` まで、``RenderContext`` のメソッドか ``ViewVisitor/visit(_:index:)`` に渡したときの `index:` 引数（``View/id(_:)`` で作った ``View`` を渡したときは ``View/id(_:)`` の引数）の並びと、``View`` の型で決まる。
+///
+/// ``Application`` が最初にメソッドを呼び出す ``View`` から先の ``View`` は、`Application.draw()` のたびに、レイアウトの計算と描画より前にもたどられる。たどられる ``View`` は、``View/body`` の値の ``View`` と、``PrimitiveView/visitChildren(_:)`` が ``ViewVisitor/visit(_:index:)`` に渡した ``View``。``State`` は、その ``View`` の ``View/body`` の値を取得するより前に記憶域へ結び付く。
 ///
 /// ``View`` の外（``Component/handle(_:)`` など）から値を変えるには、``View/body`` の中で `$` から得た ``Binding`` を ``TextField`` の `text:` 引数か ``ListView`` の `selection:` 引数へ渡し、`TextFieldState.handle(_: InputEvent)`・``ListState/handle(_:)`` に書き戻させる。
 ///
-/// - Note: 記憶域を捨てる規則は次の 2 つ。1 つ目は、`Application.draw()` の 1 回で、``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` のどれにも `child` 引数として渡されなかった ``View`` の記憶域を、その `Application.draw()` の終わりに捨てる（``Application`` が最初にメソッドを呼び出す ``View`` は除く）。
+/// - Note: 記憶域を捨てる規則は次の 2 つ。1 つ目は、`Application.draw()` の 1 回で、レイアウトの計算と描画より前にたどられず、``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` のどれにも `child` 引数として渡されなかった ``View`` の記憶域を、その `Application.draw()` の終わりに捨てる（``Application`` が最初にメソッドを呼び出す ``View`` は除く）。`rect` 引数によってレイアウトの計算でも描画でも渡されなかった ``View`` の記憶域は、たどられていれば残る。
 ///   2 つ目は、`index:` 引数の並びが同じまま ``View`` の型が変わったら、前の型の ``View`` の記憶域と、前の型の ``View`` から先で `child` 引数として渡されていた ``View`` の記憶域を捨てる。どちらも、次に同じ `index:` 引数の並びで渡された ``View`` は初期値から始まる。
 /// - Note: ``View`` に準拠する型の格納プロパティとして直接宣言する。``View`` が持つ別の構造体の中や、``Component`` に準拠する型に置いた ``State`` は記憶域に結び付かない。
 /// - Note: ``View/body``、``View/sizeThatFits(_:context:)``、``View/layoutTraits(context:)``、``View/render(into:rect:context:)`` の中で読むと記憶域の値が返る。``State`` が記憶域に結び付く前（``View`` を作った直後など）は、読むと初期値を返し、代入は捨てる。そのときに `$` で得た ``Binding`` も初期値を返し続け、書き戻しを捨てる。

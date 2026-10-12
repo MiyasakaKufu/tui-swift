@@ -53,6 +53,14 @@ public struct PaddingView<Content: View>: PrimitiveView {
         guard !inner.isEmpty else { return }
         context.render(content, index: 0, into: &buffer, rect: inner)
     }
+
+    /// ``PaddingView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        visitor.visit(content, index: 0)
+    }
 }
 
 /// ``BorderView/content`` を枠線で囲む ``View``。
@@ -188,6 +196,14 @@ public struct BorderView<Content: View>: PrimitiveView {
             )
         }
     }
+
+    /// ``BorderView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        visitor.visit(content, index: 0)
+    }
 }
 
 /// ``BackgroundView/content`` の背景を塗る ``View``。
@@ -236,6 +252,14 @@ public struct BackgroundView<Content: View>: PrimitiveView {
         guard !rect.isEmpty else { return }
         buffer.fill(rect, style: style)
         context.render(content, index: 0, into: &buffer, rect: rect)
+    }
+
+    /// ``BackgroundView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        visitor.visit(content, index: 0)
     }
 }
 
@@ -320,6 +344,14 @@ public struct FrameView<Content: View>: PrimitiveView {
         let contentRect = Rect(x: x, y: y, width: contentWidth, height: contentHeight)
         context.render(content, index: 0, into: &buffer, rect: contentRect)
     }
+
+    /// ``FrameView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        visitor.visit(content, index: 0)
+    }
 }
 
 /// ``LayoutTraits`` だけを差し替える ``View``。
@@ -364,6 +396,14 @@ public struct FlexibleView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         context.render(content, index: 0, into: &buffer, rect: rect)
+    }
+
+    /// ``FlexibleView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        visitor.visit(content, index: 0)
     }
 }
 
@@ -416,6 +456,14 @@ public struct AlignedView<Content: View>: PrimitiveView {
         let x = rect.minX + horizontal.offset(content: desired.width, available: rect.width)
         let y = rect.minY + vertical.offset(content: desired.height, available: rect.height)
         context.render(content, index: 0, into: &buffer, rect: Rect(origin: Point(x: x, y: y), size: desired))
+    }
+
+    /// ``AlignedView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        visitor.visit(content, index: 0)
     }
 }
 
