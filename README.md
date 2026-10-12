@@ -59,6 +59,33 @@ final class Counter: TerminalApp {
 
 `@main` はファイル名 `main.swift` では使えないため、ファイル名は型名に合わせる。
 
+CLI のコマンドを定義するライブラリ（swift-argument-parser など）が `@main` を受け持つ場合は、`TerminalApp` に準拠する型に
+`@main` を付けず、コマンドのメソッドから `TerminalApp.run()` を呼び出す。インスタンスメソッドの `run()` は、そのインスタンスで
+起動する（コマンドライン引数を渡したイニシャライザで作ったインスタンスなど）。型メソッドの `run()` は、引数のないイニシャライザで
+作ったインスタンスで起動する。コマンドライン引数を見て `Application` を起動せずに終えるかどうかは、コマンドのメソッドで決める。
+
+```swift
+import ArgumentParser
+import TUIKit
+
+@main
+struct Tool: AsyncParsableCommand {
+    @Flag var list = false
+    @Argument var path: String
+
+    func run() async throws {
+        if list {
+            print(try loadItems(at: path).joined(separator: "\n"))
+            return
+        }
+        try await Viewer(path: path).run()   // Viewer は TerminalApp に準拠する型
+    }
+}
+```
+
+`static func main()` を持つプロトコル（`AsyncParsableCommand` など）と `TerminalApp` の両方に 1 つの型を準拠させると、
+`@main` がどちらの `main()` を呼び出すか決まらずコンパイルできない。`@main` を付ける型と `TerminalApp` に準拠する型は分ける。
+
 `Application` の起動時に渡す `ApplicationOptions` は、`TerminalApp.options` が返す。マウス（`ApplicationOptions.mouseTracking`）と
 フォーカス通知（`ApplicationOptions.reportsFocus`）は、初期値では無効になっている。
 
