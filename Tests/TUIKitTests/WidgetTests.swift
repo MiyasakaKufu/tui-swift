@@ -559,32 +559,35 @@ final class WidgetTests: XCTestCase {
         }
     }
 
-    func testEmptyTextFieldShowsCursorOverPlaceholder() async {
+    func testEmptyFocusedTextFieldShowsCursorOverPlaceholder() async {
+        let field = TextField(state: TextFieldState(), placeholder: "入力")
+        let harness = FocusHarness(size: Size(width: 10, height: 1)) { field }
+
+        XCTAssertTrue(harness.buffer[0, 0].style.attributes.contains(.reverse))
+        XCTAssertEqual(harness.buffer.debugText(), "入力      ")
+    }
+
+    func testEmptyFocusedTextFieldWithoutPlaceholderShowsCursor() async {
+        let field = TextField(state: TextFieldState())
+        let harness = FocusHarness(size: Size(width: 4, height: 1)) { field }
+
+        XCTAssertTrue(harness.buffer[0, 0].style.attributes.contains(.reverse))
+    }
+
+    func testTextFieldWithoutFocusHasNoCursor() async {
         let field = TextField(state: TextFieldState(), placeholder: "入力")
         var buffer = Buffer(size: Size(width: 10, height: 1))
         let bounds = buffer.bounds
         field.renderAsRoot(into: &buffer, rect: bounds)
 
-        XCTAssertTrue(buffer[0, 0].style.attributes.contains(.reverse))
-        XCTAssertEqual(buffer.debugText(), "入力      ")
-    }
-
-    func testEmptyTextFieldWithoutPlaceholderShowsCursor() async {
-        let field = TextField(state: TextFieldState())
-        var buffer = Buffer(size: Size(width: 4, height: 1))
-        let bounds = buffer.bounds
-        field.renderAsRoot(into: &buffer, rect: bounds)
-
-        XCTAssertTrue(buffer[0, 0].style.attributes.contains(.reverse))
+        XCTAssertFalse(buffer[0, 0].style.attributes.contains(.reverse))
     }
 
     func testPlaceholderHasNoCursorWhenCursorHidden() async {
         let field = TextField(state: TextFieldState(), placeholder: "name", showsCursor: false)
-        var buffer = Buffer(size: Size(width: 6, height: 1))
-        let bounds = buffer.bounds
-        field.renderAsRoot(into: &buffer, rect: bounds)
+        let harness = FocusHarness(size: Size(width: 6, height: 1)) { field }
 
-        XCTAssertFalse(buffer[0, 0].style.attributes.contains(.reverse))
+        XCTAssertFalse(harness.buffer[0, 0].style.attributes.contains(.reverse))
     }
 
     // MARK: - TextField が報告するカーソル位置

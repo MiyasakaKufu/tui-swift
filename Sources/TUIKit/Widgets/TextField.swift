@@ -37,8 +37,7 @@ public final class TextFieldState {
 
     /// 直前の描画でカーソルを置いた画面上の位置。まだ描画していなければ `nil`。
     ///
-    /// - Note: IME の変換中の文字と変換候補の一覧は、端末エミュレータが本物のカーソル位置に表示する。
-    ///   入力欄にフォーカスがある間、`Component.cursorPosition` でこの値を返すと、変換中の文字が入力欄の上に出る。返さなければ ``Renderer`` が最後に書き込んだ位置に出る。
+    /// - Note: ``TextField`` がフォーカスを持つ間、``Application`` は端末エミュレータのカーソルをこの位置へ置く。IME の変換中の文字と変換候補の一覧は、端末エミュレータがこのカーソルの位置に表示する。
     public internal(set) var renderedCursorPoint: Point?
 
     /// 初期の文字列を指定して ``TextFieldState`` を作る。
@@ -303,7 +302,7 @@ public struct TextField: PrimitiveView {
     public var style: Style
     /// プレースホルダのスタイル。
     public var placeholderStyle: Style
-    /// カーソル位置を反転表示する（``TerminalApp`` に準拠する型が ``Component/cursorPosition`` で端末エミュレータのカーソルを出す場合は `false`）。
+    /// フォーカスを持つ間、カーソル位置を反転表示する。
     public var showsCursor: Bool
 
     /// ``Binding`` で渡すプロパティの文字列を編集する ``TextField`` を作る。
@@ -314,7 +313,7 @@ public struct TextField: PrimitiveView {
     ///   - placeholder: 空のときに表示する文字列。
     ///   - style: 文字のスタイル。
     ///   - placeholderStyle: プレースホルダのスタイル。
-    ///   - showsCursor: カーソル位置を反転表示するか。
+    ///   - showsCursor: フォーカスを持つ間、カーソル位置を反転表示するか。
     /// - Postcondition: `state` は以後、内容を `text` から読み、編集の結果を `text` へ書き戻す。
     ///   書き戻すのは `state.handle(_:)` などの編集の中だけで、描画では書き戻さない。
     public init(
@@ -342,7 +341,7 @@ public struct TextField: PrimitiveView {
     ///   - placeholder: 空のときに表示する文字列。
     ///   - style: 文字のスタイル。
     ///   - placeholderStyle: プレースホルダのスタイル。
-    ///   - showsCursor: カーソル位置を反転表示するか。
+    ///   - showsCursor: フォーカスを持つ間、カーソル位置を反転表示するか。
     public init(
         state: TextFieldState,
         placeholder: String = "",
@@ -407,15 +406,17 @@ public struct TextField: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。使うのは最初の 1 行だけ。
-    ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読む ``RenderContext``。
+    ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読み、フォーカスを持つかを取得する ``RenderContext``。
     /// - Postcondition: `state.renderedCursorPoint` がカーソルの画面上の位置に更新される。
     ///   描く領域がなければ `nil` になる。
+    /// - Postcondition: フォーカスを持ち、`showsCursor` が `true` なら、カーソルの位置の ``Cell`` を反転した ``Style`` で書き込む。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width > 0, rect.height > 0 else {
             state.renderedCursorPoint = nil
             return
         }
         let row = Rect(x: rect.minX, y: rect.minY, width: rect.width, height: 1)
+        context.recordHitRegion(row)
         buffer.fill(row, with: Cell(character: " ", style: style))
 
         if state.isEmpty && !placeholder.isEmpty {
@@ -430,7 +431,7 @@ public struct TextField: PrimitiveView {
                 clippedTo: row
             )
             // プレースホルダを表示している間はカーソルを置かずに済ませたくなるが、置かないと空の入力欄のどこに入力されるかが見えない。
-            placeCursor(into: &buffer, at: Point(x: rect.minX, y: rect.minY), in: rect)
+            placeCursor(into: &buffer, at: Point(x: rect.minX, y: rect.minY), in: rect, context: context)
             return
         }
 
@@ -448,26 +449,29 @@ public struct TextField: PrimitiveView {
                 x: rect.minX + state.cursorColumn(ambiguous: context.ambiguousWidth) - offset,
                 y: rect.minY
             ),
-            in: rect
+            in: rect,
+            context: context
         )
     }
 
-    /// カーソルの位置を ``TextFieldState/renderedCursorPoint`` へ記録し、その ``Cell`` を反転させる。
+    /// カーソルの位置を ``TextFieldState/renderedCursorPoint`` へ記録し、フォーカスを持つならその ``Cell`` を反転させる。
     ///
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - point: カーソルを置く ``Cell`` の位置。
     ///   - rect: 入力欄の矩形。この外へは描かない。
+    ///   - context: フォーカスを持つかを取得し、端末エミュレータのカーソルを置く位置を記録する ``RenderContext``。
     /// - Postcondition: `state.renderedCursorPoint` が `point`（矩形の外なら `nil`）になる。
-    private func placeCursor(into buffer: inout Buffer, at point: Point, in rect: Rect) {
+    private func placeCursor(into buffer: inout Buffer, at point: Point, in rect: Rect, context: RenderContext) {
         guard point.x >= rect.minX, point.x < rect.maxX else {
             state.renderedCursorPoint = nil
             return
         }
         // 反転表示をやめても IME に渡す位置は要る。記録を `showsCursor` で止めてはいけない。
         state.renderedCursorPoint = point
+        context.recordCursorPoint(point)
 
-        guard showsCursor else { return }
+        guard showsCursor, context.isFocused else { return }
         var cell = buffer[point.x, point.y]
         cell.style = cell.style.adding(.reverse)
         cell.isContinuation = false

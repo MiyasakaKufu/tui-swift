@@ -69,6 +69,7 @@ public struct ProgressBar: PrimitiveView {
     ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読む ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width > 0, rect.height > 0 else { return }
+        context.recordHitRegion(rect)
 
         var barWidth = rect.width
         var suffix = ""

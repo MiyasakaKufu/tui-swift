@@ -54,6 +54,11 @@
 | `ViewPath` と型が同じ `View` に、`Application.draw()` をまたいで使われ続けるクラス | `ViewNode` | internal。`ViewNode.id` が同じなら、同じ `View` として扱われる |
 | `View.id(_:)` に渡した引数。`ViewPath.Component` の `.key(_:)` になる | `View.id(_:)` の引数 | |
 | `View` に準拠する型の格納プロパティに `@State` として付け、そのプロパティを `Application.draw()` をまたいで残す型 | `State` | プロパティは `ViewNode` が持つ。`$` で得る `Binding` は `State.projectedValue` |
+| `TextField`・`ListView` のうち、`InputEvent` の `.key`・`.paste` を最初に受け取る `View` がそうであること | フォーカス | 端末エミュレータのウィンドウが入力を受け取ること（`.focus`）は「端末エミュレータのフォーカス」と書き、「フォーカス」を単独で使わない |
+| Tab・Shift+Tab・クリック・`@FocusState` を付けたプロパティへの代入でフォーカスが移る `View` | フォーカスを受け取る `View` | 今は `TextField` と `ListView` |
+| `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` が `beforeRender` に渡す `View` の一覧の順 | たどった順 | Tab の順と、フォーカスを与える先を決める |
+| `View` に準拠する型の格納プロパティに `@FocusState` として付け、フォーカスを持つ `View` を表し、代入でフォーカスを移す型 | `FocusState` | 値は `ApplicationContext` が保持するフォーカスから求める。`$` で得るのは `FocusState.Binding` |
+| `Application` が持ち、`ViewNode` とフォーカスを保持し、`InputEvent` を `View` へ渡すクラス | `ApplicationContext` | internal |
 | `View` の拡張として定義された `View.padding(_: EdgeInsets)`・`View.border(_:style:title:titleStyle:)` などのメソッド | `View` の拡張メソッド | 個々のメソッドは名前で書く |
 | `Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型 | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型」 |
 | `TextFieldState.cursor`・`ListState.scrollOffset` などを持つクラス | `ListState`・`TextFieldState` | 2 つをまとめる語は置かない。5cf1d9a は、`View` の `State` へ移せるのは #53 の後と書いている |
@@ -97,7 +102,7 @@
 | 別スレッドや `Task` から `MessageSender.send(_:)` で `Application` へ送る引数の型 | `Component.Message` | |
 | `Component.Message` を `Application` へ送る型 | `MessageSender` | |
 | `TerminalApp` に準拠する型が `Component.Message` を受け取るメソッド | `Component.receive(_:)` | |
-| `TerminalApp` に準拠する型が `InputEvent` を受け取るメソッド | `Component.handle(_:)` | `ListState.handle(_:)`・`TextFieldState.handle(_: InputEvent)` は別の宣言 |
+| `TerminalApp` に準拠する型が `InputEvent` を受け取るメソッド | `Component.handle(_:)` | `ListState.handle(_:)`・`TextFieldState.handle(_: InputEvent)` は別の宣言。受け取るのは、どの `View` も処理しなかった `InputEvent` だけ |
 
 ## #98 の表の行
 
@@ -121,4 +126,8 @@
 | `View.frame(width:height:horizontalAlignment:verticalAlignment:)` | `horizontalAlignment:`・`verticalAlignment:` を省くと `.leading`・`.top`。揃えで動くのは `FrameView` の矩形で、`FrameView.content` はその矩形いっぱいに書き込まれる |
 | `Text` | `wrap:` を省くと `.truncate` で、折り返さずに末尾を省略する |
 | `Binding` | プロパティラッパーではない。`$` と `projectedValue` は無い（`$` で `Binding` を返すのは `State.projectedValue`） |
+| `FocusState` | 値の型は Optional か `Bool` に限る。代入した先がたどった `View` の一覧に無ければ、次の `Application.draw()` の 1 回で 1 回だけ試みる |
+| `View.onKeyPress(_:action:)` | 宣言はこの 1 つだけ。修飾キーの付いた押下では `action:` のクロージャを呼び出さない（文字のキーは Shift だけなら呼び出す） |
+| `View.onChange(of:_:)` | `initial:` 引数は無い。比べるのは描画より前にたどったときの値。クロージャを呼び出したら `Application.draw()` をもう 1 回行うが、そのもう 1 回からはさらに行わない |
+| `View.sheet(isPresented:content:)` | `content:` を画面の中央に重ねる。表示している間も、どの `View` も処理しなかった `.key`・`.paste` は `Component.handle(_:)` へ渡る |
 | `ViewBuilder` | `[any View]` を返す |

@@ -58,6 +58,7 @@ public struct Text: PrimitiveView {
     ///   - context: ``RenderContext/ambiguousWidth`` を取得するための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
+        context.recordHitRegion(rect)
         let lines = TextWrapping.wrap(
             content, width: rect.width, mode: wrap, tabSize: tabSize, ambiguous: context.ambiguousWidth
         )

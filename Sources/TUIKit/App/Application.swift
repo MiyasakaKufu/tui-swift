@@ -16,7 +16,7 @@ public final class Application<Root: Component> {
     private let reader: InputReader
     private let renderer: Renderer
     private let eventQueue: LoopEventQueue<Root.Message>
-    private let graph = ViewGraph()
+    private let context = ApplicationContext()
 
     /// 別スレッドや `Task` から、``Component/Message`` の値をイベントループへ届ける ``MessageSender``。
     ///
@@ -281,12 +281,27 @@ public final class Application<Root: Component> {
         }
     }
 
-    /// ``InputEvent`` を ``Component/handle(_:)`` へ渡す。
+    /// ``InputEvent`` を ``View`` へ渡し、どの ``View`` も処理しなければ ``Component/handle(_:)`` へ渡す。
     ///
     /// - Parameters:
-    ///   - event: ``Component/handle(_:)`` へ渡す ``InputEvent``。
+    ///   - event: 渡す ``InputEvent``。
     /// - Returns: ループを続けるなら `true`。
     private func deliver(_ event: InputEvent) -> Bool {
+        switch event {
+        case .key(let keyEvent):
+            switch context.deliver(keyEvent) {
+            case .quit: return false
+            case .handled: return true
+            case .ignored, nil: break
+            }
+        case .mouse(let mouseEvent):
+            if context.deliver(mouseEvent) { return true }
+        case .paste:
+            if context.deliverPaste(event) { return true }
+        case .resize, .focus:
+            break
+        }
+
         switch root.handle(event) {
         case .quit:
             return false
@@ -342,12 +357,12 @@ public final class Application<Root: Component> {
     /// ``Component/body`` を ``Buffer`` に書き込み、``Renderer`` で端末デバイスへ書き出す。
     ///
     /// - Precondition: `Application.synchronizeSize()` によって ``Buffer`` が端末デバイスのウィンドウサイズに追従している。
+    /// - Postcondition: たどった後にフォーカスが変わったか、``View/onChange(of:_:)`` が値の変化を見つけたら、もう 1 回描く。そのもう 1 回では、さらには描かない。
+    /// - Postcondition: 端末エミュレータのカーソルは、``Component/cursorPosition`` が `nil` 以外ならその位置に、`nil` ならフォーカスを持つ ``TextField`` が示す位置に置く。どちらも無ければ隠す。
     private func draw() {
-        buffer.clear()
-
-        let view = root.body
-        graph.renderFrame(view, into: &buffer, ambiguousWidth: options.ambiguousWidth)
-        renderer.render(buffer, cursor: root.cursorPosition)
+        context.draw({ root.body }, into: &buffer, ambiguousWidth: options.ambiguousWidth) { buffer in
+            renderer.render(buffer, cursor: root.cursorPosition ?? context.cursorPosition)
+        }
     }
 }
 

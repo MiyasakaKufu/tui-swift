@@ -136,6 +136,11 @@ public struct BorderView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width >= 2, rect.height >= 2 else { return }
+        // 枠線の矩形を `rect` 全体で記録したくなるが、`BorderView.content` が何も書き込まない内側の位置まで当たり判定に入り、その下の `View` へ `.mouse` が渡らなくなる。
+        context.recordHitRegion(Rect(x: rect.minX, y: rect.minY, width: rect.width, height: 1))
+        context.recordHitRegion(Rect(x: rect.minX, y: rect.maxY - 1, width: rect.width, height: 1))
+        context.recordHitRegion(Rect(x: rect.minX, y: rect.minY, width: 1, height: rect.height))
+        context.recordHitRegion(Rect(x: rect.maxX - 1, y: rect.minY, width: 1, height: rect.height))
         drawFrame(into: &buffer, rect: rect, ambiguous: context.ambiguousWidth)
         let inner = rect.inset(by: 1)
         if !inner.isEmpty {
@@ -250,6 +255,7 @@ public struct BackgroundView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
+        context.recordHitRegion(rect)
         buffer.fill(rect, style: style)
         context.render(content, index: 0, into: &buffer, rect: rect)
     }

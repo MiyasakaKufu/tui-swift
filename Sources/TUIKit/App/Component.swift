@@ -27,6 +27,7 @@ public protocol Component: AnyObject {
     /// - Parameters:
     ///   - event: ``Application`` が渡す ``InputEvent``。
     /// - Returns: 処理したかどうかを表す ``EventResult``。`.quit` を返すと ``Application`` が終了する。
+    /// - Note: 受け取るのは、フォーカスを持つ ``View``（``TextField``・``ListView``）、``View/onKeyPress(_:action:)`` のクロージャ、Tab・Shift+Tab によるフォーカスの移動、クリックした位置の ``View`` のどれも処理しなかった ``InputEvent`` だけ。Tab・Shift+Tab を受け取るのは、フォーカスを受け取る ``View`` が 1 つも無いときだけ。
     func handle(_ event: InputEvent) -> EventResult
 
     /// 別スレッドや `Task` から `MessageSender.send(_:)` で送られた値を処理する。
@@ -37,7 +38,9 @@ public protocol Component: AnyObject {
     /// - Note: 送られた順に呼び出される。``Component/handle(_:)`` との前後は、``InputReader`` が端末デバイスからキーのバイト列を読んだ時点で決まる。キーが端末デバイスに届いた時点ではないので、届いてから読むまでの間に送られた値は、そのキーより先に渡る。
     func receive(_ message: Message) -> EventResult
 
-    /// 端末エミュレータのカーソルを表示したい位置。`nil` ならカーソルを隠す。
+    /// 端末エミュレータのカーソルを表示したい位置。
+    ///
+    /// - Note: `nil` なら、フォーカスを持つ ``TextField`` が示す位置に置く。その ``TextField`` が無いか、描画されなかったなら隠す。
     var cursorPosition: Point? { get }
 
     /// `Application.draw()` の直前に、前に呼び出されてからの経過秒数を受け取る。
@@ -66,7 +69,7 @@ extension Component {
     /// - Returns: 常に `.ignored`。
     public func receive(_ message: Message) -> EventResult { .ignored }
 
-    /// カーソルを隠す。
+    /// `nil`。フォーカスを持つ ``TextField`` が示す位置にカーソルを置く。
     public var cursorPosition: Point? { nil }
 
     /// 何もしない。
