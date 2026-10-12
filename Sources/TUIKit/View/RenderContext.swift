@@ -51,6 +51,9 @@ struct ViewPath: Hashable {
     func contains(_ other: ViewPath) -> Bool {
         other.components.starts(with: components)
     }
+
+    /// `ViewPath.Component` の数。
+    var depth: Int { components.count }
 }
 
 /// 別の ``View`` の ``View/sizeThatFits(_:context:)``・``View/layoutTraits(context:)``・``View/render(into:rect:context:)`` を呼び出すために、``View`` が `context` 引数で受け取る型。
@@ -133,6 +136,27 @@ public struct RenderContext {
         let node = graph.node(at: path.appending(child, index: index), viewType: type(of: child))
         graph.bindState(of: child, to: node)
         return RenderContext(node: node, graph: graph, screen: screen, ambiguousWidth: ambiguousWidth)
+    }
+
+    /// この ``RenderContext`` を受け取る ``View`` がフォーカスを持てば `true`。
+    var isFocused: Bool {
+        graph.environment.focus?.isFocused(node) ?? false
+    }
+
+    /// この ``RenderContext`` を受け取る ``View`` が ``Buffer`` へ書き込んだ矩形を、``InputEvent`` の `.mouse` の当たり判定に加える。
+    ///
+    /// - Parameters:
+    ///   - rect: ``Buffer`` へ書き込んだ矩形。
+    func recordHitRegion(_ rect: Rect) {
+        graph.recordHitRegion(rect, path: path)
+    }
+
+    /// この ``RenderContext`` を受け取る ``TextField`` がフォーカスを持つ間に、端末エミュレータのカーソルを置く位置を記録する。
+    ///
+    /// - Parameters:
+    ///   - point: カーソルを置く位置。
+    func recordCursorPoint(_ point: Point) {
+        graph.recordCursorPoint(point, of: node)
     }
 
     /// `child` の ``View/sizeThatFits(_:context:)`` の戻り値を返す。

@@ -342,6 +342,7 @@ public struct ListView: PrimitiveView {
     ///   選択が表示範囲に入るようスクロールする。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
+        context.recordHitRegion(rect)
 
         // 描画のたびに選択へ戻すと、ホイールで動かした表示位置が元に戻る。
         let rowsChanged = state.visibleRows != rect.height

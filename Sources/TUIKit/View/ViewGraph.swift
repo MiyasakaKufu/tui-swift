@@ -42,6 +42,29 @@ final class ViewNode {
         states[label] = storage
         return storage
     }
+
+    /// `label` の記憶域を返す。無ければ `make` で作る。
+    ///
+    /// - Parameters:
+    ///   - label: ``View`` に準拠する型の中でのプロパティの名前か、TUIKit の ``View`` が記憶域を区別するための名前。
+    ///   - make: 記憶域を作るクロージャ。
+    /// - Returns: `label` の記憶域。
+    func object<Storage: AnyObject>(for label: String, make: () -> Storage) -> Storage {
+        if let storage = states[label] as? Storage {
+            return storage
+        }
+        let storage = make()
+        states[label] = storage
+        return storage
+    }
+}
+
+/// ``View`` が ``Buffer`` へ書き込んだ矩形 1 つ分の記録。
+struct HitRegion {
+    /// ``Buffer`` へ書き込んだ ``View`` の `ViewPath`。
+    let path: ViewPath
+    /// ``View`` が ``Buffer`` へ書き込んだ矩形。
+    let rect: Rect
 }
 
 /// `ViewNode` を、`ViewPath` ごとに `Application.draw()` をまたいで保持するもの。
@@ -69,6 +92,15 @@ final class ViewGraph {
     /// いま描いている `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の呼び出しで、`ViewGraph.visit(_:node:)` が辿った順に並べた `VisitedView`。
     private var visitedViews: [VisitedView] = []
 
+    /// ``State`` などを結び付けるときと描画するときに、``View`` へ渡す `ViewEnvironment`。値は `ApplicationContext` が設定する。
+    var environment = ViewEnvironment()
+
+    /// 最後の `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の呼び出しで、``View`` が ``Buffer`` へ書き込んだ矩形。書き込んだ順に並ぶ。
+    private(set) var hitRegions: [HitRegion] = []
+
+    /// 最後の `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の呼び出しで描画された ``TextField`` が示した、端末エミュレータのカーソルの位置。`ViewNode.id` ごとに持つ。
+    private(set) var cursorPoints: [Int: Point] = [:]
+
     /// 保持している `ViewNode` の数。
     var nodeCount: Int { nodes.count }
 
@@ -95,7 +127,26 @@ final class ViewGraph {
         return node
     }
 
-    /// `view` の `State` を、`node` の記憶域へ結び付ける。
+    /// `view` が ``Buffer`` へ書き込んだ矩形を記録する。
+    ///
+    /// - Parameters:
+    ///   - rect: ``Buffer`` へ書き込んだ矩形。
+    ///   - path: 書き込んだ ``View`` の `ViewPath`。
+    func recordHitRegion(_ rect: Rect, path: ViewPath) {
+        guard !rect.isEmpty else { return }
+        hitRegions.append(HitRegion(path: path, rect: rect))
+    }
+
+    /// 描画された ``TextField`` が示した、端末エミュレータのカーソルの位置を記録する。
+    ///
+    /// - Parameters:
+    ///   - point: カーソルを置く位置。
+    ///   - node: ``TextField`` の `ViewNode`。
+    func recordCursorPoint(_ point: Point, of node: ViewNode) {
+        cursorPoints[node.id] = point
+    }
+
+    /// `view` の ``State`` と ``FocusState`` を、`node` の記憶域へ結び付ける。
     ///
     /// - Parameters:
     ///   - view: 結び付ける ``View``。
@@ -108,7 +159,7 @@ final class ViewGraph {
         var hasState = false
         for child in Mirror(reflecting: view).children {
             guard let label = child.label, let property = child.value as? any StateProperty else { continue }
-            property.bind(to: node, label: label)
+            property.bind(to: node, label: label, environment: environment)
             hasState = true
         }
         if !hasState {
@@ -158,6 +209,8 @@ final class ViewGraph {
         visit(view, node: rootNode)
         beforeRender(visitedViews)
         visitedViews = []
+        hitRegions = []
+        cursorPoints = [:]
 
         let context = RenderContext(
             node: rootNode,

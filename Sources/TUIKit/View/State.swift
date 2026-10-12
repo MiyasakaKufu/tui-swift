@@ -18,7 +18,7 @@
 ///
 /// ``Application`` が最初にメソッドを呼び出す ``View`` から先の ``View`` は、`Application.draw()` のたびに、レイアウトの計算と描画より前にもたどられる。たどられる ``View`` は、``View/body`` の値の ``View`` と、``PrimitiveView/visitChildren(_:)`` が ``ViewVisitor/visit(_:index:)`` に渡した ``View``。``State`` は、その ``View`` の ``View/body`` の値を取得するより前に記憶域へ結び付く。
 ///
-/// ``View`` の外（``Component/handle(_:)`` など）から値を変えるには、``View/body`` の中で `$` から得た ``Binding`` を ``TextField`` の `text:` 引数か ``ListView`` の `selection:` 引数へ渡し、`TextFieldState.handle(_: InputEvent)`・``ListState/handle(_:)`` に書き戻させる。
+/// ``TextField``・``ListView`` で値を変えるには、``View/body`` の中で `$` から得た ``Binding`` を ``TextField`` の `text:` 引数か ``ListView`` の `selection:` 引数へ渡す。フォーカスを持つ ``TextField``・``ListView`` が受け取った ``InputEvent`` で、`TextFieldState.handle(_: InputEvent)`・``ListState/handle(_:)`` が書き戻す。キーで値を変えるには、``View/onKeyPress(_:action:)`` に渡すクロージャの中で代入する。
 ///
 /// - Note: 記憶域を捨てる規則は次の 2 つ。1 つ目は、`Application.draw()` の 1 回で、レイアウトの計算と描画より前にたどられず、``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` のどれにも `child` 引数として渡されなかった ``View`` の記憶域を、その `Application.draw()` の終わりに捨てる（``Application`` が最初にメソッドを呼び出す ``View`` は除く）。`rect` 引数によってレイアウトの計算でも描画でも渡されなかった ``View`` の記憶域は、たどられていれば残る。
 ///   2 つ目は、`index:` 引数の並びが同じまま ``View`` の型が変わったら、前の型の ``View`` の記憶域と、前の型の ``View`` から先で `child` 引数として渡されていた ``View`` の記憶域を捨てる。どちらも、次に同じ `index:` 引数の並びで渡された ``View`` は初期値から始まる。
@@ -69,7 +69,8 @@ protocol StateProperty {
     /// - Parameters:
     ///   - node: 記憶域を持つ `ViewNode`。
     ///   - label: ``View`` に準拠する型の中でのプロパティの名前。
-    func bind(to node: ViewNode, label: String)
+    ///   - environment: `node` を持つ `ViewGraph` の `ViewGraph.environment`。
+    func bind(to node: ViewNode, label: String, environment: ViewEnvironment)
 }
 
 extension State: StateProperty {
@@ -78,7 +79,8 @@ extension State: StateProperty {
     /// - Parameters:
     ///   - node: 記憶域を持つ `ViewNode`。
     ///   - label: ``View`` に準拠する型の中でのプロパティの名前。
-    func bind(to node: ViewNode, label: String) {
+    ///   - environment: `node` を持つ `ViewGraph` の `ViewGraph.environment`。
+    func bind(to node: ViewNode, label: String, environment: ViewEnvironment) {
         box.storage = node.storage(for: label, initialValue: initialValue)
     }
 }
