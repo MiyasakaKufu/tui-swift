@@ -92,7 +92,7 @@ final class ViewGraph {
     /// いま描いている `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の呼び出しで、`ViewGraph.visit(_:node:)` が辿った順に並べた `VisitedView`。
     private var visitedViews: [VisitedView] = []
 
-    /// ``State`` などを結び付けるときと描画するときに、``View`` へ渡す `ViewEnvironment`。`ViewGraph` を使う側が設定する。
+    /// ``State`` などを結び付けるときと描画するときに、``View`` へ渡す `ViewEnvironment`。値は `ApplicationContext` が設定する。
     var environment = ViewEnvironment()
 
     /// 最後の `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の呼び出しで、``View`` が ``Buffer`` へ書き込んだ矩形。書き込んだ順に並ぶ。

@@ -57,8 +57,10 @@
 | `TextField`・`ListView` のうち、`InputEvent` の `.key`・`.paste` を最初に受け取る `View` がそうであること | フォーカス | 端末エミュレータのウィンドウが入力を受け取ること（`.focus`）は「端末エミュレータのフォーカス」と書き、「フォーカス」を単独で使わない |
 | Tab・Shift+Tab・クリック・`@FocusState` を付けたプロパティへの代入でフォーカスが移る `View` | フォーカスを受け取る `View` | 今は `TextField` と `ListView` |
 | `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` が `beforeRender` に渡す `View` の一覧の順 | たどった順 | Tab の順と、フォーカスを与える先を決める |
-| `View` に準拠する型の格納プロパティに `@FocusState` として付け、フォーカスを持つ `View` を表し、代入でフォーカスを移す型 | `FocusState` | 値は `ApplicationContext` が保持するフォーカスから求める。`$` で得るのは `FocusState.Binding` |
-| `Application` が持ち、`ViewNode` とフォーカスを保持し、`InputEvent` を `View` へ渡すクラス | `ApplicationContext` | internal |
+| `View` に準拠する型の格納プロパティに `@FocusState` として付け、フォーカスを持つ `View` を表し、代入でフォーカスを移す型 | `FocusState` | 値は `FocusController` が保持するフォーカスから求める。`$` で得るのは `FocusState.Binding` |
+| `Application` が持ち、`ViewGraph` と `FocusController` をまとめるクラス | `ApplicationContext` | internal |
+| フォーカスを保持し、たどった `View` の一覧からフォーカスを決め、`InputEvent` を `View` へ渡すクラス | `FocusController` | internal。`ViewGraph` を参照しない |
+| `ViewGraph` が、`State` などを結び付けるときと描画するときに `View` へ渡すもの | `ViewEnvironment` | internal。今は `FocusController` だけを持つ |
 | `View` の拡張として定義された `View.padding(_: EdgeInsets)`・`View.border(_:style:title:titleStyle:)` などのメソッド | `View` の拡張メソッド | 個々のメソッドは名前で書く |
 | `Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型 | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型」 |
 | `TextFieldState.cursor`・`ListState.scrollOffset` などを持つクラス | `ListState`・`TextFieldState` | 2 つをまとめる語は置かない。5cf1d9a は、`View` の `State` へ移せるのは #53 の後と書いている |

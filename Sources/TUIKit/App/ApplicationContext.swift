@@ -1,6 +1,4 @@
 /// ``Application`` が持ち、`ViewGraph` と `FocusController` をまとめるクラス。
-///
-/// `ViewGraph` がたどった ``View`` の一覧を `FocusController` へ渡し、`FocusController` が描画より前にフォーカスを決める。`ViewGraph` はフォーカスを知らず、`ViewGraph.environment` で `FocusController` を ``View`` へ渡すだけ。
 @MainActor
 final class ApplicationContext {
     /// `ViewNode` を `ViewPath` ごとに保持する `ViewGraph`。
@@ -81,7 +79,7 @@ final class ApplicationContext {
 
 /// フォーカスを保持し、``InputEvent`` を ``View`` へ渡すクラス。
 ///
-/// フォーカスは、描画より前にたどった ``View`` の一覧だけから決める。`ViewGraph` は知らない。
+/// フォーカスは、描画より前にたどった ``View`` の一覧から決める。
 @MainActor
 final class FocusController: FocusProviding {
     /// フォーカスを持つ ``View`` の `ViewNode.id`。どの ``View`` もフォーカスを持たなければ `nil`。

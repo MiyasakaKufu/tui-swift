@@ -1,4 +1,4 @@
-/// `ViewGraph` を使う側が、``State`` などを結び付けるときと描画するときに ``View`` へ渡すもの。
+/// `ViewGraph` が、``State`` などを結び付けるときと描画するときに ``View`` へ渡すもの。値は `ApplicationContext` が設定する。
 @MainActor
 struct ViewEnvironment {
     /// フォーカスを保持する `FocusProviding`。無ければ、どの ``View`` もフォーカスを持たない。
