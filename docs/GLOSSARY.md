@@ -24,7 +24,7 @@
 
 | 指すもの | 書き方 | 補足 |
 |---|---|---|
-| TUIKit を使う開発者が `@main` を付けて書く型 | `TerminalApp` に準拠する型 | `TerminalApp` は `Component` を継承している。`Component` は #105 で廃止する予定 |
+| TUIKit を使う開発者が書き、`@main` を付けるか、別の型のメソッドから起動する型 | `TerminalApp` に準拠する型 | `TerminalApp` は `Component` を継承している。`Component` は #105 で廃止する予定 |
 | 端末デバイスを raw モードにし、`InputReader` が端末デバイスから受け取ったバイト列を `InputEvent` にすることと `Buffer` を端末デバイスへ書き出すことを繰り返し、終了時に端末デバイスの termios と、端末エミュレータへ送ったモードを元に戻す型 | `Application` | |
 | 端末デバイスへの書き出しと termios の書き換え、端末エミュレータへ送るモードの切り替えを行う型 | `Terminal` | |
 | `Terminal.inputDescriptor`・`Terminal.outputDescriptor` がつながり、`isatty` が真になる文字デバイス（POSIX の terminal device） | 端末デバイス | |

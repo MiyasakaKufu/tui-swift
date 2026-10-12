@@ -358,12 +358,3 @@ private let wakeupFallbackInterval = 0.1
 
 /// 起動時の問い合わせに応答を待つ時間（秒）。
 private let queryTimeout = 0.25
-
-extension Application where Root: TerminalApp {
-    /// ``TerminalApp`` に準拠する型のインスタンスと ``TerminalApp/options`` から ``Application`` を作り、``Application/run()`` を呼び出す。
-    ///
-    /// - Throws: `run()` が投げるもの。
-    static func start() async throws {
-        try await Application(root: Root(), options: Root.options).run()
-    }
-}
