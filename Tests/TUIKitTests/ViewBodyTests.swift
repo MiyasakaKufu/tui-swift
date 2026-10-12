@@ -63,6 +63,12 @@ private struct NodeProbe: PrimitiveView {
         log.rendered[name] = context.node.id
         log.history[name, default: []].append(context.node.id)
     }
+
+    /// `RenderContext` のメソッドに `View` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる `View` を受け取る `ViewVisitor`。
+    func visitChildren(_ visitor: ViewVisitor) {}
 }
 
 /// `View.body` で `NodeProbe` を返す `View`。

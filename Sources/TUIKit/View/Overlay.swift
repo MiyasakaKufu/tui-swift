@@ -128,6 +128,16 @@ public struct ZStack: PrimitiveView {
             context.render(child, index: index, into: &buffer, rect: childRect)
         }
     }
+
+    /// ``ZStack/children`` の ``View`` を、並びの中の位置を `index:` 引数として、並びの順に `visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        for (index, child) in children.enumerated() {
+            visitor.visit(child, index: index)
+        }
+    }
 }
 
 /// ``OverlayView/content`` の上へ、レイアウトに加わらない ``OverlayView/overlay`` を重ねる ``View``。
@@ -199,6 +209,15 @@ public struct OverlayView<Content: View, Overlay: View>: PrimitiveView {
             context: context
         )
         context.render(overlay, index: 1, into: &buffer, rect: overlayRect)
+    }
+
+    /// ``OverlayView/content`` を `index:` 引数を 0 として、``OverlayView/overlay`` を `index:` 引数を 1 として、`visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        visitor.visit(content, index: 0)
+        visitor.visit(overlay, index: 1)
     }
 }
 
@@ -276,6 +295,15 @@ public struct ScreenOverlayView<Content: View, Overlay: View>: PrimitiveView {
             context: context
         )
         context.render(overlay, index: 1, into: &buffer, rect: overlayRect)
+    }
+
+    /// ``ScreenOverlayView/content`` を `index:` 引数を 0 として、``ScreenOverlayView/overlay`` を `index:` 引数を 1 として、`visitor` に渡す。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {
+        visitor.visit(content, index: 0)
+        visitor.visit(overlay, index: 1)
     }
 }
 

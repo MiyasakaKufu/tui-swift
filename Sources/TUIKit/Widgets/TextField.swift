@@ -473,4 +473,10 @@ public struct TextField: PrimitiveView {
         cell.isContinuation = false
         buffer[point.x, point.y] = cell
     }
+
+    /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {}
 }

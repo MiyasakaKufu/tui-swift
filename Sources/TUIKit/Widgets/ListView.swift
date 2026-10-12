@@ -386,4 +386,10 @@ public struct ListView: PrimitiveView {
             )
         }
     }
+
+    /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。
+    ///
+    /// - Parameters:
+    ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
+    public func visitChildren(_ visitor: ViewVisitor) {}
 }

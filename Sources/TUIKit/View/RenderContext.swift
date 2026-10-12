@@ -1,11 +1,12 @@
-/// ``Application`` が最初にメソッドを呼び出す ``View`` から、``RenderContext`` のメソッドに `child` 引数として渡された ``View`` を順にたどったときの、`ViewPath.Component` の並び。
+/// ``Application`` が最初にメソッドを呼び出す ``View`` から、``RenderContext`` のメソッドに `child` 引数として渡された ``View`` か、``ViewVisitor/visit(_:index:)`` に渡された ``View`` を順にたどったときの、`ViewPath.Component` の並び。
 ///
 /// - Invariant: ``RenderContext`` のメソッドに `child` 引数として渡した ``View`` の `ViewPath` は、その ``RenderContext`` の `ViewPath` と、`index:` 引数（`child` が ``View/id(_:)`` で作った ``View`` なら ``View/id(_:)`` の引数）だけで決まる。
 ///   同じ ``View`` を何度測っても、測っただけで描かなくても、描く途中で測り直しても、同じ ``View`` には同じ `ViewPath` が振られる。
+///   ``ViewVisitor/visit(_:index:)`` に渡した ``View`` の `ViewPath` も同じ規則で決まるので、``RenderContext`` のメソッドに渡すのと同じ `index:` 引数を渡せば、同じ `ViewPath` になる。
 struct ViewPath: Hashable {
     /// `ViewPath` の 1 段。
     enum Component: Hashable {
-        /// ``RenderContext`` のメソッドに渡した `index:` 引数。
+        /// ``RenderContext`` のメソッドか ``ViewVisitor/visit(_:index:)`` に渡した `index:` 引数。
         case index(Int)
         /// ``View/id(_:)`` の引数。
         case key(AnyHashable)
@@ -16,7 +17,7 @@ struct ViewPath: Hashable {
 
     /// `ViewPath.Component` を 1 つも持たない `ViewPath`。
     ///
-    /// `ViewGraph.renderFrame(_:into:ambiguousWidth:)` の `view` 引数と、``RenderContext/init(screen:ambiguousWidth:)`` で作った ``RenderContext`` を受け取る ``View`` に使う。
+    /// `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の `view` 引数と、``RenderContext/init(screen:ambiguousWidth:)`` で作った ``RenderContext`` を受け取る ``View`` に使う。
     static var root: ViewPath { ViewPath(components: []) }
 
     /// 末尾に `component` を足した `ViewPath` を返す。
@@ -26,6 +27,20 @@ struct ViewPath: Hashable {
     /// - Returns: この `ViewPath` の末尾に `component` を足した `ViewPath`。
     func appending(_ component: Component) -> ViewPath {
         ViewPath(components: components + [component])
+    }
+
+    /// 末尾に、`child` を区別する `ViewPath.Component` を足した `ViewPath` を返す。
+    ///
+    /// - Parameters:
+    ///   - child: ``RenderContext`` のメソッドか ``ViewVisitor/visit(_:index:)`` に渡す ``View``。
+    ///   - index: `child` とともに渡す `index:` 引数。
+    /// - Returns: `child` が ``View/id(_:)`` で作った ``View`` なら ``View/id(_:)`` の引数を `.key(_:)` として、そうでなければ `index` を `.index(_:)` として、末尾に足した `ViewPath`。
+    @MainActor
+    func appending(_ child: some View, index: Int) -> ViewPath {
+        if let identified = child as? any ExplicitlyIdentified {
+            return appending(.key(identified.identityKey))
+        }
+        return appending(.index(index))
     }
 
     /// `other` がこの `ViewPath` で始まるかを返す。
@@ -48,7 +63,7 @@ struct ViewPath: Hashable {
 /// }
 /// ```
 ///
-/// - Note: `index` は、`child` 引数として渡す ``View`` どうしを区別する番号で、同じ ``View`` には ``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` で同じ番号を渡す。``VStack/children`` の並びのように、``View`` の並びの中の位置で決まる値を使う。
+/// - Note: `index` は、`child` 引数として渡す ``View`` どうしを区別する番号で、同じ ``View`` には ``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` で同じ番号を渡す。``PrimitiveView/visitChildren(_:)`` で ``ViewVisitor/visit(_:index:)`` に渡す番号も同じにする。``VStack/children`` の並びのように、``View`` の並びの中の位置で決まる値を使う。
 @MainActor
 public struct RenderContext {
     /// この ``RenderContext`` を受け取る ``View`` の `ViewNode`。
@@ -115,13 +130,7 @@ public struct RenderContext {
     /// - Returns: `child` の `ViewNode` を持つ ``RenderContext``。`child` が ``View/id(_:)`` で作った ``View`` なら、`ViewPath` には `index` の代わりに ``View/id(_:)`` の引数を `.key(_:)` として足す。
     /// - Postcondition: `child` の ``State`` が、`child` の `ViewNode` の記憶域へ結び付いている。
     func context(for child: some View, index: Int) -> RenderContext {
-        let component: ViewPath.Component
-        if let identified = child as? any ExplicitlyIdentified {
-            component = .key(identified.identityKey)
-        } else {
-            component = .index(index)
-        }
-        let node = graph.node(at: path.appending(component), viewType: type(of: child))
+        let node = graph.node(at: path.appending(child, index: index), viewType: type(of: child))
         graph.bindState(of: child, to: node)
         return RenderContext(node: node, graph: graph, screen: screen, ambiguousWidth: ambiguousWidth)
     }
