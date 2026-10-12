@@ -140,7 +140,7 @@ public struct RenderContext {
 
     /// この ``RenderContext`` を受け取る ``View`` がフォーカスを持てば `true`。
     var isFocused: Bool {
-        graph.focusedNodeID == node.id
+        graph.environment.focus?.isFocused(node) ?? false
     }
 
     /// この ``RenderContext`` を受け取る ``View`` が ``Buffer`` へ書き込んだ矩形を、``InputEvent`` の `.mouse` の当たり判定に加える。

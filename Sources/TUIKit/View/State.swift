@@ -69,8 +69,8 @@ protocol StateProperty {
     /// - Parameters:
     ///   - node: 記憶域を持つ `ViewNode`。
     ///   - label: ``View`` に準拠する型の中でのプロパティの名前。
-    ///   - graph: `node` を持つ `ViewGraph`。
-    func bind(to node: ViewNode, label: String, in graph: ViewGraph)
+    ///   - environment: `node` を持つ `ViewGraph` の `ViewGraph.environment`。
+    func bind(to node: ViewNode, label: String, environment: ViewEnvironment)
 }
 
 extension State: StateProperty {
@@ -79,8 +79,8 @@ extension State: StateProperty {
     /// - Parameters:
     ///   - node: 記憶域を持つ `ViewNode`。
     ///   - label: ``View`` に準拠する型の中でのプロパティの名前。
-    ///   - graph: `node` を持つ `ViewGraph`。
-    func bind(to node: ViewNode, label: String, in graph: ViewGraph) {
+    ///   - environment: `node` を持つ `ViewGraph` の `ViewGraph.environment`。
+    func bind(to node: ViewNode, label: String, environment: ViewEnvironment) {
         box.storage = node.storage(for: label, initialValue: initialValue)
     }
 }

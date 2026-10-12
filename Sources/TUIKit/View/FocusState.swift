@@ -88,11 +88,11 @@ extension FocusState: StateProperty {
     /// - Parameters:
     ///   - node: 記憶域を持つ `ViewNode`。
     ///   - label: ``View`` に準拠する型の中でのプロパティの名前。
-    ///   - graph: `node` を持つ `ViewGraph`。
-    func bind(to node: ViewNode, label: String, in graph: ViewGraph) {
+    ///   - environment: `node` を持つ `ViewGraph` の `ViewGraph.environment`。
+    func bind(to node: ViewNode, label: String, environment: ViewEnvironment) {
         let resetValue = self.resetValue
         let storage = node.object(for: label) { FocusStateStorage(resetValue: resetValue) }
-        storage.graph = graph
+        storage.focus = environment.focus
         box.storage = storage
     }
 }
@@ -108,11 +108,36 @@ final class FocusStateBox<Value: Hashable> {
 @MainActor
 protocol AnyFocusStateStorage: AnyObject {}
 
+/// フォーカスを保持し、``View`` と ``FocusState`` にフォーカスを示す型。
+@MainActor
+protocol FocusProviding: AnyObject {
+    /// `node` の ``View`` がフォーカスを持つかを返す。
+    ///
+    /// - Parameters:
+    ///   - node: 調べる ``View`` の `ViewNode`。
+    /// - Returns: フォーカスを持てば `true`。
+    func isFocused(_ node: ViewNode) -> Bool
+
+    /// `storage` に結び付いた ``View`` のうち、フォーカスを持つものの値を返す。
+    ///
+    /// - Parameters:
+    ///   - storage: `@FocusState` を付けたプロパティの記憶域。
+    /// - Returns: フォーカスを持つ ``View`` に `storage` が結び付いていればその値。結び付いていなければ `nil`。
+    func focusedValue(of storage: any AnyFocusStateStorage) -> AnyHashable?
+
+    /// `@FocusState` を付けたプロパティへの代入を、フォーカスへ反映する。
+    ///
+    /// - Parameters:
+    ///   - value: 代入された値。`nil`（`Bool` なら `false`）が代入されたなら `nil`。
+    ///   - storage: 代入された `@FocusState` を付けたプロパティの記憶域。
+    func assign(_ value: AnyHashable?, to storage: any AnyFocusStateStorage)
+}
+
 /// `ViewNode` が持つ、``FocusState`` 1 つ分の記憶域。
 @MainActor
 final class FocusStateStorage<Value: Hashable>: AnyFocusStateStorage {
-    /// この記憶域を持つ `ViewNode` の `ViewGraph`。
-    weak var graph: ViewGraph?
+    /// フォーカスを保持する `FocusProviding`。``RenderContext/init(screen:ambiguousWidth:)`` で作った ``RenderContext`` から結び付いたときは `nil`。
+    weak var focus: (any FocusProviding)?
     /// フォーカスが結び付いた ``View`` に無いときの値。
     let resetValue: Value
 
@@ -126,16 +151,16 @@ final class FocusStateStorage<Value: Hashable>: AnyFocusStateStorage {
 
     /// フォーカスを持つ ``View`` に結び付いた値。どれにも結び付いていなければ `FocusStateStorage.resetValue`。
     var value: Value {
-        guard let focused = graph?.focusController?.focusedValue(of: self) else { return resetValue }
+        guard let focused = focus?.focusedValue(of: self) else { return resetValue }
         return focused.base as? Value ?? resetValue
     }
 
-    /// `newValue` に結び付いた ``View`` へフォーカスを移すよう `ApplicationContext` に求める。
+    /// `newValue` に結び付いた ``View`` へフォーカスを移すよう `FocusController` に求める。
     ///
     /// - Parameters:
     ///   - newValue: 代入された値。
     func assign(_ newValue: Value) {
-        graph?.focusController?.assign(newValue == resetValue ? nil : AnyHashable(newValue), to: self)
+        focus?.assign(newValue == resetValue ? nil : AnyHashable(newValue), to: self)
     }
 }
 
@@ -168,7 +193,7 @@ public struct FocusedView<Content: View, Value: Hashable>: View {
     public var body: Content { content }
 }
 
-/// ``View/focused(_:equals:)``・``View/focused(_:)`` で作った ``View`` が、たどったときに `ApplicationContext` へ示すもの。
+/// ``View/focused(_:equals:)``・``View/focused(_:)`` で作った ``View`` が、たどったときに `FocusController` へ示すもの。
 @MainActor
 protocol FocusBindingView {
     /// 結び付ける ``FocusState`` の記憶域。``FocusState`` が記憶域に結び付く前に作った ``View`` では `nil`。

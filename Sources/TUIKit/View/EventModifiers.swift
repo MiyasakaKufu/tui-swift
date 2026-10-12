@@ -23,7 +23,7 @@ public struct KeyPressView<Content: View>: View {
     public var body: Content { content }
 }
 
-/// ``View/onKeyPress(_:action:)`` で作った ``View`` が、たどったときに `ApplicationContext` へ示すもの。
+/// ``View/onKeyPress(_:action:)`` で作った ``View`` が、たどったときに `FocusController` へ示すもの。
 @MainActor
 protocol KeyPressHandlingView {
     /// 受け取る ``Key``。
@@ -64,7 +64,7 @@ public struct ChangeObservingView<Content: View, Value: Equatable>: View {
     public var body: Content { content }
 }
 
-/// ``View/onChange(of:_:)`` で作った ``View`` が、たどったときに `ApplicationContext` へ示すもの。
+/// ``View/onChange(of:_:)`` で作った ``View`` が、たどったときに `FocusController` へ示すもの。
 @MainActor
 protocol ChangeObservingViewProtocol {
     /// 前に `node` でたどったときの値と比べ、変わっていれば呼び出すクロージャを返す。

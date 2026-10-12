@@ -1,43 +1,23 @@
-/// ``Application`` が持ち、`ViewNode` とフォーカスを `Application.draw()` をまたいで保持するクラス。
+/// ``Application`` が持ち、`ViewGraph` と `FocusController` をまとめるクラス。
 ///
-/// フォーカスは、`ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` が描画より前にたどった ``View`` の一覧から決める。``InputEvent`` を渡す先も、直前にたどった一覧から決める。`.mouse` の当たり判定だけは、直前の描画で ``Buffer`` へ書き込んだ ``View`` の矩形を使う。
+/// `ViewGraph` がたどった ``View`` の一覧を `FocusController` へ渡し、`FocusController` が描画より前にフォーカスを決める。`ViewGraph` はフォーカスを知らず、`ViewGraph.environment` で `FocusController` を ``View`` へ渡すだけ。
 @MainActor
 final class ApplicationContext {
     /// `ViewNode` を `ViewPath` ごとに保持する `ViewGraph`。
     let graph = ViewGraph()
 
-    /// フォーカスを持つ ``View`` の `ViewNode.id`。どの ``View`` もフォーカスを持たなければ `nil`。
-    private(set) var focusedNodeID: Int? {
-        didSet { graph.focusedNodeID = focusedNodeID }
-    }
-
-    /// `@FocusState` を付けたプロパティへの `nil`（`Bool` なら `false`）の代入でフォーカスを外した後なら `true`。
-    private var isFocusRemovedByAssignment = false
-
-    /// 移す先が一覧に無かったために保留している、`@FocusState` を付けたプロパティへの代入。
-    private var pendingAssignment: FocusAssignment?
-
-    /// ``View/sheet(isPresented:content:)`` の `content:` を表示する直前のフォーカスの状態。`content:` を表示している ``SheetView`` の `ViewNode.id` ごとに持つ。
-    private var savedFocusBeforeSheets: [Int: SavedFocus] = [:]
-
-    /// 直前にたどった ``View`` の一覧から作った `FocusIndex`。
-    private(set) var index = FocusIndex()
-
-    /// 直前の `ApplicationContext.renderFrame(_:into:ambiguousWidth:allowsFollowUp:)` の呼び出しで、``View/onChange(of:_:)`` が値の変化を見つけて呼び出すクロージャ。
-    private var changeActions: [@MainActor () -> Void] = []
+    /// フォーカスを保持する `FocusController`。
+    let focus = FocusController()
 
     /// `ApplicationContext` を作る。
     init() {
-        graph.focusController = self
+        graph.environment.focus = focus
     }
 
     /// フォーカスを持つ ``TextField`` が直前の描画で示した、端末エミュレータのカーソルの位置。描画されなかったか、フォーカスを持つ ``TextField`` が無ければ `nil`。
     var cursorPosition: Point? {
-        guard let focusedNodeID else { return nil }
-        return graph.cursorPoints[focusedNodeID]
+        focus.cursorPosition(in: graph.cursorPoints)
     }
-
-    // MARK: - 描画
 
     /// `makeView` が返す ``View`` を `ViewPath.root` に置いて `Application.draw()` の 1 回分を描き、`present` に渡す。
     ///
@@ -56,55 +36,80 @@ final class ApplicationContext {
         var allowsFollowUp = true
         while true {
             buffer.clear()
-            let needsFollowUp = renderFrame(
-                makeView(),
-                into: &buffer,
-                ambiguousWidth: ambiguousWidth,
-                allowsFollowUp: allowsFollowUp
-            )
+            var changeActions: [@MainActor () -> Void] = []
+            var focusChanged = false
+            graph.renderFrame(makeView(), into: &buffer, ambiguousWidth: ambiguousWidth) { visited in
+                changeActions = visited.compactMap { visitedView in
+                    (visitedView.view as? any ChangeObservingViewProtocol)?.detectChange(in: visitedView.node)
+                }
+                focusChanged = focus.decideFocus(visiting: visited)
+            }
+            for action in changeActions { action() }
             present(buffer)
-            guard needsFollowUp else { return }
+            guard allowsFollowUp, focusChanged || !changeActions.isEmpty else { return }
             allowsFollowUp = false
         }
     }
 
-    /// `view` を `ViewPath.root` に置き、`Application.draw()` の 1 回分を描く。
+    /// `event` を `FocusController.deliver(_:)` へ渡す。
     ///
     /// - Parameters:
-    ///   - view: ``Application`` が最初にメソッドを呼び出す ``View``。
-    ///   - buffer: 描画先の ``Buffer``。画面全体として扱う。
-    ///   - ambiguousWidth: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
-    ///   - allowsFollowUp: もう 1 回続けて描けるなら `true`。続けて描く 1 回では `false` を渡す。
-    /// - Returns: たどった後にフォーカスが変わったか、``View/onChange(of:_:)`` が値の変化を見つけ、`allowsFollowUp` が `true` なら `true`。
-    /// - Postcondition: ``View/onChange(of:_:)`` が値の変化を見つけたら、描画した後にそのクロージャを呼び出している。
-    private func renderFrame(
-        _ view: some View,
-        into buffer: inout Buffer,
-        ambiguousWidth: DisplayWidth.AmbiguousWidth,
-        allowsFollowUp: Bool
-    ) -> Bool {
-        var focusChanged = false
-        graph.renderFrame(view, into: &buffer, ambiguousWidth: ambiguousWidth) { visited in
-            focusChanged = self.decideFocus(visiting: visited)
-        }
-
-        let actions = changeActions
-        changeActions = []
-        for action in actions { action() }
-        return allowsFollowUp && (focusChanged || !actions.isEmpty)
+    ///   - event: 渡す `KeyEvent`。
+    /// - Returns: `FocusController.deliver(_:)` の戻り値。
+    func deliver(_ event: KeyEvent) -> EventResult? {
+        focus.deliver(event)
     }
 
-    /// たどった ``View`` の一覧から `ApplicationContext.index` を作り直し、フォーカスを決める。
+    /// `.paste` を `FocusController.deliverPaste(_:)` へ渡す。
     ///
     /// - Parameters:
-    ///   - visited: `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` がたどった順に並べた `VisitedView`。
+    ///   - event: 渡す `.paste`。
+    /// - Returns: `FocusController.deliverPaste(_:)` の戻り値。
+    func deliverPaste(_ event: InputEvent) -> Bool {
+        focus.deliverPaste(event)
+    }
+
+    /// `event` を、直前の描画で ``Buffer`` へ書き込んだ ``View`` の矩形とともに `FocusController.deliver(_:hitRegions:)` へ渡す。
+    ///
+    /// - Parameters:
+    ///   - event: 渡す `MouseEvent`。
+    /// - Returns: `FocusController.deliver(_:hitRegions:)` の戻り値。
+    func deliver(_ event: MouseEvent) -> Bool {
+        focus.deliver(event, hitRegions: graph.hitRegions)
+    }
+}
+
+/// フォーカスを保持し、``InputEvent`` を ``View`` へ渡すクラス。
+///
+/// フォーカスは、描画より前にたどった ``View`` の一覧だけから決める。`ViewGraph` は知らない。
+@MainActor
+final class FocusController: FocusProviding {
+    /// フォーカスを持つ ``View`` の `ViewNode.id`。どの ``View`` もフォーカスを持たなければ `nil`。
+    private(set) var focusedNodeID: Int?
+
+    /// `@FocusState` を付けたプロパティへの `nil`（`Bool` なら `false`）の代入でフォーカスを外した後なら `true`。
+    private var isFocusRemovedByAssignment = false
+
+    /// 移す先が一覧に無かったために保留している、`@FocusState` を付けたプロパティへの代入。
+    private var pendingAssignment: FocusAssignment?
+
+    /// ``View/sheet(isPresented:content:)`` の `content:` を表示する直前のフォーカスの状態。`content:` を表示している ``SheetView`` の `ViewNode.id` ごとに持つ。
+    private var savedFocusBeforeSheets: [Int: SavedFocus] = [:]
+
+    /// 直前にたどった ``View`` の一覧から作った `FocusIndex`。
+    private(set) var index = FocusIndex()
+
+    /// `FocusController` を作る。
+    init() {}
+
+    /// たどった ``View`` の一覧から `FocusController.index` を作り直し、フォーカスを決める。
+    ///
+    /// - Parameters:
+    ///   - visited: 描画より前にたどった順に並べた `VisitedView`。
     /// - Returns: フォーカスを持つ ``View`` が変わったら `true`。
-    private func decideFocus(visiting visited: [ViewGraph.VisitedView]) -> Bool {
+    func decideFocus(visiting visited: [ViewGraph.VisitedView]) -> Bool {
         let previousIndex = index
         index = FocusIndex(visited)
-        changeActions = visited.compactMap { visitedView in
-            (visitedView.view as? any ChangeObservingViewProtocol)?.detectChange(in: visitedView.node)
-        }
 
         let previousFocus = focusedNodeID
 
@@ -163,7 +168,26 @@ final class ApplicationContext {
         isFocusRemovedByAssignment = false
     }
 
-    // MARK: - @FocusState
+    // MARK: - FocusProviding
+
+    /// `node` の ``View`` がフォーカスを持つかを返す。
+    ///
+    /// - Parameters:
+    ///   - node: 調べる ``View`` の `ViewNode`。
+    /// - Returns: フォーカスを持てば `true`。
+    func isFocused(_ node: ViewNode) -> Bool {
+        focusedNodeID == node.id
+    }
+
+    /// フォーカスを持つ ``TextField`` が示した、端末エミュレータのカーソルの位置を返す。
+    ///
+    /// - Parameters:
+    ///   - cursorPoints: 直前の描画で、描画された ``TextField`` が示した位置。`ViewNode.id` ごとに持つ。
+    /// - Returns: フォーカスを持つ ``TextField`` の位置。描画されなかったか、フォーカスを持つ ``TextField`` が無ければ `nil`。
+    func cursorPosition(in cursorPoints: [Int: Point]) -> Point? {
+        guard let focusedNodeID else { return nil }
+        return cursorPoints[focusedNodeID]
+    }
 
     /// `storage` に結び付いた ``View`` のうち、フォーカスを持つものの値を返す。
     ///
@@ -240,10 +264,11 @@ final class ApplicationContext {
     ///
     /// - Parameters:
     ///   - event: 渡す `MouseEvent`。
+    ///   - hitRegions: 直前の描画で ``View`` が ``Buffer`` へ書き込んだ矩形。書き込んだ順に並ぶ。
     /// - Returns: 渡した ``View`` が処理したら `true`。渡す先が無ければ `false`。
     /// - Postcondition: `event` がボタンの押下で、渡す先があれば、渡す前にフォーカスをそこへ移している。
-    func deliver(_ event: MouseEvent) -> Bool {
-        guard let region = graph.hitRegions.last(where: { $0.rect.contains(event.position) }),
+    func deliver(_ event: MouseEvent, hitRegions: [HitRegion]) -> Bool {
+        guard let region = hitRegions.last(where: { $0.rect.contains(event.position) }),
               !index.isBehindSheet(region.path),
               let target = index.targets
                 .filter({ !$0.isBehindSheet && $0.path.contains(region.path) })
@@ -459,7 +484,7 @@ struct FocusBinding {
     let matchesAnyDescendant: Bool
 }
 
-/// フォーカスを受け取る ``View``（``TextField``・``ListView``）が、たどったときに `ApplicationContext` へ示すもの。
+/// フォーカスを受け取る ``View``（``TextField``・``ListView``）が、たどったときに `FocusController` へ示すもの。
 @MainActor
 protocol FocusableView {
     /// フォーカスを持つ間に ``InputEvent`` を受け取る。

@@ -73,7 +73,7 @@ public struct SheetView<Content: View, SheetContent: View>: PrimitiveView {
     }
 }
 
-/// ``View/sheet(isPresented:content:)`` で作った ``View`` が、たどったときに `ApplicationContext` へ示すもの。
+/// ``View/sheet(isPresented:content:)`` で作った ``View`` が、たどったときに `FocusController` へ示すもの。
 @MainActor
 protocol SheetPresentingView {
     /// `content:` の ``View`` を表示していれば `true`。

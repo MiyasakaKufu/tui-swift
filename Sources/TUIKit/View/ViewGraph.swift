@@ -92,11 +92,8 @@ final class ViewGraph {
     /// いま描いている `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の呼び出しで、`ViewGraph.visit(_:node:)` が辿った順に並べた `VisitedView`。
     private var visitedViews: [VisitedView] = []
 
-    /// フォーカスを保持し、`@FocusState` を付けたプロパティへの代入を受け取る `ApplicationContext`。``RenderContext/init(screen:ambiguousWidth:)`` で作った ``RenderContext`` の `ViewGraph` では `nil`。
-    weak var focusController: ApplicationContext?
-
-    /// フォーカスを持つ ``View`` の `ViewNode.id`。どの ``View`` もフォーカスを持たなければ `nil`。
-    var focusedNodeID: Int?
+    /// ``State`` などを結び付けるときと描画するときに、``View`` へ渡す `ViewEnvironment`。`ViewGraph` を使う側が設定する。
+    var environment = ViewEnvironment()
 
     /// 最後の `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の呼び出しで、``View`` が ``Buffer`` へ書き込んだ矩形。書き込んだ順に並ぶ。
     private(set) var hitRegions: [HitRegion] = []
@@ -162,7 +159,7 @@ final class ViewGraph {
         var hasState = false
         for child in Mirror(reflecting: view).children {
             guard let label = child.label, let property = child.value as? any StateProperty else { continue }
-            property.bind(to: node, label: label, in: self)
+            property.bind(to: node, label: label, environment: environment)
             hasState = true
         }
         if !hasState {
