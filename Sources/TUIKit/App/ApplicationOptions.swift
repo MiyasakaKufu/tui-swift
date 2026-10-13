@@ -30,16 +30,16 @@ public struct ApplicationOptions: Sendable {
     public var cursorShape: CursorShape?
     /// 入力がなくても一定間隔で再描画する（秒）。`nil` なら入力があるまで待つ。
     public var frameInterval: Double?
-    /// ``Component/handle(_:)`` が `.ignored` を返した Ctrl+C で ``Application`` を終了する。
+    /// ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+C で ``Application`` を終了する。
     ///
     /// - Note: raw モードでは `ISIG` を無効にしているため Ctrl+C は SIGINT にならない。
-    ///   この設定がなければ、``Component/handle(_:)`` が `.quit` を返さない TUIKit アプリを端末エミュレータから止められなくなる。
-    ///   ``Component/handle(_:)`` で Ctrl+C を扱う TUIKit アプリだけ `false` にする。
+    ///   この設定がなければ、``TerminalApp/isFinished`` を `true` にしない TUIKit アプリを端末エミュレータから止められなくなる。
+    ///   ``TerminalApp/handle(_:)`` で Ctrl+C を扱う TUIKit アプリだけ `false` にする。
     public var quitsOnControlC: Bool
-    /// ``Component/handle(_:)`` が `.ignored` を返した Ctrl+Z で TUIKit アプリを一時停止する。
+    /// ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+Z で TUIKit アプリを一時停止する。
     ///
     /// - Note: raw モードでは `ISIG` を無効にしているため Ctrl+Z は SIGTSTP にならない。
-    ///   この設定がなければ、端末デバイスの termios と、端末エミュレータへ送ったモードを戻さないまま止まるか、そもそも止まらない。``Component/handle(_:)`` で Ctrl+Z を扱う TUIKit アプリだけ `false` にする。
+    ///   この設定がなければ、端末デバイスの termios と、端末エミュレータへ送ったモードを戻さないまま止まるか、そもそも止まらない。``TerminalApp/handle(_:)`` で Ctrl+Z を扱う TUIKit アプリだけ `false` にする。
     public var suspendsOnControlZ: Bool
     /// East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。
     ///
@@ -58,8 +58,8 @@ public struct ApplicationOptions: Sendable {
     ///   - windowTitle: 起動時に設定するウィンドウタイトル。`nil` なら変えない。
     ///   - cursorShape: 起動時に設定するカーソル形状。`nil` なら変えない。
     ///   - frameInterval: 入力がなくても再描画する間隔（秒）。`nil` なら入力があるまで待つ。
-    ///   - quitsOnControlC: ``Component/handle(_:)`` が `.ignored` を返した Ctrl+C で終了するか。
-    ///   - suspendsOnControlZ: ``Component/handle(_:)`` が `.ignored` を返した Ctrl+Z で一時停止するか。
+    ///   - quitsOnControlC: ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+C で終了するか。
+    ///   - suspendsOnControlZ: ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+Z で一時停止するか。
     ///   - ambiguousWidth: East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。
     public init(
         usesAlternateScreen: Bool = true,
@@ -90,20 +90,20 @@ public struct ApplicationOptions: Sendable {
     /// すべて既定値の設定。
     public static let `default` = ApplicationOptions()
 
-    /// ``Component/handle(_:)`` が `.ignored` を返した ``InputEvent`` で終了するかを判定する。
+    /// ``TerminalApp/handle(_:)`` が `.ignored` を返した ``InputEvent`` で終了するかを判定する。
     ///
     /// - Parameters:
-    ///   - event: ``Component/handle(_:)`` が `.ignored` を返した ``InputEvent``。
+    ///   - event: ``TerminalApp/handle(_:)`` が `.ignored` を返した ``InputEvent``。
     /// - Returns: このイベントで終了するなら `true`。
     func quits(onUnhandled event: InputEvent) -> Bool {
         guard quitsOnControlC, case .key(let keyEvent) = event else { return false }
         return keyEvent.isControl("c")
     }
 
-    /// ``Component/handle(_:)`` が `.ignored` を返した ``InputEvent`` で一時停止するかを判定する。
+    /// ``TerminalApp/handle(_:)`` が `.ignored` を返した ``InputEvent`` で一時停止するかを判定する。
     ///
     /// - Parameters:
-    ///   - event: ``Component/handle(_:)`` が `.ignored` を返した ``InputEvent``。
+    ///   - event: ``TerminalApp/handle(_:)`` が `.ignored` を返した ``InputEvent``。
     /// - Returns: このイベントで一時停止するなら `true`。
     func suspends(onUnhandled event: InputEvent) -> Bool {
         guard suspendsOnControlZ, case .key(let keyEvent) = event else { return false }

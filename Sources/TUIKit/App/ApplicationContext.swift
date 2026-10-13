@@ -97,6 +97,9 @@ final class FocusController: FocusProviding {
     /// 直前にたどった ``View`` の一覧から作った `FocusIndex`。
     private(set) var index = FocusIndex()
 
+    /// ``View/onKeyPress(_:action:)`` のクロージャを 1 つ呼び出すたびに呼び出し、`true` を返したら残りのクロージャを呼び出さずに戻るクロージャ。
+    var stopsDelivering: @MainActor () -> Bool = { false }
+
     /// `FocusController` を作る。
     init() {}
 
@@ -229,7 +232,7 @@ final class FocusController: FocusProviding {
     ///
     /// - Parameters:
     ///   - event: 渡す `KeyEvent`。
-    /// - Returns: どれかが処理したら `.handled`、``View/onKeyPress(_:action:)`` のクロージャが `.quit` を返したら `.quit`。どれも処理しなければ `nil`。
+    /// - Returns: どれかが処理したら `.handled`。`FocusController.stopsDelivering` が `true` を返して途中で戻ったら `.ignored`。どれも処理しなければ `nil`。
     func deliver(_ event: KeyEvent) -> EventResult? {
         if let target = focusedTarget {
             if target.handle(.key(event)) { return .handled }
@@ -239,7 +242,7 @@ final class FocusController: FocusProviding {
                 .sorted { $0.path.depth > $1.path.depth }
             for handler in handlers {
                 let result = handler.action()
-                if result != .ignored { return result }
+                if result != .ignored || stopsDelivering() { return result }
             }
         }
 

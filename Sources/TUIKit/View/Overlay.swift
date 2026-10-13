@@ -227,7 +227,7 @@ public struct OverlayView<Content: View, Overlay: View>: PrimitiveView {
 ///
 /// - Warning: ``ScreenOverlayView/overlay`` は ``View/render(into:rect:context:)`` に渡された矩形の外へも描く。
 ///   ``View`` が約束する「`rect` の外の ``Cell`` は書き換えない」から外れる唯一の ``View``。
-/// - Note: ``ScreenOverlayView/overlay`` が描かれるのは、``ScreenOverlayView`` が描かれた時点。後から描かれる ``View`` には上書きされるので、``ScreenOverlayView`` を、``Application`` が最初にメソッドを呼び出す ``View`` にする（``Component/body`` が ``View/screenOverlay(_:horizontal:vertical:)`` の戻り値を返すようにする）。
+/// - Note: ``ScreenOverlayView/overlay`` が描かれるのは、``ScreenOverlayView`` が描かれた時点。後から描かれる ``View`` には上書きされるので、``ScreenOverlayView`` を、``Application`` が最初にメソッドを呼び出す ``View`` にする（``TerminalApp/body`` が ``View/screenOverlay(_:horizontal:vertical:)`` の戻り値を返すようにする）。
 public struct ScreenOverlayView<Content: View, Overlay: View>: PrimitiveView {
     /// 下に敷く ``View``。
     public var content: Content
@@ -330,7 +330,7 @@ extension View {
     ///   - horizontal: `overlay` を画面の横方向で寄せる向き。
     ///   - vertical: `overlay` を画面の縦方向で寄せる向き。
     /// - Returns: 画面全体を基準に `overlay` を重ねた ``ScreenOverlayView``。
-    /// - Note: `overlay` が後から描かれる ``View`` に隠れないよう、``ScreenOverlayView`` を、``Application`` が最初にメソッドを呼び出す ``View`` にする（``Component/body`` がこのメソッドの戻り値を返すようにする）。
+    /// - Note: `overlay` が後から描かれる ``View`` に隠れないよう、``ScreenOverlayView`` を、``Application`` が最初にメソッドを呼び出す ``View`` にする（``TerminalApp/body`` がこのメソッドの戻り値を返すようにする）。
     public func screenOverlay<Overlay: View>(
         _ overlay: Overlay,
         horizontal: HorizontalAlignment = .center,

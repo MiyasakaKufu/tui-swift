@@ -1,8 +1,8 @@
 import XCTest
 @testable import TUIKit
 
-/// `Component.body` だけを書いた表示専用の `Component` に準拠する型。
-private final class DisplayOnlyComponent: Component {
+/// `TerminalApp.body` だけを書いた表示専用の `TerminalApp` に準拠する型。
+private final class DisplayOnlyApp: TerminalApp {
     var body: some View {
         Text("こんにちは")
     }
@@ -21,21 +21,25 @@ private final class MinimalApp: TerminalApp {
 }
 
 @MainActor
-final class ComponentTests: XCTestCase {
+final class TerminalAppTests: XCTestCase {
 
     func testDefaultHandleIgnoresEvents() async {
-        let component = DisplayOnlyComponent()
-        XCTAssertEqual(component.handle(.key(KeyEvent(.up))), .ignored)
-        XCTAssertEqual(component.handle(.resize(Size(width: 10, height: 4))), .ignored)
+        let app = DisplayOnlyApp()
+        XCTAssertEqual(app.handle(.key(KeyEvent(.up))), .ignored)
+        XCTAssertEqual(app.handle(.resize(Size(width: 10, height: 4))), .ignored)
     }
 
     func testDefaultCursorPositionIsNil() async {
-        XCTAssertNil(DisplayOnlyComponent().cursorPosition)
+        XCTAssertNil(DisplayOnlyApp().cursorPosition)
+    }
+
+    func testDefaultIsFinishedIsFalse() async {
+        XCTAssertFalse(DisplayOnlyApp().isFinished)
     }
 
     func testBodyRendersThroughStaticType() async {
         var buffer = Buffer(size: Size(width: 10, height: 1))
-        DisplayOnlyComponent().body.renderAsRoot(into: &buffer, rect: buffer.bounds)
+        DisplayOnlyApp().body.renderAsRoot(into: &buffer, rect: buffer.bounds)
         XCTAssertEqual(buffer.text(ofRow: 0), "こんにちは")
     }
 

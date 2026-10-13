@@ -27,6 +27,7 @@ final class DemoApp: TerminalApp {
         "View の重ね描きとダイアログ",
     ]
 
+    private(set) var isFinished = false
     private var progress = 0.35
     private var lastEventDescription = "（まだ入力はありません）"
     private var terminalSize = Size(width: 0, height: 0)
@@ -51,7 +52,8 @@ final class DemoApp: TerminalApp {
         guard case .key(let keyEvent) = event else { return .ignored }
         switch keyEvent.key {
         case .character("q"), .escape:
-            return .quit
+            isFinished = true
+            return .handled
         case .character("+"):
             progress = min(1.0, progress + 0.05)
             return .handled
@@ -159,7 +161,7 @@ private struct DemoScreen: View {
         VStack(spacing: 1) {
             Text("選択中: \(items.indices.contains(selection) ? items[selection] : "-")", wrap: .word).bold()
             Text("ウィンドウサイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
-            Text("Component.handle(_:) に届いた入力: \(lastEventDescription)", wrap: .word)
+            Text("TerminalApp.handle(_:) に届いた入力: \(lastEventDescription)", wrap: .word)
 
             VStack(spacing: 0) {
                 Text("進捗（一覧で + / - を押すと増減）").dim()

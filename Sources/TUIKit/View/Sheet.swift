@@ -1,6 +1,6 @@
 /// ``SheetView/isPresented`` が `true` の間、画面の中央に `content:` の ``View`` を表示し、後ろの ``SheetView/content`` へ ``InputEvent`` を渡さない ``View``。``View/sheet(isPresented:content:)`` で作る。
 ///
-/// - Note: 画面の中央に表示した ``View`` が後から描かれる ``View`` に隠れないよう、``SheetView`` を、``Application`` が最初にメソッドを呼び出す ``View`` にする（``Component/body`` が ``View/sheet(isPresented:content:)`` の戻り値を返すようにする）。
+/// - Note: 画面の中央に表示した ``View`` が後から描かれる ``View`` に隠れないよう、``SheetView`` を、``Application`` が最初にメソッドを呼び出す ``View`` にする（``TerminalApp/body`` が ``View/sheet(isPresented:content:)`` の戻り値を返すようにする）。
 public struct SheetView<Content: View, SheetContent: View>: PrimitiveView {
     /// 後ろに描く ``View``。
     public var content: Content
@@ -110,7 +110,7 @@ extension View {
     ///   - isPresented: 表示するかを持つプロパティの ``Binding``。
     ///   - content: 画面の中央に表示する ``View`` を返すクロージャ。`isPresented` が `true` の間だけ呼び出す。
     /// - Returns: `content` を重ねる ``SheetView``。
-    /// - Note: 表示している間も、どの ``View`` も処理しなかった `.key`・`.paste` は ``Component/handle(_:)`` へ渡る。
+    /// - Note: 表示している間も、どの ``View`` も処理しなかった `.key`・`.paste` は ``TerminalApp/handle(_:)`` へ渡る。
     public func sheet<SheetContent: View>(
         isPresented: Binding<Bool>,
         content: @escaping @MainActor () -> SheetContent

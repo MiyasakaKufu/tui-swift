@@ -138,11 +138,11 @@ final class ApplicationSignalTests: XCTestCase {
     /// イベントループを回す `Task` を作る。
     ///
     /// - Parameters:
-    ///   - root: `Application` に渡す、`Component` に準拠する型のインスタンス。
+    ///   - root: `Application` に渡す、`TerminalApp` に準拠する型のインスタンス。
     ///   - terminal: 入出力に使う `Terminal`。
     /// - Returns: `Application.run()` を回している `Task`。
     @MainActor
-    private func runInBackground<Root: Component>(
+    private func runInBackground<Root: TerminalApp>(
         root: Root,
         terminal: Terminal
     ) -> Task<Void, Error> {
@@ -156,17 +156,24 @@ final class ApplicationSignalTests: XCTestCase {
     }
 }
 
-/// リサイズの通知を記録し、二度目の通知で終了する `Component` に準拠する型。
+/// リサイズの通知を記録し、二度目の通知で終了する `TerminalApp` に準拠する型。
 ///
 /// 最初の描画で一度だけ、渡された処理を実行する。
-private final class ResizeProbe: Component, @unchecked Sendable {
+private final class ResizeProbe: TerminalApp, @unchecked Sendable {
     private let trigger: () -> Void
     private var hasDrawn = false
 
     private(set) var sizes: [Size] = []
+    /// `Application` を終了するかどうか。
+    private(set) var isFinished = false
 
     init(trigger: @escaping () -> Void) {
         self.trigger = trigger
+    }
+
+    /// 何もしない処理を渡して作る。
+    convenience init() {
+        self.init(trigger: {})
     }
 
     var body: some View {
@@ -181,17 +188,23 @@ private final class ResizeProbe: Component, @unchecked Sendable {
         guard case .resize(let size) = event else { return .ignored }
         sizes.append(size)
         guard sizes.count >= 2 else { return .handled }
-        return .quit
+        isFinished = true
+        return .handled
     }
 }
 
-/// 最初の描画で一度だけ終了シグナルを送り、自分からは終了しない `Component` に準拠する型。
-private final class TerminationProbe: Component, @unchecked Sendable {
+/// 最初の描画で一度だけ終了シグナルを送り、自分からは終了しない `TerminalApp` に準拠する型。
+private final class TerminationProbe: TerminalApp, @unchecked Sendable {
     private let trigger: () -> Void
     private var hasDrawn = false
 
     init(trigger: @escaping () -> Void) {
         self.trigger = trigger
+    }
+
+    /// 何もしない処理を渡して作る。
+    convenience init() {
+        self.init(trigger: {})
     }
 
     var body: some View {
