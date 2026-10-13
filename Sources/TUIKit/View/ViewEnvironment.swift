@@ -3,4 +3,6 @@
 struct ViewEnvironment {
     /// フォーカスを保持する `FocusProviding`。無ければ、どの ``View`` もフォーカスを持たない。
     var focus: (any FocusProviding)?
+    /// ``RenderContext/theme`` が返す ``Theme``。
+    var theme: Theme = .standard
 }

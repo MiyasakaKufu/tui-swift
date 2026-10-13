@@ -46,6 +46,8 @@ public struct ApplicationOptions: Sendable {
     /// - Note: 端末エミュレータの設定と食い違うと、罫線素片や `…` を含む行で、後ろに続く文字が横にずれる。
     ///   既定値は `DisplayWidth.defaultAmbiguousWidth`（環境変数 `RUNEWIDTH_EASTASIAN` から決まる）。
     public var ambiguousWidth: DisplayWidth.AmbiguousWidth
+    /// ``View`` が ``RenderContext/theme`` で読む ``Theme``。
+    public var theme: Theme
 
     /// 設定を作る。
     ///
@@ -61,6 +63,7 @@ public struct ApplicationOptions: Sendable {
     ///   - quitsOnControlC: ``Component/handle(_:)`` が `.ignored` を返した Ctrl+C で終了するか。
     ///   - suspendsOnControlZ: ``Component/handle(_:)`` が `.ignored` を返した Ctrl+Z で一時停止するか。
     ///   - ambiguousWidth: East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。
+    ///   - theme: ``View`` が ``RenderContext/theme`` で読む ``Theme``。
     public init(
         usesAlternateScreen: Bool = true,
         mouseTracking: MouseTracking = .disabled,
@@ -72,7 +75,8 @@ public struct ApplicationOptions: Sendable {
         frameInterval: Double? = nil,
         quitsOnControlC: Bool = true,
         suspendsOnControlZ: Bool = true,
-        ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
+        ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth,
+        theme: Theme = .standard
     ) {
         self.usesAlternateScreen = usesAlternateScreen
         self.mouseTracking = mouseTracking
@@ -85,6 +89,7 @@ public struct ApplicationOptions: Sendable {
         self.quitsOnControlC = quitsOnControlC
         self.suspendsOnControlZ = suspendsOnControlZ
         self.ambiguousWidth = ambiguousWidth
+        self.theme = theme
     }
 
     /// すべて既定値の設定。

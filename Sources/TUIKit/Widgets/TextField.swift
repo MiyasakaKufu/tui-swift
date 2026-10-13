@@ -298,10 +298,10 @@ public struct TextField: PrimitiveView {
     public var state: TextFieldState
     /// 空のときに表示する文字列。
     public var placeholder: String
-    /// 文字のスタイル。
-    public var style: Style
-    /// プレースホルダのスタイル。
-    public var placeholderStyle: Style
+    /// 文字のスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/text``。
+    public var style: Style?
+    /// プレースホルダのスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/secondaryText``。
+    public var placeholderStyle: Style?
     /// フォーカスを持つ間、カーソル位置を反転表示する。
     public var showsCursor: Bool
 
@@ -311,8 +311,8 @@ public struct TextField: PrimitiveView {
     ///   - text: 編集する文字列を持つプロパティを読み書きする ``Binding``。
     ///   - state: カーソル位置を持つ ``TextFieldState``。内容は持たず、`text` を読み書きする。
     ///   - placeholder: 空のときに表示する文字列。
-    ///   - style: 文字のスタイル。
-    ///   - placeholderStyle: プレースホルダのスタイル。
+    ///   - style: 文字のスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/text``。
+    ///   - placeholderStyle: プレースホルダのスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/secondaryText``。
     ///   - showsCursor: フォーカスを持つ間、カーソル位置を反転表示するか。
     /// - Postcondition: `state` は以後、内容を `text` から読み、編集の結果を `text` へ書き戻す。
     ///   書き戻すのは `state.handle(_:)` などの編集の中だけで、描画では書き戻さない。
@@ -320,8 +320,8 @@ public struct TextField: PrimitiveView {
         text: Binding<String>,
         state: TextFieldState,
         placeholder: String = "",
-        style: Style = .plain,
-        placeholderStyle: Style = Style(foreground: .brightBlack),
+        style: Style? = nil,
+        placeholderStyle: Style? = nil,
         showsCursor: Bool = true
     ) {
         state.bind(text)
@@ -339,14 +339,14 @@ public struct TextField: PrimitiveView {
     /// - Parameters:
     ///   - state: 内容とカーソル位置を持つ ``TextFieldState``。
     ///   - placeholder: 空のときに表示する文字列。
-    ///   - style: 文字のスタイル。
-    ///   - placeholderStyle: プレースホルダのスタイル。
+    ///   - style: 文字のスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/text``。
+    ///   - placeholderStyle: プレースホルダのスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/secondaryText``。
     ///   - showsCursor: フォーカスを持つ間、カーソル位置を反転表示するか。
     public init(
         state: TextFieldState,
         placeholder: String = "",
-        style: Style = .plain,
-        placeholderStyle: Style = Style(foreground: .brightBlack),
+        style: Style? = nil,
+        placeholderStyle: Style? = nil,
         showsCursor: Bool = true
     ) {
         self.state = state
@@ -406,7 +406,7 @@ public struct TextField: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。使うのは最初の 1 行だけ。
-    ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読み、フォーカスを持つかを取得する ``RenderContext``。
+    ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読み、フォーカスを持つかと ``RenderContext/theme`` を取得する ``RenderContext``。
     /// - Postcondition: `state.renderedCursorPoint` がカーソルの画面上の位置に更新される。
     ///   描く領域がなければ `nil` になる。
     /// - Postcondition: フォーカスを持ち、`showsCursor` が `true` なら、カーソルの位置の ``Cell`` を反転した ``Style`` で書き込む。
@@ -415,6 +415,7 @@ public struct TextField: PrimitiveView {
             state.renderedCursorPoint = nil
             return
         }
+        let style = style ?? context.theme.text
         let row = Rect(x: rect.minX, y: rect.minY, width: rect.width, height: 1)
         context.recordHitRegion(row)
         buffer.fill(row, with: Cell(character: " ", style: style))
@@ -427,7 +428,7 @@ public struct TextField: PrimitiveView {
                     ambiguous: context.ambiguousWidth
                 ),
                 at: Point(x: rect.minX, y: rect.minY),
-                style: placeholderStyle,
+                style: placeholderStyle ?? context.theme.secondaryText,
                 clippedTo: row
             )
             // プレースホルダを表示している間はカーソルを置かずに済ませたくなるが、置かないと空の入力欄のどこに入力されるかが見えない。

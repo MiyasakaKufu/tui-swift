@@ -17,7 +17,7 @@ struct ViewPath: Hashable {
 
     /// `ViewPath.Component` を 1 つも持たない `ViewPath`。
     ///
-    /// `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の `view` 引数と、``RenderContext/init(screen:ambiguousWidth:)`` で作った ``RenderContext`` を受け取る ``View`` に使う。
+    /// `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` の `view` 引数と、``RenderContext/init(screen:ambiguousWidth:theme:)`` で作った ``RenderContext`` を受け取る ``View`` に使う。
     static var root: ViewPath { ViewPath(components: []) }
 
     /// 末尾に `component` を足した `ViewPath` を返す。
@@ -88,11 +88,15 @@ public struct RenderContext {
     /// - Note: `DisplayWidth` の各関数は、`ambiguous` を省くと `DisplayWidth.defaultAmbiguousWidth` で測る。文字列の幅を測るときはこの値を渡す。渡さないと、TUIKit を使う開発者が指定した扱いと測った幅が食い違い、その行の文字の ``Point/x`` がずれる。
     public let ambiguousWidth: DisplayWidth.AmbiguousWidth
 
+    /// ``Style`` の引数を省いた ``View`` が描くときに使う ``Theme``。``Application`` が描くときは ``ApplicationOptions/theme``。
+    public var theme: Theme { graph.environment.theme }
+
     /// ``View`` のメソッドを直接呼び出すときに渡す ``RenderContext`` を作る。
     ///
     /// - Parameters:
     ///   - screen: 画面全体の矩形。描画先の ``Buffer`` 全体を渡す。
     ///   - ambiguousWidth: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
+    ///   - theme: ``RenderContext/theme`` が返す ``Theme``。
     /// - Precondition: `ambiguousWidth` が描画先の ``Buffer`` の ``Buffer/ambiguousWidth`` と同じ。
     ///   違うと、``View`` が測った幅と、``Buffer`` に置かれる ``Cell`` の数が食い違う。
     /// - Note: 作るたびに新しい記憶域を使う。前に作った ``RenderContext`` で辿った ``View`` とは、同じ `index:` 引数の並びで渡しても同一性を共有せず、``State`` の記憶域も共有しない。
@@ -100,9 +104,11 @@ public struct RenderContext {
     ///   結び付くのは、この ``RenderContext`` のメソッドに `child` 引数として渡した ``View`` と、その先で ``RenderContext`` のメソッドに `child` 引数として渡された ``View``。
     public init(
         screen: Rect,
-        ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
+        ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth,
+        theme: Theme = .standard
     ) {
         let graph = ViewGraph()
+        graph.environment.theme = theme
         self.init(
             node: graph.node(at: .root, viewType: nil),
             graph: graph,

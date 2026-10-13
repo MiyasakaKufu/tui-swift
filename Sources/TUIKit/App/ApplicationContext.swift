@@ -8,8 +8,12 @@ final class ApplicationContext {
     let focus = FocusController()
 
     /// `ApplicationContext` を作る。
-    init() {
+    ///
+    /// - Parameters:
+    ///   - theme: ``View`` が ``RenderContext/theme`` で読む ``Theme``。
+    init(theme: Theme = .standard) {
         graph.environment.focus = focus
+        graph.environment.theme = theme
     }
 
     /// フォーカスを持つ ``TextField`` が直前の描画で示した、端末エミュレータのカーソルの位置。描画されなかったか、フォーカスを持つ ``TextField`` が無ければ `nil`。

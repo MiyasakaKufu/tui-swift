@@ -16,7 +16,7 @@ public final class Application<Root: Component> {
     private let reader: InputReader
     private let renderer: Renderer
     private let eventQueue: LoopEventQueue<Root.Message>
-    private let context = ApplicationContext()
+    private let context: ApplicationContext
 
     /// 別スレッドや `Task` から、``Component/Message`` の値をイベントループへ届ける ``MessageSender``。
     ///
@@ -51,6 +51,7 @@ public final class Application<Root: Component> {
         self.root = root
         self.options = options
         self.buffer = Buffer(size: .zero, ambiguousWidth: options.ambiguousWidth)
+        self.context = ApplicationContext(theme: options.theme)
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)

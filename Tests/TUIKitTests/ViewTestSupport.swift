@@ -2,7 +2,7 @@
 
 @MainActor
 extension View {
-    /// `RenderContext.init(screen:ambiguousWidth:)` で作った `RenderContext` を渡して、`View.render(into:rect:context:)` を呼び出す。
+    /// `RenderContext.init(screen:ambiguousWidth:theme:)` で作った `RenderContext` を渡して、`View.render(into:rect:context:)` を呼び出す。
     ///
     /// - Parameters:
     ///   - buffer: 描画先の `Buffer`。画面全体として扱い、`Cell` の数は `Buffer.ambiguousWidth` で数える。
@@ -13,7 +13,7 @@ extension View {
         render(into: &buffer, rect: rect, context: context)
     }
 
-    /// `RenderContext.init(screen:ambiguousWidth:)` で作った `RenderContext` を渡して `View.sizeThatFits(_:context:)` を呼び出し、その戻り値を返す。
+    /// `RenderContext.init(screen:ambiguousWidth:theme:)` で作った `RenderContext` を渡して `View.sizeThatFits(_:context:)` を呼び出し、その戻り値を返す。
     ///
     /// - Parameters:
     ///   - proposal: `View.sizeThatFits(_:context:)` の `proposal` 引数に渡す `Size`。画面全体の大きさとしても扱う。
@@ -23,7 +23,7 @@ extension View {
         return sizeThatFits(proposal, context: context)
     }
 
-    /// `RenderContext.init(screen:ambiguousWidth:)` で作った `RenderContext` を渡して `View.layoutTraits(context:)` を呼び出し、その戻り値を返す。
+    /// `RenderContext.init(screen:ambiguousWidth:theme:)` で作った `RenderContext` を渡して `View.layoutTraits(context:)` を呼び出し、その戻り値を返す。
     ///
     /// - Returns: `View.layoutTraits(context:)` の戻り値の `LayoutTraits`。
     func layoutTraitsAsRoot() -> LayoutTraits {

@@ -2,8 +2,10 @@
 public struct Text: PrimitiveView {
     /// 表示する文字列。
     public var content: String
-    /// 文字のスタイル。
-    public var style: Style
+    /// 文字のスタイル。`nil` なら、``RenderContext/theme`` の ``Theme/text`` に、``Text/foreground(_:)``・``Text/background(_:)``・``Text/attributes(_:)`` で指定した色と装飾を重ねたもの。
+    public var style: Style?
+    /// ``Text/style`` が `nil` のときに、``Theme/text`` に重ねる色と装飾。
+    var themeAdjustment = StyleAdjustment()
     /// 折り返しの方法。
     public var wrap: WrapMode
     /// 行の水平方向の揃え。
@@ -17,13 +19,13 @@ public struct Text: PrimitiveView {
     ///
     /// - Parameters:
     ///   - content: 表示する文字列。
-    ///   - style: 文字のスタイル。
+    ///   - style: 文字のスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/text``。
     ///   - wrap: 折り返しの方法。
     ///   - alignment: 行の水平方向の揃え。
     ///   - tabSize: タブストップの間隔。
     public init(
         _ content: String,
-        style: Style = .plain,
+        style: Style? = nil,
         wrap: WrapMode = .truncate,
         alignment: HorizontalAlignment = .leading,
         tabSize: Int = TabExpansion.defaultSize
@@ -55,7 +57,7 @@ public struct Text: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。高さに収まらない行は描画されない。
-    ///   - context: ``RenderContext/ambiguousWidth`` を取得するための ``RenderContext``。
+    ///   - context: ``RenderContext/ambiguousWidth`` と ``RenderContext/theme`` を取得するための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         context.recordHitRegion(rect)
@@ -63,7 +65,12 @@ public struct Text: PrimitiveView {
             content, width: rect.width, mode: wrap, tabSize: tabSize, ambiguous: context.ambiguousWidth
         )
         // ここでタブを展開してはいけない。`TextWrapping.wrap` が展開した行が二重に広がる。
-        buffer.write(lines: Array(lines.prefix(rect.height)), in: rect, style: style, alignment: alignment)
+        buffer.write(
+            lines: Array(lines.prefix(rect.height)),
+            in: rect,
+            style: style ?? themeAdjustment.applied(to: context.theme.text),
+            alignment: alignment
+        )
     }
 
     // MARK: - 見た目の調整
@@ -86,7 +93,8 @@ public struct Text: PrimitiveView {
     /// - Returns: 文字色を差し替えた複製。
     public func foreground(_ color: Color) -> Text {
         var copy = self
-        copy.style.foreground = color
+        copy.style?.foreground = color
+        copy.themeAdjustment.foreground = color
         return copy
     }
 
@@ -97,7 +105,8 @@ public struct Text: PrimitiveView {
     /// - Returns: 背景色を差し替えた複製。
     public func background(_ color: Color) -> Text {
         var copy = self
-        copy.style.background = color
+        copy.style?.background = color
+        copy.themeAdjustment.background = color
         return copy
     }
 
@@ -108,7 +117,8 @@ public struct Text: PrimitiveView {
     /// - Returns: 装飾を足した複製。
     public func attributes(_ attributes: TextAttributes) -> Text {
         var copy = self
-        copy.style.attributes.formUnion(attributes)
+        copy.style?.attributes.formUnion(attributes)
+        copy.themeAdjustment.attributes.formUnion(attributes)
         return copy
     }
 
@@ -175,4 +185,26 @@ public struct Text: PrimitiveView {
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {}
+}
+
+/// ``Theme`` の ``Style`` に重ねる色と装飾。
+struct StyleAdjustment {
+    /// 差し替える文字色。`nil` なら差し替えない。
+    var foreground: Color?
+    /// 差し替える背景色。`nil` なら差し替えない。
+    var background: Color?
+    /// 足す装飾。
+    var attributes: TextAttributes = []
+
+    /// `style` に色と装飾を重ねた ``Style`` を返す。
+    ///
+    /// - Parameters:
+    ///   - style: 重ねる先の ``Style``。
+    /// - Returns: `style` の文字色・背景色を、`nil` でないものだけ差し替え、装飾を足した ``Style``。
+    func applied(to style: Style) -> Style {
+        var result = style.adding(attributes)
+        if let foreground { result.foreground = foreground }
+        if let background { result.background = background }
+        return result
+    }
 }

@@ -136,7 +136,7 @@ protocol FocusProviding: AnyObject {
 /// `ViewNode` が持つ、``FocusState`` 1 つ分の記憶域。
 @MainActor
 final class FocusStateStorage<Value: Hashable>: AnyFocusStateStorage {
-    /// フォーカスを保持する `FocusProviding`。``RenderContext/init(screen:ambiguousWidth:)`` で作った ``RenderContext`` から結び付いたときは `nil`。
+    /// フォーカスを保持する `FocusProviding`。``RenderContext/init(screen:ambiguousWidth:theme:)`` で作った ``RenderContext`` から結び付いたときは `nil`。
     weak var focus: (any FocusProviding)?
     /// フォーカスが結び付いた ``View`` に無いときの値。
     let resetValue: Value

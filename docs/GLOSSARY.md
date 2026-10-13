@@ -60,7 +60,8 @@
 | `View` に準拠する型の格納プロパティに `@FocusState` として付け、フォーカスを持つ `View` を表し、代入でフォーカスを移す型 | `FocusState` | 値は `FocusController` が保持するフォーカスから求める。`$` で得るのは `FocusState.Binding` |
 | `Application` が持ち、`ViewGraph` と `FocusController` をまとめるクラス | `ApplicationContext` | internal |
 | フォーカスを保持し、たどった `View` の一覧からフォーカスを決め、`InputEvent` を `View` へ渡すクラス | `FocusController` | internal。`ViewGraph` を参照しない |
-| `ViewGraph` が、`State` などを結び付けるときと描画するときに `View` へ渡すもの | `ViewEnvironment` | internal。今は `FocusController` だけを持つ |
+| `ViewGraph` が、`State` などを結び付けるときと描画するときに `View` へ渡すもの | `ViewEnvironment` | internal。`FocusController` と `Theme` を持つ |
+| `Theme.text`・`Theme.selection` など、役割ごとの `Style` をまとめ、`ApplicationOptions.theme` で受け取り、`View` が `RenderContext.theme` で読む型 | `Theme` | `Style` の引数を省いた `Text`・`ListView` などは、`Theme` のプロパティの `Style` で描く |
 | `View` の拡張として定義された `View.padding(_: EdgeInsets)`・`View.border(_:style:title:titleStyle:)` などのメソッド | `View` の拡張メソッド | 個々のメソッドは名前で書く |
 | `Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型 | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型」 |
 | `TextFieldState.cursor`・`ListState.scrollOffset` などを持つクラス | `ListState`・`TextFieldState` | 2 つをまとめる語は置かない。5cf1d9a は、`View` の `State` へ移せるのは #53 の後と書いている |
@@ -112,7 +113,7 @@
 |---|---|---|
 | #98 の決定 3 で、`TerminalApp` に準拠する型から一度だけ呼び出すとしたメソッド | `Application.copyToClipboard(_:limit:)`・`Application.suspend()` | 2 つをまとめる語は置かない |
 | `TerminalApp` に準拠する型のインスタンスプロパティで、`Application` が `Application.draw()` のたびにプロパティの値を取得するもの | 名前で書く（`Component.cursorPosition` など） | |
-| `Application` が保持するプロパティとその型で、すべての `View` がプロパティの値を取得するもの | 名前で書く（`ApplicationOptions.ambiguousWidth` など） | まとめる語は置かない。まだコードに無いもの（#53、#73）は issue 番号で書く |
+| `Application` が保持するプロパティとその型で、すべての `View` がプロパティの値を取得するもの | 名前で書く（`ApplicationOptions.ambiguousWidth`・`ApplicationOptions.theme` など） | まとめる語は置かない |
 
 ## SwiftUI と同じ名前で、振る舞いが違うもの
 

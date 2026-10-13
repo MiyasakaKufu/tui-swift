@@ -2,7 +2,10 @@ import TUIKit
 
 /// TUIKit の主な機能を一通り触れるデモ。
 ///
+/// 起動時の引数に `standard` か `monochrome` を渡すと、その ``Theme`` で描く。渡さなければ ``DemoApp/demoTheme`` で描く。
+///
 ///   swift run tui-demo
+///   swift run tui-demo monochrome
 @main
 final class DemoApp: TerminalApp {
     static var options: ApplicationOptions {
@@ -10,8 +13,32 @@ final class DemoApp: TerminalApp {
             mouseTracking: .motion,
             reportsFocus: true,
             windowTitle: "TUIKit デモ",
-            cursorShape: .blinkingBar
+            cursorShape: .blinkingBar,
+            theme: theme
         )
+    }
+
+    /// 起動時の引数を渡さなかったときの ``Theme``。
+    static let demoTheme = Theme(
+        secondaryText: Style(foreground: .brightBlack),
+        accent: Style(foreground: .yellow),
+        selection: Style(foreground: .black, background: .cyan),
+        border: Style(foreground: .brightBlack),
+        error: Style(foreground: .brightRed).bold,
+        warning: Style(foreground: .yellow)
+    )
+
+    /// 起動時の引数で選んだ ``Theme`` の名前。
+    static let themeName: String = {
+        let argument = CommandLine.arguments.dropFirst().first ?? ""
+        return ["standard", "monochrome"].contains(argument) ? argument : "demo"
+    }()
+
+    /// ``ApplicationOptions/theme`` に渡す ``Theme``。
+    static let theme: Theme = switch themeName {
+    case "standard": .standard
+    case "monochrome": .monochrome
+    default: demoTheme
     }
 
     private let items = [
@@ -99,10 +126,14 @@ final class DemoApp: TerminalApp {
 /// 画面上端の見出し。
 private struct Header: View {
     var body: some View {
-        Text(" TUIKit デモ ", style: Style(foreground: .black, background: .cyan).bold)
-            .frame(height: 1)
-            .background(style: Style(background: .cyan))
-            .flexible(horizontal: 1, vertical: 0)
+        HStack(spacing: 0) {
+            Text(" TUIKit デモ ", style: DemoApp.theme.selection.bold)
+            Spacer()
+            Text(" Theme: \(DemoApp.themeName) ", style: DemoApp.theme.selection)
+        }
+        .frame(height: 1)
+        .background(style: DemoApp.theme.selection)
+        .flexible(horizontal: 1, vertical: 0)
     }
 }
 
@@ -158,16 +189,19 @@ private struct DemoScreen: View {
     private var detail: some View {
         VStack(spacing: 1) {
             Text("選択中: \(items.indices.contains(selection) ? items[selection] : "-")", wrap: .word).bold()
-            Text("ウィンドウサイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
+            Text("ウィンドウサイズ: \(terminalSize.width) x \(terminalSize.height)", style: DemoApp.theme.secondaryText)
             Text("Component.handle(_:) に届いた入力: \(lastEventDescription)", wrap: .word)
 
             VStack(spacing: 0) {
-                Text("進捗（一覧で + / - を押すと増減）").dim()
+                Text("進捗（一覧で + / - を押すと増減）", style: DemoApp.theme.secondaryText)
                 ProgressBar(value: progress, showsPercentage: true)
+                if progress >= 1.0 {
+                    Text("これ以上は増えません", style: DemoApp.theme.warning)
+                }
             }
 
             VStack(spacing: 0) {
-                Text("名前（\(name.count) 文字）").dim()
+                Text("名前（\(name.count) 文字）", style: DemoApp.theme.secondaryText)
                 TextField(text: $name, state: nameState, placeholder: "ここに入力…")
                     .padding(horizontal: 1)
                     .border(.single, style: borderStyle(for: .name))
@@ -179,7 +213,7 @@ private struct DemoScreen: View {
             }
 
             VStack(spacing: 0) {
-                Text("メモ（Enter で一覧へ戻る）").dim()
+                Text("メモ（Enter で一覧へ戻る）", style: DemoApp.theme.secondaryText)
                 TextField(text: $note, state: noteState, placeholder: "ここに入力…")
                     .padding(horizontal: 1)
                     .border(.single, style: borderStyle(for: .note))
@@ -195,13 +229,13 @@ private struct DemoScreen: View {
         .padding(horizontal: 1)
     }
 
-    /// `field` がフォーカスを持つ間だけ色を付けた、枠線の ``Style`` を返す。
+    /// `field` がフォーカスを持つ間だけ ``Theme/accent`` にした、枠線の ``Style`` を返す。
     ///
     /// - Parameters:
     ///   - field: 枠線で囲む欄。
-    /// - Returns: 枠線の ``Style``。
+    /// - Returns: フォーカスを持てば ``Theme/accent``、持たなければ ``Theme/border``。
     private func borderStyle(for field: Field) -> Style {
-        Style(foreground: focusedField == field ? .yellow : .brightBlack)
+        focusedField == field ? DemoApp.theme.accent : DemoApp.theme.border
     }
 }
 
@@ -219,7 +253,7 @@ private struct Footer: View {
     var body: some View {
         HStack(spacing: 2) {
             for hint in hints {
-                Text(" \(hint) ").styled(Style(foreground: .black, background: .white))
+                Text(" \(hint) ").styled(DemoApp.theme.selection)
             }
             Spacer()
         }
@@ -234,10 +268,9 @@ private struct Dialog: View {
     @State private var buttonState = ListState()
 
     var body: some View {
-        let textStyle = Style(foreground: .brightWhite, background: .blue)
-        return VStack(spacing: 1, alignment: .center) {
-            Text("View.sheet(isPresented:content:) で重ねたダイアログです。", style: textStyle, wrap: .word)
-            Text("表示している間、後ろの欄へは入力が渡りません。", style: textStyle, wrap: .word)
+        VStack(spacing: 1, alignment: .center) {
+            Text("View.sheet(isPresented:content:) で重ねたダイアログです。", wrap: .word)
+            Text("表示している間、後ろの欄へは入力が渡りません。", wrap: .word)
             ListView(items: ["閉じる"], state: buttonState, selectionMarker: "")
                 .frame(width: 6, height: 1)
                 .onKeyPress(.enter) {
@@ -250,8 +283,8 @@ private struct Dialog: View {
                 }
         }
         .padding(horizontal: 2, vertical: 1)
-        .border(.double, style: Style(foreground: .yellow, background: .blue), title: "ダイアログ")
-        .background(style: Style(background: .blue))
+        .border(.double, style: DemoApp.theme.accent, title: "ダイアログ")
+        .background(style: DemoApp.theme.text)
         .frame(width: 48, height: 11)
     }
 }

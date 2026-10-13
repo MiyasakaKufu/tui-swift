@@ -69,8 +69,8 @@ public struct BorderView<Content: View>: PrimitiveView {
     public var content: Content
     /// 枠線に使う文字の組み合わせ。
     public var borderStyle: BorderStyle
-    /// 枠線のスタイル。
-    public var style: Style
+    /// 枠線のスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/border``。
+    public var style: Style?
     /// 上辺に重ねる見出し。`nil` なら見出しを出さない。
     public var title: String?
     /// 見出しのスタイル。`nil` なら枠線と同じスタイル。
@@ -81,13 +81,13 @@ public struct BorderView<Content: View>: PrimitiveView {
     /// - Parameters:
     ///   - content: 枠線の内側に置く ``View``。
     ///   - borderStyle: 枠線に使う文字の組み合わせ。
-    ///   - style: 枠線のスタイル。
+    ///   - style: 枠線のスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/border``。
     ///   - title: 上辺に重ねる見出し。
     ///   - titleStyle: 見出しのスタイル。`nil` なら枠線と同じスタイル。
     public init(
         content: Content,
         borderStyle: BorderStyle = .single,
-        style: Style = .plain,
+        style: Style? = nil,
         title: String? = nil,
         titleStyle: Style? = nil
     ) {
@@ -133,7 +133,7 @@ public struct BorderView<Content: View>: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 枠線を含めた矩形。幅・高さが 2 未満なら何も描かない。
-    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    ///   - context: 別の ``View`` のメソッドを呼び出し、``RenderContext/theme`` を取得するための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width >= 2, rect.height >= 2 else { return }
         // 枠線の矩形を `rect` 全体で記録したくなるが、`BorderView.content` が何も書き込まない内側の位置まで当たり判定に入り、その下の `View` へ `.mouse` が渡らなくなる。
@@ -141,7 +141,7 @@ public struct BorderView<Content: View>: PrimitiveView {
         context.recordHitRegion(Rect(x: rect.minX, y: rect.maxY - 1, width: rect.width, height: 1))
         context.recordHitRegion(Rect(x: rect.minX, y: rect.minY, width: 1, height: rect.height))
         context.recordHitRegion(Rect(x: rect.maxX - 1, y: rect.minY, width: 1, height: rect.height))
-        drawFrame(into: &buffer, rect: rect, ambiguous: context.ambiguousWidth)
+        drawFrame(into: &buffer, rect: rect, ambiguous: context.ambiguousWidth, style: style ?? context.theme.border)
         let inner = rect.inset(by: 1)
         if !inner.isEmpty {
             context.render(content, index: 0, into: &buffer, rect: inner)
@@ -163,7 +163,13 @@ public struct BorderView<Content: View>: PrimitiveView {
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 枠線を含めた矩形。
     ///   - ambiguous: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
-    private func drawFrame(into buffer: inout Buffer, rect: Rect, ambiguous: DisplayWidth.AmbiguousWidth) {
+    ///   - style: 枠線のスタイル。``BorderView/titleStyle`` が `nil` なら見出しにも使う。
+    private func drawFrame(
+        into buffer: inout Buffer,
+        rect: Rect,
+        ambiguous: DisplayWidth.AmbiguousWidth,
+        style: Style
+    ) {
         let border = effectiveBorderStyle(ambiguous: ambiguous)
         let top = rect.minY
         let bottom = rect.maxY - 1
@@ -506,13 +512,13 @@ extension View {
     ///
     /// - Parameters:
     ///   - borderStyle: 枠線に使う文字の組み合わせ。
-    ///   - style: 枠線のスタイル。
+    ///   - style: 枠線のスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/border``。
     ///   - title: 上辺に重ねる見出し。
     ///   - titleStyle: 見出しのスタイル。`nil` なら枠線と同じスタイル。
     /// - Returns: この ``View`` を ``BorderView/content`` にした ``BorderView``。
     public func border(
         _ borderStyle: BorderStyle = .single,
-        style: Style = .plain,
+        style: Style? = nil,
         title: String? = nil,
         titleStyle: Style? = nil
     ) -> BorderView<Self> {

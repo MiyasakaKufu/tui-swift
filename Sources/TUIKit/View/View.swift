@@ -228,15 +228,15 @@ public struct EmptyView: PrimitiveView {
 public struct Fill: PrimitiveView {
     /// 敷き詰める文字。
     public var character: Character
-    /// 文字に付けるスタイル。
-    public var style: Style
+    /// 文字に付けるスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/text``。
+    public var style: Style?
 
     /// 敷き詰める文字とスタイルを指定して作る。
     ///
     /// - Parameters:
     ///   - character: 敷き詰める文字。
-    ///   - style: 文字に付けるスタイル。
-    public init(_ character: Character = " ", style: Style = .plain) {
+    ///   - style: 文字に付けるスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/text``。
+    public init(_ character: Character = " ", style: Style? = nil) {
         self.character = character
         self.style = style
     }
@@ -261,10 +261,10 @@ public struct Fill: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。
-    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    ///   - context: ``RenderContext/theme`` を取得するための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         context.recordHitRegion(rect)
-        buffer.fill(rect, repeating: character, style: style)
+        buffer.fill(rect, repeating: character, style: style ?? context.theme.text)
     }
 
     /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。
@@ -325,16 +325,16 @@ public struct Divider: PrimitiveView {
     public var axis: Axis
     /// 罫線に使う文字。
     public var character: Character
-    /// 文字に付けるスタイル。
-    public var style: Style
+    /// 文字に付けるスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/border``。
+    public var style: Style?
 
     /// 方向と文字を指定して罫線を作る。
     ///
     /// - Parameters:
     ///   - axis: 罫線を伸ばす方向。
     ///   - character: 罫線に使う文字。`nil` なら方向に合わせて `─` か `│` を使う。
-    ///   - style: 文字に付けるスタイル。
-    public init(axis: Axis = .horizontal, character: Character? = nil, style: Style = .plain) {
+    ///   - style: 文字に付けるスタイル。`nil` なら ``RenderContext/theme`` の ``Theme/border``。
+    public init(axis: Axis = .horizontal, character: Character? = nil, style: Style? = nil) {
         self.axis = axis
         self.character = character ?? (axis == .horizontal ? "─" : "│")
         self.style = style
@@ -370,10 +370,10 @@ public struct Divider: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。
-    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    ///   - context: ``RenderContext/theme`` を取得するための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         context.recordHitRegion(rect)
-        buffer.fill(rect, repeating: character, style: style)
+        buffer.fill(rect, repeating: character, style: style ?? context.theme.border)
     }
 
     /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。

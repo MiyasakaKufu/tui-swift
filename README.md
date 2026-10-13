@@ -72,11 +72,22 @@ static var options: ApplicationOptions {
 環境変数 `RUNEWIDTH_EASTASIAN` が `1` のときと、`ApplicationOptions.ambiguousWidth` を `.wide` に
 したときは `Cell` 2 個分として扱い、`View.border(_:style:title:titleStyle:)` の枠線は `BorderStyle.ascii`（`+-|`）へ切り替わる。
 
+配色は `ApplicationOptions.theme` に `Theme` を渡して決める。`Text`・`ListView` などは、`Style` の引数を省くと
+`Theme` の `Style` で描く。文字色にも背景色にも `Color.default` だけを使う `Theme.monochrome` も用意している。
+
+```swift
+static var options: ApplicationOptions {
+    ApplicationOptions(theme: Theme(accent: Style(foreground: .magenta).bold))
+}
+```
+
 同梱のデモは次で起動する。
 
 ```
 swift run tui-demo
 ```
+
+引数に `standard` か `monochrome` を渡すと、その `Theme` で描く（`swift run tui-demo monochrome`）。
 
 ## 動作環境
 
