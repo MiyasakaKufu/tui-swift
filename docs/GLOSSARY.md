@@ -24,7 +24,7 @@
 
 | 指すもの | 書き方 | 補足 |
 |---|---|---|
-| TUIKit を使う開発者が書き、`@main` を付けるか、別の型のメソッドから起動する型 | `TerminalApp` に準拠する型 | `TerminalApp` は `Component` を継承している。`Component` は #105 で廃止する予定 |
+| TUIKit を使う開発者が書き、`@main` を付けるか、別の型のメソッドから起動する型 | `TerminalApp` に準拠する型 | |
 | 端末デバイスを raw モードにし、`InputReader` が端末デバイスから受け取ったバイト列を `InputEvent` にすることと `Buffer` を端末デバイスへ書き出すことを繰り返し、終了時に端末デバイスの termios と、端末エミュレータへ送ったモードを元に戻す型 | `Application` | |
 | 端末デバイスへの書き出しと termios の書き換え、端末エミュレータへ送るモードの切り替えを行う型 | `Terminal` | |
 | `Terminal.inputDescriptor`・`Terminal.outputDescriptor` がつながり、`isatty` が真になる文字デバイス（POSIX の terminal device） | 端末デバイス | |
@@ -48,7 +48,7 @@
 | `Buffer` の `Cell` に文字と `Style` を書き込むメソッド | `View.render(into:rect:context:)` | |
 | 別の `View` の `View.sizeThatFits(_:context:)`・`View.layoutTraits(context:)`・`View.render(into:rect:context:)` を呼び出すために、`View` が `context` 引数で受け取る型 | `RenderContext` | `View` は、この引数の `RenderContext.sizeThatFits(of:index:proposal:)`・`RenderContext.layoutTraits(of:index:)`・`RenderContext.render(_:index:into:rect:)` に別の `View` を `child` 引数として渡して呼び出す |
 | `Application` が最初にメソッドを呼び出す `View` から、`RenderContext` のメソッドに `child` 引数として渡された `View` か、`ViewVisitor.visit(_:index:)` に渡された `View` を順にたどったときの、`ViewPath.Component` の並び | `ViewPath` | internal。`View.body` の値の `View` には `index:` 引数 0 を使う |
-| `RenderContext` のメソッドか `ViewVisitor.visit(_:index:)` に渡された `index:` 引数（`.index(_:)`）か、`View.id(_:)` の引数（`.key(_:)`） | `ViewPath.Component` | internal。プロトコル `Component` とは別物 |
+| `RenderContext` のメソッドか `ViewVisitor.visit(_:index:)` に渡された `index:` 引数（`.index(_:)`）か、`View.id(_:)` の引数（`.key(_:)`） | `ViewPath.Component` | internal |
 | `RenderContext` のメソッドに `child` 引数として渡しうる `View` を、`index:` 引数とともに `ViewVisitor` に渡す、`PrimitiveView` の要件のメソッド | `PrimitiveView.visitChildren(_:)` | `Application.draw()` のたびに、レイアウトの計算と描画より前に呼び出される |
 | `PrimitiveView.visitChildren(_:)` で `View` を受け取る型 | `ViewVisitor` | 受け取るメソッドは `ViewVisitor.visit(_:index:)` |
 | `ViewPath` と型が同じ `View` に、`Application.draw()` をまたいで使われ続けるクラス | `ViewNode` | internal。`ViewNode.id` が同じなら、同じ `View` として扱われる |
@@ -96,22 +96,22 @@
 | 直前に書き出した `Buffer` と比べ、変わった `Cell` だけを端末デバイスへ書き出す型 | `Renderer` | |
 | 端末デバイスへ書き出す `String` のうち、`hasPrefix(ANSI.escape)` が `true` のもの | `hasPrefix(ANSI.csi)` か `hasPrefix(ANSI.osc)` が `true` の `String` | 定数と関数は `ANSI` にある。`Style` の SGR も `ANSI.csi` から作る |
 
-## `InputEvent` と `Component.Message`
+## `InputEvent` と `TerminalApp.Message`
 
 | 指すもの | 書き方 | 補足 |
 |---|---|---|
 | `InputReader` が端末デバイスから受け取ったバイト列を `InputParser` が解釈したもの（`.key`・`.mouse` など）か、`Application` が端末デバイスの大きさの変化から作るもの（`.resize`）を表す型 | `InputEvent` | |
-| 別スレッドや `Task` から `MessageSender.send(_:)` で `Application` へ送る引数の型 | `Component.Message` | |
-| `Component.Message` を `Application` へ送る型 | `MessageSender` | |
-| `TerminalApp` に準拠する型が `Component.Message` を受け取るメソッド | `Component.receive(_:)` | |
-| `TerminalApp` に準拠する型が `InputEvent` を受け取るメソッド | `Component.handle(_:)` | `ListState.handle(_:)`・`TextFieldState.handle(_: InputEvent)` は別の宣言。受け取るのは、どの `View` も処理しなかった `InputEvent` だけ |
+| 別スレッドや `Task` から `MessageSender.send(_:)` で `Application` へ送る引数の型 | `TerminalApp.Message` | |
+| `TerminalApp.Message` を `Application` へ送る型 | `MessageSender` | |
+| `TerminalApp` に準拠する型が `TerminalApp.Message` を受け取るメソッド | `TerminalApp.receive(_:)` | |
+| `TerminalApp` に準拠する型が `InputEvent` を受け取るメソッド | `TerminalApp.handle(_:)` | `ListState.handle(_:)`・`TextFieldState.handle(_: InputEvent)` は別の宣言。受け取るのは、どの `View` も処理しなかった `InputEvent` だけ |
 
 ## #98 の表の行
 
 | 指すもの | 書き方 | 補足 |
 |---|---|---|
 | #98 の決定 3 で、`TerminalApp` に準拠する型から一度だけ呼び出すとしたメソッド | `Application.copyToClipboard(_:limit:)`・`Application.suspend()` | 2 つをまとめる語は置かない |
-| `TerminalApp` に準拠する型のインスタンスプロパティで、`Application` が `Application.draw()` のたびにプロパティの値を取得するもの | 名前で書く（`Component.cursorPosition` など） | |
+| `TerminalApp` に準拠する型のインスタンスプロパティで、`Application` が `Application.draw()` のたびにプロパティの値を取得するもの | 名前で書く（`TerminalApp.cursorPosition` など） | |
 | `Application` が保持するプロパティとその型で、すべての `View` がプロパティの値を取得するもの | 名前で書く（`ApplicationOptions.ambiguousWidth` など） | まとめる語は置かない。まだコードに無いもの（#53、#73）は issue 番号で書く |
 
 ## SwiftUI と同じ名前で、振る舞いが違うもの
@@ -131,5 +131,5 @@
 | `FocusState` | 値の型は Optional か `Bool` に限る。代入した先がたどった `View` の一覧に無ければ、次の `Application.draw()` の 1 回で 1 回だけ試みる |
 | `View.onKeyPress(_:action:)` | 宣言はこの 1 つだけ。修飾キーの付いた押下では `action:` のクロージャを呼び出さない（文字のキーは Shift だけなら呼び出す） |
 | `View.onChange(of:_:)` | `initial:` 引数は無い。比べるのは描画より前にたどったときの値。クロージャを呼び出したら `Application.draw()` をもう 1 回行うが、そのもう 1 回からはさらに行わない |
-| `View.sheet(isPresented:content:)` | `content:` を画面の中央に重ねる。表示している間も、どの `View` も処理しなかった `.key`・`.paste` は `Component.handle(_:)` へ渡る |
+| `View.sheet(isPresented:content:)` | `content:` を画面の中央に重ねる。表示している間も、どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
 | `ViewBuilder` | `[any View]` を返す |

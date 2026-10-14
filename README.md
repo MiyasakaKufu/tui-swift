@@ -33,6 +33,7 @@ import TUIKit
 
 @main
 final class Counter: TerminalApp {
+    private(set) var isFinished = false
     private var count = 0
 
     var body: some View {
@@ -49,7 +50,7 @@ final class Counter: TerminalApp {
         switch key.key {
         case .up: count += 1
         case .down: count -= 1
-        case .character("q"), .escape: return .quit
+        case .character("q"), .escape: isFinished = true
         default: return .ignored
         }
         return .handled

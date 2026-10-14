@@ -32,7 +32,7 @@
 ///
 /// - Note: 値の型は Optional か `Bool` に限る。`nil`（`Bool` なら `false`）を代入すると、このプロパティを ``View/focused(_:equals:)``・``View/focused(_:)`` に渡した ``View`` からフォーカスを外す。ほかの ``View`` がフォーカスを持つときは変えない。外した後は、Tab か、フォーカスを移すクリックか、``FocusState`` を付けたプロパティへの代入か、``View/sheet(isPresented:content:)`` の `content:` の表示か閉じるまで、どの ``View`` もフォーカスを持たない。
 /// - Note: 代入すると、直前の `Application.draw()` の 1 回でたどった ``View`` の一覧を使って、すぐフォーカスを移す。移す先がその一覧に無ければ、次の `Application.draw()` の 1 回で、描画より前に 1 回だけ移すことを試みる。試みる前に Tab・フォーカスを移すクリック・別の代入があれば、試みない。
-/// - Note: ``State`` と同じく、``View`` に準拠する型の格納プロパティとして直接宣言する。``Component`` に準拠する型に置いた ``FocusState`` は記憶域に結び付かず、値は `nil`（`Bool` なら `false`）のまま変わらず、代入は捨てる。
+/// - Note: ``State`` と同じく、``View`` に準拠する型の格納プロパティとして直接宣言する。``TerminalApp`` に準拠する型に置いた ``FocusState`` は記憶域に結び付かず、値は `nil`（`Bool` なら `false`）のまま変わらず、代入は捨てる。
 @MainActor
 @propertyWrapper
 public struct FocusState<Value: Hashable> {

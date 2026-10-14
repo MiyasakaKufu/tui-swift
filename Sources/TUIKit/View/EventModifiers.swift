@@ -110,7 +110,7 @@ extension View {
     ///
     /// - Parameters:
     ///   - key: 受け取る ``Key``。
-    ///   - action: `key` が押されたときに呼び出すクロージャ。処理したら `.handled`、しなければ `.ignored` を返す。`.quit` を返すと ``Application`` が終了する。
+    ///   - action: `key` が押されたときに呼び出すクロージャ。処理したら `.handled`、しなければ `.ignored` を返す。``Application`` を終了するには、``TerminalApp/isFinished`` を `true` にする。
     /// - Returns: `action` を登録した ``KeyPressView``。
     /// - Note: 修飾キーの付いた押下では `action` を呼び出さない。文字のキーだけは、Shift だけが付いた押下でも呼び出す。
     /// - Note: `action` の中では、``State``・``FocusState`` を付けたプロパティへ代入してよい。

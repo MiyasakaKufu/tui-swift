@@ -9,10 +9,10 @@ enum LoopEvent<Message: Sendable>: Sendable {
     case message(Message)
     /// `InputEvent` も送られた値も無しに、ループを一巡させる合図。
     ///
-    /// シグナルのフラグとウィンドウサイズを読み直し、``Component/update(elapsed:)`` を呼び出して描き直す。
+    /// シグナルのフラグとウィンドウサイズを読み直し、``TerminalApp/update(elapsed:)`` を呼び出して描き直す。
     case wake
     /// 自己パイプが無いときに、`poll(2)` の待ちを一定の間隔で切り上げたことを伝える合図。
     ///
-    /// シグナルのフラグとウィンドウサイズを読み直す。どちらも変わっていなければ、``Component/update(elapsed:)`` を呼び出さず、描き直さずに次を待つ。
+    /// シグナルのフラグとウィンドウサイズを読み直す。どちらも変わっていなければ、``TerminalApp/update(elapsed:)`` を呼び出さず、描き直さずに次を待つ。
     case idle
 }

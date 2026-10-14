@@ -8,7 +8,7 @@ import Glibc
 
 /// 端末デバイスを raw モードにし、``InputReader`` が端末デバイスから受け取ったバイト列を ``InputEvent`` にすることと ``Buffer`` を端末デバイスへ書き出すことを繰り返す型。
 @MainActor
-public final class Application<Root: Component> {
+public final class Application<Root: TerminalApp> {
 
     private let root: Root
     private let options: ApplicationOptions
@@ -18,7 +18,7 @@ public final class Application<Root: Component> {
     private let eventQueue: LoopEventQueue<Root.Message>
     private let context = ApplicationContext()
 
-    /// 別スレッドや `Task` から、``Component/Message`` の値をイベントループへ届ける ``MessageSender``。
+    /// 別スレッドや `Task` から、``TerminalApp/Message`` の値をイベントループへ届ける ``MessageSender``。
     ///
     /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
     /// - Note: ``TerminalApp`` に準拠する型からは、このプロパティを取得できない。
@@ -27,7 +27,7 @@ public final class Application<Root: Component> {
     private var buffer: Buffer
     /// 最後に `.resize` として通知したサイズ。
     private var reportedSize = Size.zero
-    /// ``Component/update(elapsed:)`` の `elapsed` 引数を測り始めた時刻。
+    /// ``TerminalApp/update(elapsed:)`` の `elapsed` 引数を測り始めた時刻。
     private var lastFrameTime = 0.0
     private var isRunning = false
     private var hasRun = false
@@ -37,10 +37,10 @@ public final class Application<Root: Component> {
     /// - Note: 実際に止めるとテストプロセスまで止まるため、テストでは差し替える。
     var stopProcess: () -> Void = { SignalWatcher.stopProcess() }
 
-    /// ``Component`` に準拠する型のインスタンスと ``ApplicationOptions`` を指定して ``Application`` を作る。
+    /// ``TerminalApp`` に準拠する型のインスタンスと ``ApplicationOptions`` を指定して ``Application`` を作る。
     ///
     /// - Parameters:
-    ///   - root: 画面を組み立て、イベントを受け取る、``Component`` に準拠する型のインスタンス。
+    ///   - root: 画面を組み立て、イベントを受け取る、``TerminalApp`` に準拠する型のインスタンス。
     ///   - options: 起動時の設定。
     ///   - terminal: 使用する `Terminal`。省略すると標準入出力の記述子で作る。テストでは差し替える。
     public init(
@@ -57,6 +57,7 @@ public final class Application<Root: Component> {
         let eventQueue = LoopEventQueue<Root.Message>()
         self.eventQueue = eventQueue
         self.sender = MessageSender(eventQueue: eventQueue)
+        context.focus.stopsDelivering = { root.isFinished }
     }
 
     /// ループを終了させる。イベントハンドラの中からも呼び出せる。
@@ -89,10 +90,10 @@ public final class Application<Root: Component> {
     /// 端末デバイスの termios と、端末エミュレータへ送ったモードを元に戻してプロセスを止め、再開したら設定し直す。
     ///
     /// raw モードでは `ISIG` を無効にしているため、Ctrl+Z はシグナルにならずキーとして届く。
-    /// 一時停止したい ``Component`` に準拠する型は、そのキーを受け取ったときにこのメソッドを呼び出す。
+    /// 一時停止したい ``TerminalApp`` に準拠する型は、そのキーを受け取ったときにこのメソッドを呼び出す。
     ///
     /// - Postcondition: 再開したら画面全体を描き直し、改めて `.resize` を通知する。
-    /// - Note: `ApplicationOptions.suspendsOnControlZ` が有効なら、``Component/handle(_:)`` が `.ignored` を返した Ctrl+Z で自動的に呼び出される。
+    /// - Note: `ApplicationOptions.suspendsOnControlZ` が有効なら、``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+Z で自動的に呼び出される。
     public func suspend() {
         terminal.deactivate()
         stopProcess()
@@ -157,11 +158,18 @@ public final class Application<Root: Component> {
         lastFrameTime = monotonicSeconds()
 
         let inputStopped = startReadingInput()
-        draw()
+        if root.isFinished {
+            eventQueue.post(.wake)
+        } else {
+            draw()
+        }
 
         // `LoopEvent` を 1 つ取り出すたびに描き直してはいけない。ループより速く溜まると、
         // 溜まった数だけ描き直しが走り、後から届いたキーが `handle(_:)` に届くまでの遅れが伸び続ける。
         loop: for await _ in eventQueue.arrivals {
+            // 先頭で `TerminalApp.isFinished` を読むのをやめてはいけない。最初の `.resize` か `View.onChange(of:_:)` のクロージャで `true` になったときに、`TerminalApp.update(elapsed:)` を呼び出して描き直してから終わる。
+            if root.isFinished { break loop }
+
             let events = eventQueue.take()
             if events.isEmpty { continue loop }
 
@@ -176,7 +184,8 @@ public final class Application<Root: Component> {
                         if !deliver(input) { break loop }
                     }
                 case .message(let message):
-                    if root.receive(message) == .quit { break loop }
+                    _ = root.receive(message)
+                    if root.isFinished { break loop }
                 case .wake, .idle:
                     break
                 }
@@ -202,14 +211,14 @@ public final class Application<Root: Component> {
             let sizeBeforeSynchronizing = reportedSize
             if !synchronizeSize() { break loop }
 
-            // 何も起きていない `.idle` で先へ進んではいけない。`ApplicationOptions.frameInterval` が `nil` でも `Component.update(elapsed:)` が一定の間隔で呼び出され、描き直すたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
+            // 何も起きていない `.idle` で先へ進んではいけない。`ApplicationOptions.frameInterval` が `nil` でも `TerminalApp.update(elapsed:)` が一定の間隔で呼び出され、描き直すたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
             if isIdle, reportedSize == sizeBeforeSynchronizing { continue loop }
 
             let now = monotonicSeconds()
             root.update(elapsed: now - lastFrameTime)
             lastFrameTime = now
 
-            if !isRunning { break loop }
+            if !isRunning || root.isFinished { break loop }
             draw()
         }
 
@@ -281,30 +290,30 @@ public final class Application<Root: Component> {
         }
     }
 
-    /// ``InputEvent`` を ``View`` へ渡し、どの ``View`` も処理しなければ ``Component/handle(_:)`` へ渡す。
+    /// ``InputEvent`` を ``View`` へ渡し、どの ``View`` も処理しなければ ``TerminalApp/handle(_:)`` へ渡す。
     ///
     /// - Parameters:
     ///   - event: 渡す ``InputEvent``。
-    /// - Returns: ループを続けるなら `true`。
+    /// - Returns: ループを続けるなら `true`。``View`` か ``TerminalApp/handle(_:)`` へ渡した後に ``TerminalApp/isFinished`` が `true` なら `false`。
     private func deliver(_ event: InputEvent) -> Bool {
+        let isHandledByView: Bool
         switch event {
         case .key(let keyEvent):
-            switch context.deliver(keyEvent) {
-            case .quit: return false
-            case .handled: return true
-            case .ignored, nil: break
-            }
+            isHandledByView = context.deliver(keyEvent) == .handled
         case .mouse(let mouseEvent):
-            if context.deliver(mouseEvent) { return true }
+            isHandledByView = context.deliver(mouseEvent)
         case .paste:
-            if context.deliverPaste(event) { return true }
+            isHandledByView = context.deliverPaste(event)
         case .resize, .focus:
-            break
+            isHandledByView = false
         }
+        if root.isFinished { return false }
+        if isHandledByView { return true }
 
-        switch root.handle(event) {
-        case .quit:
-            return false
+        let result = root.handle(event)
+        if root.isFinished { return false }
+
+        switch result {
         case .handled:
             return true
         case .ignored:
@@ -312,7 +321,7 @@ public final class Application<Root: Component> {
                 suspend()
                 return isRunning
             }
-            // `ApplicationOptions.quits(onUnhandled:)` を見ずにループを続けてはいけない。raw モードでは `ISIG` を切っているので、Ctrl+C は SIGINT にならずこの `InputEvent` として届く。`Component.handle(_:)` が Ctrl+C を扱わない TUIKit アプリを、`ApplicationOptions.quitsOnControlC` が `true` でも Ctrl+C で止められなくなる。
+            // `ApplicationOptions.quits(onUnhandled:)` を見ずにループを続けてはいけない。raw モードでは `ISIG` を切っているので、Ctrl+C は SIGINT にならずこの `InputEvent` として届く。`TerminalApp.handle(_:)` が Ctrl+C を扱わない TUIKit アプリを、`ApplicationOptions.quitsOnControlC` が `true` でも Ctrl+C で止められなくなる。
             return !options.quits(onUnhandled: event)
         }
     }
@@ -320,7 +329,7 @@ public final class Application<Root: Component> {
     /// 一時停止から戻り、端末デバイスの termios と、端末エミュレータへ送ったモードを設定し直す。
     ///
     /// - Postcondition: 画面全体を描き直し、改めて `.resize` を通知する。
-    ///   止まっていた時間は ``Component/update(elapsed:)`` の `elapsed` 引数に含めない。
+    ///   止まっていた時間は ``TerminalApp/update(elapsed:)`` の `elapsed` 引数に含めない。
     ///   ``Terminal/reactivate()`` がエラーを投げたらループを終える。
     private func resumeTerminal() {
         do {
@@ -351,14 +360,15 @@ public final class Application<Root: Component> {
             buffer.resize(to: size)
             renderer.invalidate()
         }
-        return root.handle(.resize(size)) != .quit
+        _ = root.handle(.resize(size))
+        return !root.isFinished
     }
 
-    /// ``Component/body`` を ``Buffer`` に書き込み、``Renderer`` で端末デバイスへ書き出す。
+    /// ``TerminalApp/body`` を ``Buffer`` に書き込み、``Renderer`` で端末デバイスへ書き出す。
     ///
     /// - Precondition: `Application.synchronizeSize()` によって ``Buffer`` が端末デバイスのウィンドウサイズに追従している。
     /// - Postcondition: たどった後にフォーカスが変わったか、``View/onChange(of:_:)`` が値の変化を見つけたら、もう 1 回描く。そのもう 1 回では、さらには描かない。
-    /// - Postcondition: 端末エミュレータのカーソルは、``Component/cursorPosition`` が `nil` 以外ならその位置に、`nil` ならフォーカスを持つ ``TextField`` が示す位置に置く。どちらも無ければ隠す。
+    /// - Postcondition: 端末エミュレータのカーソルは、``TerminalApp/cursorPosition`` が `nil` 以外ならその位置に、`nil` ならフォーカスを持つ ``TextField`` が示す位置に置く。どちらも無ければ隠す。
     private func draw() {
         context.draw({ root.body }, into: &buffer, ambiguousWidth: options.ambiguousWidth) { buffer in
             renderer.render(buffer, cursor: root.cursorPosition ?? context.cursorPosition)

@@ -1,6 +1,6 @@
-/// 別スレッドや `Task` から、``Component/Message`` の値を ``Application`` のイベントループへ届ける型。
+/// 別スレッドや `Task` から、``TerminalApp/Message`` の値を ``Application`` のイベントループへ届ける型。
 ///
-/// どのスレッド・どの `Task` からでも送れる。送られた値は、送った順に `Component.receive(_:)` へ渡され、
+/// どのスレッド・どの `Task` からでも送れる。送られた値は、送った順に `TerminalApp.receive(_:)` へ渡され、
 /// 続けて画面が描き直される。`ApplicationOptions.frameInterval` を設定していなくても届く。
 ///
 /// - Note: ループが処理するより速く送ると、溜まった値をすべて `receive(_:)` へ渡してから、

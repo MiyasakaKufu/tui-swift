@@ -13,7 +13,7 @@ import CTUITestSupport
 @MainActor
 final class ApplicationBugReproductionTests: XCTestCase {
 
-    /// `Component.handle(_:)` の実行中に端末デバイスのウィンドウサイズが変わっても `.resize` が届く。
+    /// `TerminalApp.handle(_:)` の実行中に端末デバイスのウィンドウサイズが変わっても `.resize` が届く。
     func testResizeDuringEventHandlingIsReported() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -35,20 +35,20 @@ final class ApplicationBugReproductionTests: XCTestCase {
         drain.start()
         defer { drain.stop() }
 
-        let component = ResizeRecordingComponent()
+        let app = ResizeRecordingApp()
         let application = Application(
-            root: component,
+            root: app,
             options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
             terminal: Terminal(input: slave, output: slave)
         )
-        component.onFirstKey = {
+        app.onFirstKey = {
             _ = setTerminalSize(master, resizedSize)
             raise(SIGWINCH)
         }
-        component.onTimeout = { [weak application] in application?.stop() }
+        app.onTimeout = { [weak application] in application?.stop() }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
-        let hasStartedLoop = component.hasStartedLoop
+        let hasStartedLoop = app.hasStartedLoop
         let sender = Thread {
             guard hasStartedLoop.wait(timeout: 5) else { return }
             writeByte(master, UInt8(ascii: "a"))
@@ -59,7 +59,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         try await application.run()
 
-        XCTAssertEqual(component.reportedSizes, [initialSize, resizedSize])
+        XCTAssertEqual(app.reportedSizes, [initialSize, resizedSize])
     }
 
     /// `ApplicationOptions.reportsFocus` を有効にすると `.focus` が届き、終了時に通知が止まる。
@@ -82,9 +82,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
         drain.start()
         defer { drain.stop() }
 
-        let component = FocusRecordingComponent()
+        let app = FocusRecordingApp()
         let application = Application(
-            root: component,
+            root: app,
             options: ApplicationOptions(
                 usesAlternateScreen: false,
                 reportsFocus: true,
@@ -92,10 +92,10 @@ final class ApplicationBugReproductionTests: XCTestCase {
             ),
             terminal: Terminal(input: slave, output: slave)
         )
-        component.onTimeout = { [weak application] in application?.stop() }
+        app.onTimeout = { [weak application] in application?.stop() }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
-        let hasStartedLoop = component.hasStartedLoop
+        let hasStartedLoop = app.hasStartedLoop
         let sender = Thread {
             guard hasStartedLoop.wait(timeout: 5) else { return }
             writeBytes(master, Array("\u{1B}[I".utf8))
@@ -106,7 +106,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         try await application.run()
 
-        XCTAssertEqual(component.focusChanges, [true, false])
+        XCTAssertEqual(app.focusChanges, [true, false])
         XCTAssertTrue(
             drain.waitForOutput(containing: ANSI.enableFocusReporting, timeout: 2),
             "`ANSI.enableFocusReporting` が書き出されていない"
@@ -143,9 +143,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
             drain.start()
             defer { drain.stop() }
 
-            let component = BorderDrawingComponent()
+            let app = BorderDrawingApp()
             let application = Application(
-                root: component,
+                root: app,
                 options: ApplicationOptions(
                     usesAlternateScreen: false,
                     usesKeyboardProtocol: false,
@@ -154,7 +154,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
                 ),
                 terminal: Terminal(input: slave, output: slave)
             )
-            component.onFramesDrawn = { [weak application] in application?.stop() }
+            app.onFramesDrawn = { [weak application] in application?.stop() }
 
             try await application.run()
 
@@ -187,9 +187,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
         drain.start()
         defer { drain.stop() }
 
-        let component = MouseRecordingComponent()
+        let app = MouseRecordingApp()
         let application = Application(
-            root: component,
+            root: app,
             options: ApplicationOptions(
                 usesAlternateScreen: false,
                 mouseTracking: .motion,
@@ -197,10 +197,10 @@ final class ApplicationBugReproductionTests: XCTestCase {
             ),
             terminal: Terminal(input: slave, output: slave)
         )
-        component.onTimeout = { [weak application] in application?.stop() }
+        app.onTimeout = { [weak application] in application?.stop() }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
-        let hasStartedLoop = component.hasStartedLoop
+        let hasStartedLoop = app.hasStartedLoop
         let sender = Thread {
             guard hasStartedLoop.wait(timeout: 5) else { return }
             writeBytes(master, Array("\u{1B}[<35;4;2M".utf8))
@@ -210,7 +210,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         try await application.run()
 
         XCTAssertEqual(
-            component.mouseEvents,
+            app.mouseEvents,
             [MouseEvent(position: Point(x: 3, y: 1), button: .none, action: .move)]
         )
         XCTAssertTrue(
@@ -243,13 +243,13 @@ final class ApplicationBugReproductionTests: XCTestCase {
         drain.start()
         defer { drain.stop() }
 
-        let component = KeyRecordingComponent(expectedCount: 2)
+        let app = KeyRecordingApp(expectedCount: 2)
         let application = Application(
-            root: component,
+            root: app,
             options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
             terminal: Terminal(input: slave, output: slave)
         )
-        component.onTimeout = { [weak application] in application?.stop() }
+        app.onTimeout = { [weak application] in application?.stop() }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、問い合わせが届いてから応答する。
         let responder = Thread {
@@ -266,7 +266,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         try await application.run()
 
         XCTAssertEqual(
-            component.keys,
+            app.keys,
             [KeyEvent(.character("i"), modifiers: .control), KeyEvent(.tab)],
             "Ctrl+I と Tab が区別されていない"
         )
@@ -300,16 +300,16 @@ final class ApplicationBugReproductionTests: XCTestCase {
         drain.start()
         defer { drain.stop() }
 
-        let component = KeyRecordingComponent(expectedCount: 1)
+        let app = KeyRecordingApp(expectedCount: 1)
         let application = Application(
-            root: component,
+            root: app,
             options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
             terminal: Terminal(input: slave, output: slave)
         )
-        component.onTimeout = { [weak application] in application?.stop() }
+        app.onTimeout = { [weak application] in application?.stop() }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
-        let hasStartedLoop = component.hasStartedLoop
+        let hasStartedLoop = app.hasStartedLoop
         let sender = Thread {
             guard hasStartedLoop.wait(timeout: 5) else { return }
             writeByte(master, 0x09)
@@ -318,14 +318,14 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         try await application.run()
 
-        XCTAssertEqual(component.keys, [KeyEvent(.tab)], "従来どおりの形式で届いていない")
+        XCTAssertEqual(app.keys, [KeyEvent(.tab)], "従来どおりの形式で届いていない")
         XCTAssertFalse(
             drain.waitForOutput(containing: ANSI.enableKeyboardProtocol, timeout: 0.5),
             "応答しない端末エミュレータで有効にしてはいけない"
         )
     }
 
-    /// Ctrl+Z を受けると、止まる前に端末デバイスの termios を元に戻し、再開したら raw モードへ設定し直して、`Component.handle(_:)` へ `.resize` を改めて渡す。
+    /// Ctrl+Z を受けると、止まる前に端末デバイスの termios を元に戻し、再開したら raw モードへ設定し直して、`TerminalApp.handle(_:)` へ `.resize` を改めて渡す。
     func testControlZSuspendsAndResumesTerminal() async throws {
         var masterDescriptor: Int32 = -1
         var slaveDescriptor: Int32 = -1
@@ -346,13 +346,13 @@ final class ApplicationBugReproductionTests: XCTestCase {
         defer { drain.stop() }
 
         let terminal = Terminal(input: slave, output: slave)
-        let component = SuspendRecordingComponent()
+        let app = SuspendRecordingApp()
         let application = Application(
-            root: component,
+            root: app,
             options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
             terminal: terminal
         )
-        component.onTimeout = { [weak application] in application?.stop() }
+        app.onTimeout = { [weak application] in application?.stop() }
 
         // 本当に止めるとテストプロセスまで止まるので、止める処理だけ差し替える。
         var isRawModeWhileStopped = true
@@ -364,13 +364,13 @@ final class ApplicationBugReproductionTests: XCTestCase {
 
         var isRawModeAfterResume = false
         var isCanonicalAfterResume = true
-        component.onResume = {
+        app.onResume = {
             isRawModeAfterResume = terminal.isRawModeEnabled
             isCanonicalAfterResume = isCanonicalMode(slave)
         }
 
         // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
-        let hasStartedLoop = component.hasStartedLoop
+        let hasStartedLoop = app.hasStartedLoop
         let sender = Thread {
             guard hasStartedLoop.wait(timeout: 5) else { return }
             writeByte(master, 0x1A)
@@ -384,7 +384,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         XCTAssertTrue(isRawModeAfterResume, "再開後に raw モードへ戻っていない")
         XCTAssertFalse(isCanonicalAfterResume, "再開後に端末デバイスの termios を設定し直していない")
         XCTAssertEqual(
-            component.reportedSizes,
+            app.reportedSizes,
             [Size(width: 80, height: 24), Size(width: 80, height: 24)],
             "再開後に .resize が通知されていない"
         )
@@ -425,19 +425,21 @@ final class ApplicationBugReproductionTests: XCTestCase {
     }
 }
 
-// MARK: - テスト用の `Component` に準拠する型
+// MARK: - テスト用の `TerminalApp` に準拠する型
 
-/// 受け取った `.resize` を記録し、キー入力に合わせて決められた動きをする `Component` に準拠する型。
-private final class ResizeRecordingComponent: Component {
+/// 受け取った `.resize` を記録し、キー入力に合わせて決められた動きをする `TerminalApp` に準拠する型。
+private final class ResizeRecordingApp: TerminalApp {
 
     /// 受け取った `.resize` のサイズを届いた順に並べたもの。
     private(set) var reportedSizes: [Size] = []
+    /// `Application` を終了するかどうか。
+    private(set) var isFinished = false
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// 最初のキーを受け取った `Component.handle(_:)` が、戻る前に呼び出すクロージャ。
+    /// 最初のキーを受け取った `TerminalApp.handle(_:)` が、戻る前に呼び出すクロージャ。
     var onFirstKey: () -> Void = {}
-    /// 入力が届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
+    /// 入力が届かないまま時間切れになったときに `TerminalApp.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private var keyCount = 0
@@ -454,7 +456,10 @@ private final class ResizeRecordingComponent: Component {
             return .handled
         case .key:
             keyCount += 1
-            guard keyCount == 1 else { return .quit }
+            guard keyCount == 1 else {
+                isFinished = true
+                return .handled
+            }
             onFirstKey()
             return .handled
         default:
@@ -469,15 +474,17 @@ private final class ResizeRecordingComponent: Component {
     }
 }
 
-/// 受け取った `.focus` を記録し、フォーカスを失った時点で終了する `Component` に準拠する型。
-private final class FocusRecordingComponent: Component {
+/// 受け取った `.focus` を記録し、フォーカスを失った時点で終了する `TerminalApp` に準拠する型。
+private final class FocusRecordingApp: TerminalApp {
 
     /// 受け取った `.focus` の値を届いた順に並べたもの。
     private(set) var focusChanges: [Bool] = []
+    /// `Application` を終了するかどうか。
+    private(set) var isFinished = false
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// 通知が届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
+    /// 通知が届かないまま時間切れになったときに `TerminalApp.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private var elapsedTotal = 0.0
@@ -489,7 +496,8 @@ private final class FocusRecordingComponent: Component {
     func handle(_ event: InputEvent) -> EventResult {
         guard case .focus(let gained) = event else { return .ignored }
         focusChanges.append(gained)
-        return gained ? .handled : .quit
+        if !gained { isFinished = true }
+        return .handled
     }
 
     func update(elapsed: Double) {
@@ -499,10 +507,10 @@ private final class FocusRecordingComponent: Component {
     }
 }
 
-/// 枠線で囲んだ文字列を描き、`Component.update(elapsed:)` に渡された `elapsed` の合計が 0.1 秒を超えたら `onFramesDrawn` を呼び出す `Component` に準拠する型。
-private final class BorderDrawingComponent: Component {
+/// 枠線で囲んだ文字列を描き、`TerminalApp.update(elapsed:)` に渡された `elapsed` の合計が 0.1 秒を超えたら `onFramesDrawn` を呼び出す `TerminalApp` に準拠する型。
+private final class BorderDrawingApp: TerminalApp {
 
-    /// 渡された `elapsed` の合計が 0.1 秒を超えたときに、`Component.update(elapsed:)` が呼び出すクロージャ。
+    /// 渡された `elapsed` の合計が 0.1 秒を超えたときに、`TerminalApp.update(elapsed:)` が呼び出すクロージャ。
     var onFramesDrawn: () -> Void = {}
 
     private var elapsedTotal = 0.0
@@ -519,15 +527,17 @@ private final class BorderDrawingComponent: Component {
     }
 }
 
-/// 受け取ったマウスイベントを記録し、移動が届いたら終了する `Component` に準拠する型。
-private final class MouseRecordingComponent: Component {
+/// 受け取ったマウスイベントを記録し、移動が届いたら終了する `TerminalApp` に準拠する型。
+private final class MouseRecordingApp: TerminalApp {
 
     /// 受け取ったマウスイベントを届いた順に並べたもの。
     private(set) var mouseEvents: [MouseEvent] = []
+    /// `Application` を終了するかどうか。
+    private(set) var isFinished = false
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// 移動が届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
+    /// 移動が届かないまま時間切れになったときに `TerminalApp.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private var elapsedTotal = 0.0
@@ -539,7 +549,8 @@ private final class MouseRecordingComponent: Component {
     func handle(_ event: InputEvent) -> EventResult {
         guard case .mouse(let mouseEvent) = event else { return .ignored }
         mouseEvents.append(mouseEvent)
-        return mouseEvent.action == .move ? .quit : .handled
+        if mouseEvent.action == .move { isFinished = true }
+        return .handled
     }
 
     func update(elapsed: Double) {
@@ -549,15 +560,17 @@ private final class MouseRecordingComponent: Component {
     }
 }
 
-/// 受け取ったキーを記録し、決めた数だけ届いたら終了する `Component` に準拠する型。
-private final class KeyRecordingComponent: Component {
+/// 受け取ったキーを記録し、決めた数だけ届いたら終了する `TerminalApp` に準拠する型。
+private final class KeyRecordingApp: TerminalApp {
 
     /// 受け取ったキーを届いた順に並べたもの。
     private(set) var keys: [KeyEvent] = []
+    /// `Application` を終了するかどうか。
+    private(set) var isFinished = false
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// キーが届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
+    /// キーが届かないまま時間切れになったときに `TerminalApp.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private let expectedCount: Int
@@ -571,6 +584,11 @@ private final class KeyRecordingComponent: Component {
         self.expectedCount = expectedCount
     }
 
+    /// 受け取るキーの数を 0 にして作る。
+    convenience init() {
+        self.init(expectedCount: 0)
+    }
+
     var body: some View {
         Text("キーの確認")
     }
@@ -578,7 +596,8 @@ private final class KeyRecordingComponent: Component {
     func handle(_ event: InputEvent) -> EventResult {
         guard case .key(let keyEvent) = event else { return .ignored }
         keys.append(keyEvent)
-        return keys.count >= expectedCount ? .quit : .handled
+        if keys.count >= expectedCount { isFinished = true }
+        return .handled
     }
 
     func update(elapsed: Double) {
@@ -588,19 +607,21 @@ private final class KeyRecordingComponent: Component {
     }
 }
 
-/// 受け取った `.resize` を記録し、起動時に続く 2 度目（再開後の最初）の `.resize` で終了する `Component` に準拠する型。
+/// 受け取った `.resize` を記録し、起動時に続く 2 度目（再開後の最初）の `.resize` で終了する `TerminalApp` に準拠する型。
 ///
 /// Ctrl+Z を処理しないので、`Application` が一時停止する。
-private final class SuspendRecordingComponent: Component {
+private final class SuspendRecordingApp: TerminalApp {
 
     /// 受け取った `.resize` のサイズを届いた順に並べたもの。
     private(set) var reportedSizes: [Size] = []
+    /// `Application` を終了するかどうか。
+    private(set) var isFinished = false
     /// イベントループが 1 周したら立つ。
     let hasStartedLoop = Latch()
 
-    /// 起動時に続く 2 度目の `.resize`（再開後に届く最初の `.resize`）を受け取った `Component.handle(_:)` が呼び出すクロージャ。
+    /// 起動時に続く 2 度目の `.resize`（再開後に届く最初の `.resize`）を受け取った `TerminalApp.handle(_:)` が呼び出すクロージャ。
     var onResume: () -> Void = {}
-    /// 入力が届かないまま時間切れになったときに `Component.update(elapsed:)` が呼び出すクロージャ。
+    /// 入力が届かないまま時間切れになったときに `TerminalApp.update(elapsed:)` が呼び出すクロージャ。
     var onTimeout: () -> Void = {}
 
     private var elapsedTotal = 0.0
@@ -614,7 +635,8 @@ private final class SuspendRecordingComponent: Component {
         reportedSizes.append(size)
         guard reportedSizes.count >= 2 else { return .handled }
         onResume()
-        return .quit
+        isFinished = true
+        return .handled
     }
 
     func update(elapsed: Double) {
