@@ -61,12 +61,15 @@
 | `Application` が持ち、`ViewGraph` と `FocusController` をまとめるクラス | `ApplicationContext` | internal |
 | フォーカスを保持し、たどった `View` の一覧からフォーカスを決め、`InputEvent` を `View` へ渡すクラス | `FocusController` | internal。`ViewGraph` を参照しない |
 | `ViewGraph` が、`State` などを結び付けるときと描画するときに `View` へ渡すもの | `ViewEnvironment` | internal。今は `FocusController` だけを持つ |
-| `View` の拡張として定義された `View.padding(_: EdgeInsets)`・`View.border(_:style:title:titleStyle:)` などのメソッド | `View` の拡張メソッド | 個々のメソッドは名前で書く |
+| `View` の拡張として定義された `View.padding(_: EdgeInsets)`・`View.border(_:color:title:)` などのメソッド | `View` の拡張メソッド | 個々のメソッドは名前で書く |
 | `Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型 | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型」 |
 | `TextFieldState.cursor`・`ListState.scrollOffset` などを持つクラス | `ListState`・`TextFieldState` | 2 つをまとめる語は置かない。5cf1d9a は、`View` の `State` へ移せるのは #53 の後と書いている |
 | 別の場所にあるプロパティの値を取得し、書き換える型 | `Binding` | |
 | `TextField` の `text:` 引数と `ListView` の `selection:` 引数に、`Binding` で渡すプロパティ。`TerminalApp` に準拠する型のインスタンスプロパティか、`View` の `@State` を付けたプロパティ | `Binding` で渡すプロパティ | |
 | `TextFieldState`・`ListState` が持つ、`Binding` で渡さないプロパティ | `TextFieldState.cursor`・`ListState.scrollOffset`・`ListState.renderedRect` など、それぞれの名前 | |
+| `View.foregroundStyle(_: Color)`・`View.foregroundStyle(_:_:)` が決め、`RenderContext` のメソッドに `child` 引数として渡す `View` へ伝わる文字色の 1 段目と 2 段目 | primary の段・secondary の段 | コードでは `HierarchicalShapeStyle.primary`・`HierarchicalShapeStyle.secondary` で指す |
+| `View.tint(_:)` が決め、`RenderContext` のメソッドに `child` 引数として渡す `View` へ伝わる色 | tint | 決めていなければ primary の段の文字色 |
+| `RenderContext` が持つ、primary の段・secondary の段・tint・`View.background(_:)` で塗った背景色 | `ViewColors` | internal。`RenderContext.colors` |
 
 ## レイアウト
 
@@ -122,9 +125,9 @@
 |---|---|
 | `VStack` / `HStack` | 引数の順は `spacing:` → `alignment:`。`alignment:` を省くと `.leading` / `.top`。`spacing:` は `Int` で、省くと 0 |
 | `Spacer` | 入っている `VStack`・`HStack` に関係なく、縦横両方に伸びる。`minLength:` を省くと 0 |
-| `Divider` | 向きは入っている `VStack`・`HStack` に合わせず、`axis:` で決める（省くと `.horizontal`） |
+| `Divider` | 向きは入っている `VStack`・`HStack` に合わせず、`axis:` で決める（省くと `.horizontal`）。文字色は primary の段 |
 | `View.padding(horizontal:vertical:)` | 引数を省いた `padding()` はこのメソッドを呼び出し、空ける幅は 0 |
-| `View.border(_:style:title:titleStyle:)` | 枠線を `BorderView.content` の外側に足す。`BorderView` は `BorderView.content` より縦横に 2 ずつ大きい |
+| `View.border(_:color:title:)` | 枠線を `BorderView.content` の外側に足す。`BorderView` は `BorderView.content` より縦横に 2 ずつ大きい。1 つ目の引数は色でなく `BorderStyle` で、色は `color:` で渡す（省くと primary の段） |
 | `View.frame(width:height:horizontalAlignment:verticalAlignment:)` | `horizontalAlignment:`・`verticalAlignment:` を省くと `.leading`・`.top`。揃えで動くのは `FrameView` の矩形で、`FrameView.content` はその矩形いっぱいに書き込まれる |
 | `Text` | `wrap:` を省くと `.truncate` で、折り返さずに末尾を省略する |
 | `Binding` | プロパティラッパーではない。`$` と `projectedValue` は無い（`$` で `Binding` を返すのは `State.projectedValue`） |
@@ -133,3 +136,7 @@
 | `View.onChange(of:_:)` | `initial:` 引数は無い。比べるのは描画より前にたどったときの値。クロージャを呼び出したら `Application.draw()` をもう 1 回行うが、そのもう 1 回からはさらに行わない |
 | `View.sheet(isPresented:content:)` | `content:` を画面の中央に重ねる。表示している間も、どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
 | `ViewBuilder` | `[any View]` を返す |
+| `View.foregroundStyle(_: Color)`・`View.foregroundStyle(_:_:)` | 引数は `Color` か `HierarchicalShapeStyle`。`ShapeStyle` は無く、グラデーションなどは渡せない。`foregroundStyle(_:_:_:)` は無い |
+| `HierarchicalShapeStyle` | `.primary` と `.secondary` だけ。secondary の段を `View.foregroundStyle(_:_:)` で決めていなければ、primary の段に `TextAttributes.dim`（SGR 2）を足したものになる |
+| `View.tint(_:)` | 引数は `Color?`。決めていなければ、アクセントカラーではなく primary の段の文字色を使う。使うのは `ProgressBar` の進んだ部分と `ListView` の選択行で、選択行は tint を文字色にして反転（SGR 7）した `Style` で描く |
+| `View.background(_:)` | `BackgroundView.content` とその内側の `View` が書き込む `Cell` の背景色も、引数の色になる。`ZStack`・`View.overlay(_:horizontal:vertical:)` で上に重ねた `View` には伝わらず、下の背景色は透けない |

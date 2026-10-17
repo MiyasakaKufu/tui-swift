@@ -88,6 +88,9 @@ public struct RenderContext {
     /// - Note: `DisplayWidth` の各関数は、`ambiguous` を省くと `DisplayWidth.defaultAmbiguousWidth` で測る。文字列の幅を測るときはこの値を渡す。渡さないと、TUIKit を使う開発者が指定した扱いと測った幅が食い違い、その行の文字の ``Point/x`` がずれる。
     public let ambiguousWidth: DisplayWidth.AmbiguousWidth
 
+    /// この ``RenderContext`` を受け取る ``View`` の外側で、`View.foregroundStyle(_: Color)`・``View/tint(_:)``・``View/background(_:)`` が決めた色。
+    var colors = ViewColors()
+
     /// ``View`` のメソッドを直接呼び出すときに渡す ``RenderContext`` を作る。
     ///
     /// - Parameters:
@@ -118,11 +121,19 @@ public struct RenderContext {
     ///   - graph: `node` を持つ `ViewGraph`。
     ///   - screen: 画面全体の矩形。
     ///   - ambiguousWidth: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
-    init(node: ViewNode, graph: ViewGraph, screen: Rect, ambiguousWidth: DisplayWidth.AmbiguousWidth) {
+    ///   - colors: `node` の ``View`` の外側で決めた色。
+    init(
+        node: ViewNode,
+        graph: ViewGraph,
+        screen: Rect,
+        ambiguousWidth: DisplayWidth.AmbiguousWidth,
+        colors: ViewColors = ViewColors()
+    ) {
         self.node = node
         self.graph = graph
         self.screen = screen
         self.ambiguousWidth = ambiguousWidth
+        self.colors = colors
     }
 
     /// `child` に渡す ``RenderContext`` を返す。
@@ -130,12 +141,23 @@ public struct RenderContext {
     /// - Parameters:
     ///   - child: ``RenderContext`` を `context` 引数で受け取る ``View``。
     ///   - index: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``View`` と `child` を区別する番号。
-    /// - Returns: `child` の `ViewNode` を持つ ``RenderContext``。`child` が ``View/id(_:)`` で作った ``View`` なら、`ViewPath` には `index` の代わりに ``View/id(_:)`` の引数を `.key(_:)` として足す。
+    /// - Returns: `child` の `ViewNode` を持ち、この ``RenderContext`` と同じ ``RenderContext/colors`` を持つ ``RenderContext``。`child` が ``View/id(_:)`` で作った ``View`` なら、`ViewPath` には `index` の代わりに ``View/id(_:)`` の引数を `.key(_:)` として足す。
     /// - Postcondition: `child` の ``State`` が、`child` の `ViewNode` の記憶域へ結び付いている。
     func context(for child: some View, index: Int) -> RenderContext {
         let node = graph.node(at: path.appending(child, index: index), viewType: type(of: child))
         graph.bindState(of: child, to: node)
-        return RenderContext(node: node, graph: graph, screen: screen, ambiguousWidth: ambiguousWidth)
+        return RenderContext(node: node, graph: graph, screen: screen, ambiguousWidth: ambiguousWidth, colors: colors)
+    }
+
+    /// ``RenderContext/colors`` だけを書き換えた ``RenderContext`` を返す。
+    ///
+    /// - Parameters:
+    ///   - change: ``RenderContext/colors`` を書き換えるクロージャ。
+    /// - Returns: `change` で書き換えた ``RenderContext/colors`` を持ち、ほかはこの ``RenderContext`` と同じ ``RenderContext``。
+    func withColors(_ change: (inout ViewColors) -> Void) -> RenderContext {
+        var copy = self
+        change(&copy.colors)
+        return copy
     }
 
     /// この ``RenderContext`` を受け取る ``View`` がフォーカスを持てば `true`。

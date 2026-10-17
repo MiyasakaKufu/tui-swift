@@ -15,7 +15,7 @@ final class ModifierGenericsTests: XCTestCase {
 
         XCTAssertEqual(padded.insets, EdgeInsets(all: 1))
         XCTAssertEqual(bordered.title, "T")
-        XCTAssertEqual(background.style.background, .red)
+        XCTAssertEqual(background.color, .red)
         XCTAssertEqual(framed.width, 2)
         XCTAssertEqual(flexed.traits, LayoutTraits(horizontalFlex: 2, verticalFlex: 3))
         XCTAssertEqual(aligned.horizontal, .center)
