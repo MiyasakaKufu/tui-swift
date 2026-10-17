@@ -63,7 +63,7 @@
 | `ViewGraph` が、`State` などを結び付けるときと描画するときに `View` へ渡すもの | `ViewEnvironment` | internal。今は `FocusController` だけを持つ |
 | `View` の拡張として定義された `View.padding(_: EdgeInsets)`・`View.border(_:style:title:titleStyle:)` などのメソッド | `View` の拡張メソッド | 個々のメソッドは名前で書く |
 | `Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型 | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型」 |
-| `TextFieldState.cursor`・`ListState.scrollOffset` などを持つクラス | `ListState`・`TextFieldState` | 2 つをまとめる語は置かない。5cf1d9a は、`View` の `State` へ移せるのは #53 の後と書いている |
+| `TextFieldState.cursor`・`ListState.scrollOffset` などを持つクラス | `ListState`・`TextFieldState` | 2 つをまとめる語は置かない |
 | 別の場所にあるプロパティの値を取得し、書き換える型 | `Binding` | |
 | `TextField` の `text:` 引数と `ListView` の `selection:` 引数に、`Binding` で渡すプロパティ。`TerminalApp` に準拠する型のインスタンスプロパティか、`View` の `@State` を付けたプロパティ | `Binding` で渡すプロパティ | |
 | `TextFieldState`・`ListState` が持つ、`Binding` で渡さないプロパティ | `TextFieldState.cursor`・`ListState.scrollOffset`・`ListState.renderedRect` など、それぞれの名前 | |
@@ -106,13 +106,13 @@
 | `TerminalApp` に準拠する型が `TerminalApp.Message` を受け取るメソッド | `TerminalApp.receive(_:)` | |
 | `TerminalApp` に準拠する型が `InputEvent` を受け取るメソッド | `TerminalApp.handle(_:)` | `ListState.handle(_:)`・`TextFieldState.handle(_: InputEvent)` は別の宣言。受け取るのは、どの `View` も処理しなかった `InputEvent` だけ |
 
-## #98 の表の行
+## `Application` と `TerminalApp`
 
 | 指すもの | 書き方 | 補足 |
 |---|---|---|
-| #98 の決定 3 で、`TerminalApp` に準拠する型から一度だけ呼び出すとしたメソッド | `Application.copyToClipboard(_:limit:)`・`Application.suspend()` | 2 つをまとめる語は置かない |
+| `Application` のメソッドのうち、文字列をクリップボードへ渡すものと、端末デバイスの termios と端末エミュレータへ送ったモードを元に戻してプロセスを止めるもの | `Application.copyToClipboard(_:limit:)`・`Application.suspend()` | 2 つをまとめる語は置かない |
 | `TerminalApp` に準拠する型のインスタンスプロパティで、`Application` が `Application.draw()` のたびにプロパティの値を取得するもの | 名前で書く（`TerminalApp.cursorPosition` など） | |
-| `Application` が保持するプロパティとその型で、すべての `View` がプロパティの値を取得するもの | 名前で書く（`ApplicationOptions.ambiguousWidth` など） | まとめる語は置かない。まだコードに無いもの（#53、#73）は issue 番号で書く |
+| `Application` が保持するプロパティとその型で、すべての `View` がプロパティの値を取得するもの | 名前で書く（`ApplicationOptions.ambiguousWidth` など） | まとめる語は置かない |
 
 ## SwiftUI と同じ名前で、振る舞いが違うもの
 
