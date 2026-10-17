@@ -35,7 +35,7 @@ enum OverlayLayout {
 
 /// 中の ``View`` を同じ矩形へ重ねて描く ``View``。
 ///
-/// ``ZStack/children`` の後ろにある ``View`` ほど手前に描かれる。下の ``View`` を確実に覆うには、重ねる ``View`` に ``View/background(style:)`` や ``Fill`` を使って領域を塗る。
+/// ``ZStack/children`` の後ろにある ``View`` ほど手前に描かれる。下の ``View`` を確実に覆うには、重ねる ``View`` に ``View/background(_:)`` や ``Fill`` を使って領域を塗る。
 public struct ZStack: PrimitiveView {
     /// 重ねる ``View``。先頭が最背面。
     public var children: [any View]

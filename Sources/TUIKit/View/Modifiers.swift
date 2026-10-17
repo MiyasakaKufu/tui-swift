@@ -64,38 +64,35 @@ public struct PaddingView<Content: View>: PrimitiveView {
 }
 
 /// ``BorderView/content`` を枠線で囲む ``View``。
+///
+/// 枠線と見出しの背景色は、この ``View`` を内側に含む ``View``の ``View/background(_:)`` で塗った色になる。
 public struct BorderView<Content: View>: PrimitiveView {
     /// 枠線の内側に置く ``View``。
     public var content: Content
     /// 枠線に使う文字の組み合わせ。
     public var borderStyle: BorderStyle
-    /// 枠線のスタイル。
-    public var style: Style
+    /// 枠線と見出しの文字色。`nil` ならプライマリレベルの色。
+    public var color: Color?
     /// 上辺に重ねる見出し。`nil` なら見出しを出さない。
     public var title: String?
-    /// 見出しのスタイル。`nil` なら枠線と同じスタイル。
-    public var titleStyle: Style?
 
     /// `content` と枠線の見た目を指定して ``BorderView`` を作る。
     ///
     /// - Parameters:
     ///   - content: 枠線の内側に置く ``View``。
     ///   - borderStyle: 枠線に使う文字の組み合わせ。
-    ///   - style: 枠線のスタイル。
+    ///   - color: 枠線と見出しの文字色。`nil` ならプライマリレベルの色。
     ///   - title: 上辺に重ねる見出し。
-    ///   - titleStyle: 見出しのスタイル。`nil` なら枠線と同じスタイル。
     public init(
         content: Content,
         borderStyle: BorderStyle = .single,
-        style: Style = .plain,
-        title: String? = nil,
-        titleStyle: Style? = nil
+        color: Color? = nil,
+        title: String? = nil
     ) {
         self.content = content
         self.borderStyle = borderStyle
-        self.style = style
+        self.color = color
         self.title = title
-        self.titleStyle = titleStyle
     }
 
     /// ``BorderView/content`` の ``LayoutTraits`` を返す。
@@ -133,7 +130,7 @@ public struct BorderView<Content: View>: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 枠線を含めた矩形。幅・高さが 2 未満なら何も描かない。
-    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    ///   - context: 別の ``View`` のメソッドを呼び出し、枠線の文字色と背景色を決めるための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width >= 2, rect.height >= 2 else { return }
         // 枠線の矩形を `rect` 全体で記録したくなるが、`BorderView.content` が何も書き込まない内側の位置まで当たり判定に入り、その下の `View` へ `.mouse` が渡らなくなる。
@@ -141,7 +138,8 @@ public struct BorderView<Content: View>: PrimitiveView {
         context.recordHitRegion(Rect(x: rect.minX, y: rect.maxY - 1, width: rect.width, height: 1))
         context.recordHitRegion(Rect(x: rect.minX, y: rect.minY, width: 1, height: rect.height))
         context.recordHitRegion(Rect(x: rect.maxX - 1, y: rect.minY, width: 1, height: rect.height))
-        drawFrame(into: &buffer, rect: rect, ambiguous: context.ambiguousWidth)
+        let style = context.colors.style(color.map { .color($0) } ?? .hierarchical(.primary))
+        drawFrame(into: &buffer, rect: rect, style: style, ambiguous: context.ambiguousWidth)
         let inner = rect.inset(by: 1)
         if !inner.isEmpty {
             context.render(content, index: 0, into: &buffer, rect: inner)
@@ -162,8 +160,9 @@ public struct BorderView<Content: View>: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 枠線を含めた矩形。
+    ///   - style: 枠線と見出しの ``Style``。
     ///   - ambiguous: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
-    private func drawFrame(into buffer: inout Buffer, rect: Rect, ambiguous: DisplayWidth.AmbiguousWidth) {
+    private func drawFrame(into buffer: inout Buffer, rect: Rect, style: Style, ambiguous: DisplayWidth.AmbiguousWidth) {
         let border = effectiveBorderStyle(ambiguous: ambiguous)
         let top = rect.minY
         let bottom = rect.maxY - 1
@@ -196,7 +195,7 @@ public struct BorderView<Content: View>: PrimitiveView {
             buffer.write(
                 trimmed,
                 at: Point(x: left + 1, y: top),
-                style: titleStyle ?? style,
+                style: style,
                 clippedTo: Rect(x: left + 1, y: top, width: rect.width - 2, height: 1)
             )
         }
@@ -212,20 +211,22 @@ public struct BorderView<Content: View>: PrimitiveView {
 }
 
 /// ``BackgroundView/content`` の背景を塗る ``View``。
+///
+/// ``BackgroundView/content`` とその内側の ``View`` が書き込む ``Cell`` の背景色も、``BackgroundView/color`` になる。
 public struct BackgroundView<Content: View>: PrimitiveView {
     /// 背景の上に置く ``View``。
     public var content: Content
-    /// 背景を塗るスタイル。
-    public var style: Style
+    /// 背景色。
+    public var color: Color
 
-    /// `content` と背景のスタイルを指定して ``BackgroundView`` を作る。
+    /// `content` と背景色を指定して ``BackgroundView`` を作る。
     ///
     /// - Parameters:
     ///   - content: 背景の上に置く ``View``。
-    ///   - style: 背景を塗るスタイル。
-    public init(content: Content, style: Style) {
+    ///   - color: 背景色。
+    public init(content: Content, color: Color) {
         self.content = content
-        self.style = style
+        self.color = color
     }
 
     /// ``BackgroundView/content`` の ``LayoutTraits`` を返す。
@@ -247,7 +248,7 @@ public struct BackgroundView<Content: View>: PrimitiveView {
         context.sizeThatFits(of: content, index: 0, proposal: proposal)
     }
 
-    /// `rect` を塗ってから ``BackgroundView/content`` を描画する。
+    /// `rect` を塗ってから、背景色を ``BackgroundView/color`` にして ``BackgroundView/content`` を描画する。
     ///
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
@@ -256,8 +257,9 @@ public struct BackgroundView<Content: View>: PrimitiveView {
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         context.recordHitRegion(rect)
-        buffer.fill(rect, style: style)
-        context.render(content, index: 0, into: &buffer, rect: rect)
+        let colored = context.withColors { $0.background = color }
+        buffer.fill(rect, style: colored.colors.style(.hierarchical(.primary)))
+        colored.render(content, index: 0, into: &buffer, rect: rect)
     }
 
     /// ``BackgroundView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
@@ -506,35 +508,26 @@ extension View {
     ///
     /// - Parameters:
     ///   - borderStyle: 枠線に使う文字の組み合わせ。
-    ///   - style: 枠線のスタイル。
+    ///   - color: 枠線と見出しの文字色。`nil` ならプライマリレベルの色。
     ///   - title: 上辺に重ねる見出し。
-    ///   - titleStyle: 見出しのスタイル。`nil` なら枠線と同じスタイル。
     /// - Returns: この ``View`` を ``BorderView/content`` にした ``BorderView``。
     public func border(
         _ borderStyle: BorderStyle = .single,
-        style: Style = .plain,
-        title: String? = nil,
-        titleStyle: Style? = nil
+        color: Color? = nil,
+        title: String? = nil
     ) -> BorderView<Self> {
-        BorderView(content: self, borderStyle: borderStyle, style: style, title: title, titleStyle: titleStyle)
+        BorderView(content: self, borderStyle: borderStyle, color: color, title: title)
     }
 
     /// 背景色を塗る。
+    ///
+    /// この ``View`` とその内側の ``View`` が書き込む ``Cell`` の背景色も `color` になる。
     ///
     /// - Parameters:
     ///   - color: 背景色。
     /// - Returns: この ``View`` を ``BackgroundView/content`` にした ``BackgroundView``。
     public func background(_ color: Color) -> BackgroundView<Self> {
-        BackgroundView(content: self, style: Style(background: color))
-    }
-
-    /// 背景をスタイルごと塗る。
-    ///
-    /// - Parameters:
-    ///   - style: 背景を塗るスタイル。
-    /// - Returns: この ``View`` を ``BackgroundView/content`` にした ``BackgroundView``。
-    public func background(style: Style) -> BackgroundView<Self> {
-        BackgroundView(content: self, style: style)
+        BackgroundView(content: self, color: color)
     }
 
     /// 幅・高さを固定する。

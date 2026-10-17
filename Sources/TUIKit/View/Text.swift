@@ -1,9 +1,11 @@
 /// 文字列を表示する ``View``。
+///
+/// この ``View`` を内側に含む ``View``で決めた色で描く。文字は、`Text.foregroundStyle(_: Color)` などで決めていなければプライマリレベルの色、背景は ``View/background(_:)`` で塗った色。
 public struct Text: PrimitiveView {
     /// 表示する文字列。
     public var content: String
-    /// 文字のスタイル。
-    public var style: Style
+    /// 文字装飾。
+    public var attributes: TextAttributes
     /// 折り返しの方法。
     public var wrap: WrapMode
     /// 行の水平方向の揃え。
@@ -12,24 +14,24 @@ public struct Text: PrimitiveView {
     ///
     /// タブは、``Text/content`` を改行で区切った行の先頭から（折り返す前に）数えた ``Cell`` の数が、次にこの値の倍数になる位置まで空白で埋められる。0 以下なら、タブは取り除かれる。
     public var tabSize: Int
+    /// `Text.foregroundStyle(_: Color)` などで決めた文字色。`nil` ならプライマリレベルの色。
+    var foreground: ForegroundStyleValue?
 
     /// 文字列と見た目を指定して ``Text`` を作る。
     ///
     /// - Parameters:
     ///   - content: 表示する文字列。
-    ///   - style: 文字のスタイル。
     ///   - wrap: 折り返しの方法。
     ///   - alignment: 行の水平方向の揃え。
     ///   - tabSize: タブストップの間隔。
     public init(
         _ content: String,
-        style: Style = .plain,
         wrap: WrapMode = .truncate,
         alignment: HorizontalAlignment = .leading,
         tabSize: Int = TabExpansion.defaultSize
     ) {
         self.content = content
-        self.style = style
+        self.attributes = []
         self.wrap = wrap
         self.alignment = alignment
         self.tabSize = tabSize
@@ -55,49 +57,40 @@ public struct Text: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。高さに収まらない行は描画されない。
-    ///   - context: ``RenderContext/ambiguousWidth`` を取得するための ``RenderContext``。
+    ///   - context: ``RenderContext/ambiguousWidth`` を取得し、文字色と背景色を決めるための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         context.recordHitRegion(rect)
         let lines = TextWrapping.wrap(
             content, width: rect.width, mode: wrap, tabSize: tabSize, ambiguous: context.ambiguousWidth
         )
+        var style = context.colors.style(foreground ?? .hierarchical(.primary))
+        style.attributes.formUnion(attributes)
         // ここでタブを展開してはいけない。`TextWrapping.wrap` が展開した行が二重に広がる。
         buffer.write(lines: Array(lines.prefix(rect.height)), in: rect, style: style, alignment: alignment)
     }
 
     // MARK: - 見た目の調整
 
-    /// スタイルを差し替えた複製。
+    /// 文字色を `style` にした複製。
     ///
     /// - Parameters:
-    ///   - style: 新しいスタイル。
-    /// - Returns: スタイルを差し替えた複製。
-    public func styled(_ style: Style) -> Text {
-        var copy = self
-        copy.style = style
-        return copy
-    }
-
-    /// 文字色を差し替えた複製。
-    ///
-    /// - Parameters:
-    ///   - color: 新しい文字色。
+    ///   - style: 文字色。
     /// - Returns: 文字色を差し替えた複製。
-    public func foreground(_ color: Color) -> Text {
+    public func foregroundStyle(_ style: Color) -> Text {
         var copy = self
-        copy.style.foreground = color
+        copy.foreground = .color(style)
         return copy
     }
 
-    /// 背景色を差し替えた複製。
+    /// 文字色を、前景スタイルの `style` のレベルの色にした複製。
     ///
     /// - Parameters:
-    ///   - color: 新しい背景色。
-    /// - Returns: 背景色を差し替えた複製。
-    public func background(_ color: Color) -> Text {
+    ///   - style: 前景スタイルのうち、使うレベル。
+    /// - Returns: 文字色を差し替えた複製。
+    public func foregroundStyle(_ style: HierarchicalShapeStyle) -> Text {
         var copy = self
-        copy.style.background = color
+        copy.foreground = .hierarchical(style)
         return copy
     }
 
@@ -108,7 +101,7 @@ public struct Text: PrimitiveView {
     /// - Returns: 装飾を足した複製。
     public func attributes(_ attributes: TextAttributes) -> Text {
         var copy = self
-        copy.style.attributes.formUnion(attributes)
+        copy.attributes.formUnion(attributes)
         return copy
     }
 

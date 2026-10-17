@@ -225,20 +225,18 @@ public struct EmptyView: PrimitiveView {
 }
 
 /// 領域全体を 1 文字で塗りつぶす ``View``。
+///
+/// この ``View`` を内側に含む ``View``で決めた色で描く。文字はプライマリレベルの色、背景は ``View/background(_:)`` で塗った色。
 public struct Fill: PrimitiveView {
     /// 敷き詰める文字。
     public var character: Character
-    /// 文字に付けるスタイル。
-    public var style: Style
 
-    /// 敷き詰める文字とスタイルを指定して作る。
+    /// 敷き詰める文字を指定して作る。
     ///
     /// - Parameters:
     ///   - character: 敷き詰める文字。
-    ///   - style: 文字に付けるスタイル。
-    public init(_ character: Character = " ", style: Style = .plain) {
+    public init(_ character: Character = " ") {
         self.character = character
-        self.style = style
     }
 
     /// ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` がともに 1 の ``LayoutTraits`` を返す。
@@ -261,10 +259,10 @@ public struct Fill: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。
-    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    ///   - context: 文字色と背景色を決めるための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         context.recordHitRegion(rect)
-        buffer.fill(rect, repeating: character, style: style)
+        buffer.fill(rect, repeating: character, style: context.colors.style(.hierarchical(.primary)))
     }
 
     /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。
@@ -320,24 +318,22 @@ public struct Spacer: PrimitiveView {
 }
 
 /// 1 本の罫線。
+///
+/// この ``View`` を内側に含む ``View``で決めた色で描く。文字はプライマリレベルの色、背景は ``View/background(_:)`` で塗った色。
 public struct Divider: PrimitiveView {
     /// 罫線を伸ばす方向。
     public var axis: Axis
     /// 罫線に使う文字。
     public var character: Character
-    /// 文字に付けるスタイル。
-    public var style: Style
 
     /// 方向と文字を指定して罫線を作る。
     ///
     /// - Parameters:
     ///   - axis: 罫線を伸ばす方向。
     ///   - character: 罫線に使う文字。`nil` なら方向に合わせて `─` か `│` を使う。
-    ///   - style: 文字に付けるスタイル。
-    public init(axis: Axis = .horizontal, character: Character? = nil, style: Style = .plain) {
+    public init(axis: Axis = .horizontal, character: Character? = nil) {
         self.axis = axis
         self.character = character ?? (axis == .horizontal ? "─" : "│")
-        self.style = style
     }
 
     /// ``Divider/axis`` が `.horizontal` なら ``LayoutTraits/horizontalFlex`` だけが 1、`.vertical` なら ``LayoutTraits/verticalFlex`` だけが 1 の ``LayoutTraits`` を返す。
@@ -370,10 +366,10 @@ public struct Divider: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。
-    ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
+    ///   - context: 文字色と背景色を決めるための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         context.recordHitRegion(rect)
-        buffer.fill(rect, repeating: character, style: style)
+        buffer.fill(rect, repeating: character, style: context.colors.style(.hierarchical(.primary)))
     }
 
     /// ``RenderContext`` のメソッドに ``View`` を渡さないので、何もしない。
