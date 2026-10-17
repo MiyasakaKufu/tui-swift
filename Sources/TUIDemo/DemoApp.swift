@@ -39,6 +39,7 @@ final class DemoApp: TerminalApp {
             lastEventDescription: lastEventDescription,
             terminalSize: terminalSize
         )
+        .tint(.green)
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -101,9 +102,11 @@ final class DemoApp: TerminalApp {
 /// 画面上端の見出し。
 private struct Header: View {
     var body: some View {
-        Text(" TUIKit デモ ", style: Style(foreground: .black, background: .cyan).bold)
+        Text(" TUIKit デモ ")
+            .foregroundStyle(.black)
+            .bold()
             .frame(height: 1)
-            .background(style: Style(background: .cyan))
+            .background(.cyan)
             .flexible(horizontal: 1, vertical: 0)
     }
 }
@@ -136,7 +139,7 @@ private struct DemoScreen: View {
             HStack(spacing: 1) {
                 ListView(items: items, selection: $selection, state: listState)
                     .padding(horizontal: 1)
-                    .border(.rounded, style: borderStyle(for: .list), title: "機能一覧")
+                    .border(.rounded, color: borderColor(for: .list), title: "機能一覧")
                     .focused($focusedField, equals: .list)
                     .onKeyPress(.character("d")) {
                         isShowingDialog = true
@@ -160,19 +163,19 @@ private struct DemoScreen: View {
     private var detail: some View {
         VStack(spacing: 1) {
             Text("選択中: \(items.indices.contains(selection) ? items[selection] : "-")", wrap: .word).bold()
-            Text("ウィンドウサイズ: \(terminalSize.width) x \(terminalSize.height)").dim()
+            Text("ウィンドウサイズ: \(terminalSize.width) x \(terminalSize.height)").foregroundStyle(.secondary)
             Text("TerminalApp.handle(_:) に届いた入力: \(lastEventDescription)", wrap: .word)
 
             VStack(spacing: 0) {
-                Text("進捗（一覧で + / - を押すと増減）").dim()
+                Text("進捗（一覧で + / - を押すと増減）").foregroundStyle(.secondary)
                 ProgressBar(value: progress, showsPercentage: true)
             }
 
             VStack(spacing: 0) {
-                Text("名前（\(name.count) 文字）").dim()
+                Text("名前（\(name.count) 文字）").foregroundStyle(.secondary)
                 TextField(text: $name, state: nameState, placeholder: "ここに入力…")
                     .padding(horizontal: 1)
-                    .border(.single, style: borderStyle(for: .name))
+                    .border(.single, color: borderColor(for: .name))
                     .focused($focusedField, equals: .name)
                     .onKeyPress(.enter) {
                         focusedField = .note
@@ -181,10 +184,10 @@ private struct DemoScreen: View {
             }
 
             VStack(spacing: 0) {
-                Text("メモ（Enter で一覧へ戻る）").dim()
+                Text("メモ（Enter で一覧へ戻る）").foregroundStyle(.secondary)
                 TextField(text: $note, state: noteState, placeholder: "ここに入力…")
                     .padding(horizontal: 1)
-                    .border(.single, style: borderStyle(for: .note))
+                    .border(.single, color: borderColor(for: .note))
                     .focused($focusedField, equals: .note)
                     .onKeyPress(.enter) {
                         focusedField = .list
@@ -197,13 +200,13 @@ private struct DemoScreen: View {
         .padding(horizontal: 1)
     }
 
-    /// `field` がフォーカスを持つ間だけ色を付けた、枠線の ``Style`` を返す。
+    /// `field` がフォーカスを持つ間だけ目立たせる、枠線の文字色を返す。
     ///
     /// - Parameters:
     ///   - field: 枠線で囲む欄。
-    /// - Returns: 枠線の ``Style``。
-    private func borderStyle(for field: Field) -> Style {
-        Style(foreground: focusedField == field ? .yellow : .brightBlack)
+    /// - Returns: `field` がフォーカスを持てば `.yellow`、持たなければ `.brightBlack`。
+    private func borderColor(for field: Field) -> Color {
+        focusedField == field ? .yellow : .brightBlack
     }
 }
 
@@ -221,7 +224,7 @@ private struct Footer: View {
     var body: some View {
         HStack(spacing: 2) {
             for hint in hints {
-                Text(" \(hint) ").styled(Style(foreground: .black, background: .white))
+                Text(" \(hint) ").foregroundStyle(.black).background(.white)
             }
             Spacer()
         }
@@ -236,10 +239,9 @@ private struct Dialog: View {
     @State private var buttonState = ListState()
 
     var body: some View {
-        let textStyle = Style(foreground: .brightWhite, background: .blue)
-        return VStack(spacing: 1, alignment: .center) {
-            Text("View.sheet(isPresented:content:) で重ねたダイアログです。", style: textStyle, wrap: .word)
-            Text("表示している間、後ろの欄へは入力が渡りません。", style: textStyle, wrap: .word)
+        VStack(spacing: 1, alignment: .center) {
+            Text("View.sheet(isPresented:content:) で重ねたダイアログです。", wrap: .word)
+            Text("表示している間、後ろの欄へは入力が渡りません。", wrap: .word)
             ListView(items: ["閉じる"], state: buttonState, selectionMarker: "")
                 .frame(width: 6, height: 1)
                 .onKeyPress(.enter) {
@@ -251,9 +253,10 @@ private struct Dialog: View {
                     return .handled
                 }
         }
+        .foregroundStyle(.brightWhite)
         .padding(horizontal: 2, vertical: 1)
-        .border(.double, style: Style(foreground: .yellow, background: .blue), title: "ダイアログ")
-        .background(style: Style(background: .blue))
+        .border(.double, color: .yellow, title: "ダイアログ")
+        .background(.blue)
         .frame(width: 48, height: 11)
     }
 }

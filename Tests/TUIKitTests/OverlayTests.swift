@@ -95,7 +95,7 @@ final class OverlayTests: XCTestCase {
     func testBackgroundCoversContentBelow() async {
         let view = ZStack {
             Fill(".")
-            Text("ok").padding(1).background(style: Style(background: .blue))
+            Text("ok").padding(1).background(.blue)
         }
         XCTAssertEqual(
             render(view, width: 6, height: 5),
@@ -124,7 +124,7 @@ final class OverlayTests: XCTestCase {
     func testDialogOverWideCharactersKeepsRowWidth() async {
         let view = ZStack {
             Fill("あ")
-            Text("確認").padding(1).background(style: Style(background: .blue))
+            Text("確認").padding(1).background(.blue)
         }
         var buffer = Buffer(size: Size(width: 9, height: 5))
         let bounds = buffer.bounds

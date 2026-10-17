@@ -234,15 +234,13 @@ public final class ListState {
 }
 
 /// 選択可能なリスト。
+///
+/// この ``View`` を内側に含む ``View``で決めた色で描く。行の文字はプライマリレベルの色、背景は ``View/background(_:)`` で塗った色。選択行は、ティントカラーを文字色にして反転した ``Style`` で描く。
 public struct ListView: PrimitiveView {
     /// 各行に表示する文字列。
     public var items: [String]
     /// スクロール位置を持つ ``ListState``。``Binding`` を渡さずに作った場合は選択位置も持つ。
     public var state: ListState
-    /// 非選択行のスタイル。
-    public var style: Style
-    /// 選択行のスタイル。
-    public var selectedStyle: Style
     /// 選択行の先頭に付ける印。
     public var selectionMarker: String
     /// 非選択行の先頭に入れる字下げ。既定では `selectionMarker` と同じ幅の空白。
@@ -254,8 +252,6 @@ public struct ListView: PrimitiveView {
     ///   - items: 各行に表示する文字列。
     ///   - selection: 選択位置を持つプロパティを読み書きする ``Binding``。
     ///   - state: スクロール位置を持つ ``ListState``。選択位置は持たず、`selection` を読み書きする。
-    ///   - style: 非選択行のスタイル。
-    ///   - selectedStyle: 選択行のスタイル。
     ///   - selectionMarker: 選択行の先頭に付ける印。
     ///   - marginMarker: 非選択行の先頭に入れる字下げ。`nil` なら印と同じ幅の空白。
     /// - Postcondition: `state.itemCount` が `items` の個数に更新される。`state` は以後、
@@ -265,8 +261,6 @@ public struct ListView: PrimitiveView {
         items: [String],
         selection: Binding<Int>,
         state: ListState,
-        style: Style = .plain,
-        selectedStyle: Style = Style(attributes: .reverse),
         selectionMarker: String = "> ",
         marginMarker: String? = nil
     ) {
@@ -274,8 +268,6 @@ public struct ListView: PrimitiveView {
         self.init(
             items: items,
             state: state,
-            style: style,
-            selectedStyle: selectedStyle,
             selectionMarker: selectionMarker,
             marginMarker: marginMarker
         )
@@ -286,23 +278,17 @@ public struct ListView: PrimitiveView {
     /// - Parameters:
     ///   - items: 各行に表示する文字列。
     ///   - state: 選択位置とスクロール位置を持つ ``ListState``。
-    ///   - style: 非選択行のスタイル。
-    ///   - selectedStyle: 選択行のスタイル。
     ///   - selectionMarker: 選択行の先頭に付ける印。
     ///   - marginMarker: 非選択行の先頭に入れる字下げ。`nil` なら印と同じ幅の空白。
     /// - Postcondition: `state.itemCount` が `items` の個数に更新される。
     public init(
         items: [String],
         state: ListState,
-        style: Style = .plain,
-        selectedStyle: Style = Style(attributes: .reverse),
         selectionMarker: String = "> ",
         marginMarker: String? = nil
     ) {
         self.items = items
         self.state = state
-        self.style = style
-        self.selectedStyle = selectedStyle
         self.selectionMarker = selectionMarker
         self.marginMarker = marginMarker
         state.itemCount = items.count
@@ -336,7 +322,7 @@ public struct ListView: PrimitiveView {
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。
-    ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読む ``RenderContext``。
+    ///   - context: 文字列の幅を測るときに ``RenderContext/ambiguousWidth`` を読み、行の ``Style`` を決める ``RenderContext``。
     /// - Postcondition: `state.renderedRect` が `rect` に更新され、
     ///   スクロール位置が項目の範囲へ収められる。直前の描画から選択位置が変わっていれば、
     ///   選択が表示範囲に入るようスクロールする。
@@ -360,6 +346,9 @@ public struct ListView: PrimitiveView {
             repeating: " ",
             count: DisplayWidth.width(of: selectionMarker, ambiguous: context.ambiguousWidth)
         )
+
+        let style = context.colors.style(.hierarchical(.primary))
+        let selectedStyle = context.colors.tintStyle().adding(.reverse)
 
         for row in 0..<rect.height {
             let index = state.scrollOffset + row
