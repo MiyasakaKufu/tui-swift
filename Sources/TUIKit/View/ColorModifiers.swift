@@ -4,17 +4,17 @@
 public struct ForegroundStyleView<Content: View>: PrimitiveView {
     /// 文字色を決める範囲の ``View``。
     public var content: Content
-    /// primary の段にする文字色。
+    /// プライマリレベルにする文字色。
     let primary: ForegroundStyleValue
-    /// secondary の段にする文字色。`nil` なら primary の段から決まる。
+    /// セカンダリレベルにする文字色。`nil` ならプライマリレベルから決まる。
     let secondary: Color?
 
     /// ``ForegroundStyleView`` を作る。
     ///
     /// - Parameters:
     ///   - content: 文字色を決める範囲の ``View``。
-    ///   - primary: primary の段にする文字色。
-    ///   - secondary: secondary の段にする文字色。`nil` なら primary の段から決まる。
+    ///   - primary: プライマリレベルにする文字色。
+    ///   - secondary: セカンダリレベルにする文字色。`nil` ならプライマリレベルから決まる。
     init(content: Content, primary: ForegroundStyleValue, secondary: Color?) {
         self.content = content
         self.primary = primary
@@ -61,18 +61,18 @@ public struct ForegroundStyleView<Content: View>: PrimitiveView {
     }
 }
 
-/// ``TintView/content`` の tint を決める ``View``。``View/tint(_:)`` で作る。
+/// ``TintView/content`` のティントカラーを決める ``View``。``View/tint(_:)`` で作る。
 public struct TintView<Content: View>: PrimitiveView {
-    /// tint を決める範囲の ``View``。
+    /// ティントカラーを決める範囲の ``View``。
     public var content: Content
-    /// tint にする色。`nil` なら primary の段の文字色。
+    /// ティントカラー。`nil` ならプライマリレベルの文字色。
     public var tint: Color?
 
     /// ``TintView`` を作る。
     ///
     /// - Parameters:
-    ///   - content: tint を決める範囲の ``View``。
-    ///   - tint: tint にする色。`nil` なら primary の段の文字色。
+    ///   - content: ティントカラーを決める範囲の ``View``。
+    ///   - tint: ティントカラー。`nil` ならプライマリレベルの文字色。
     init(content: Content, tint: Color?) {
         self.content = content
         self.tint = tint
@@ -97,7 +97,7 @@ public struct TintView<Content: View>: PrimitiveView {
         context.sizeThatFits(of: content, index: 0, proposal: proposal)
     }
 
-    /// tint を決め直してから ``TintView/content`` を描画する。
+    /// ティントカラーを決め直してから ``TintView/content`` を描画する。
     ///
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
@@ -119,42 +119,42 @@ public struct TintView<Content: View>: PrimitiveView {
 }
 
 extension View {
-    /// この ``View`` と、その内側の文字色を `style` にする。
+    /// この ``View`` と、その内側の前景スタイルを `style` にする。
     ///
-    /// secondary の段は、`style` に ``TextAttributes/dim`` を足したものになる。
+    /// セカンダリレベルは、`style` に ``TextAttributes/dim`` を足したものになる。
     ///
     /// - Parameters:
-    ///   - style: primary の段にする文字色。
+    ///   - style: プライマリレベルにする文字色。
     /// - Returns: この ``View`` を ``ForegroundStyleView/content`` にした ``ForegroundStyleView``。
     public func foregroundStyle(_ style: Color) -> ForegroundStyleView<Self> {
         ForegroundStyleView(content: self, primary: .color(style), secondary: nil)
     }
 
-    /// この ``View`` と、その内側の文字色を、外側で決めた文字色の `style` の段にする。
+    /// この ``View`` と、その内側の前景スタイルを、この ``View`` を内側に含む ``View``が決めた前景スタイルの `style` のレベルにする。
     ///
     /// - Parameters:
-    ///   - style: 外側で決めた文字色のうち、primary の段にする段。
+    ///   - style: この ``View`` を内側に含む ``View``が決めた前景スタイルのうち、プライマリレベルにするレベル。
     /// - Returns: この ``View`` を ``ForegroundStyleView/content`` にした ``ForegroundStyleView``。
     public func foregroundStyle(_ style: HierarchicalShapeStyle) -> ForegroundStyleView<Self> {
         ForegroundStyleView(content: self, primary: .hierarchical(style), secondary: nil)
     }
 
-    /// この ``View`` と、その内側の文字色の primary と secondary の段を決める。
+    /// この ``View`` と、その内側の前景スタイルのプライマリレベルとセカンダリレベルを決める。
     ///
     /// - Parameters:
-    ///   - primary: primary の段にする文字色。
-    ///   - secondary: secondary の段にする文字色。
+    ///   - primary: プライマリレベルにする文字色。
+    ///   - secondary: セカンダリレベルにする文字色。
     /// - Returns: この ``View`` を ``ForegroundStyleView/content`` にした ``ForegroundStyleView``。
     public func foregroundStyle(_ primary: Color, _ secondary: Color) -> ForegroundStyleView<Self> {
         ForegroundStyleView(content: self, primary: .color(primary), secondary: secondary)
     }
 
-    /// この ``View`` と、その内側の tint を `tint` にする。
+    /// この ``View`` と、その内側のティントカラーを `tint` にする。
     ///
-    /// tint を使うのは、``ProgressBar`` の進んだ部分と、``ListView`` の選択行。``ListView`` は、tint を文字色にして反転した ``Style`` で選択行を描く。
+    /// ティントカラーを使うのは、``ProgressBar`` の進んだ部分と、``ListView`` の選択行。``ListView`` は、ティントカラーを文字色にして反転した ``Style`` で選択行を描く。
     ///
     /// - Parameters:
-    ///   - tint: tint にする色。`nil` なら primary の段の文字色。
+    ///   - tint: ティントカラー。`nil` ならプライマリレベルの文字色。
     /// - Returns: この ``View`` を ``TintView/content`` にした ``TintView``。
     public func tint(_ tint: Color?) -> TintView<Self> {
         TintView(content: self, tint: tint)

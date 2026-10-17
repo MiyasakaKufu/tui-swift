@@ -226,7 +226,7 @@ public struct EmptyView: PrimitiveView {
 
 /// 領域全体を 1 文字で塗りつぶす ``View``。
 ///
-/// 文字色は外側で決めた primary の段、背景色は外側の ``View/background(_:)`` で塗った色になる。
+/// この ``View`` を内側に含む ``View``で決めた色で描く。文字はプライマリレベルの色、背景は ``View/background(_:)`` で塗った色。
 public struct Fill: PrimitiveView {
     /// 敷き詰める文字。
     public var character: Character
@@ -319,7 +319,7 @@ public struct Spacer: PrimitiveView {
 
 /// 1 本の罫線。
 ///
-/// 文字色は外側で決めた primary の段、背景色は外側の ``View/background(_:)`` で塗った色になる。
+/// この ``View`` を内側に含む ``View``で決めた色で描く。文字はプライマリレベルの色、背景は ``View/background(_:)`` で塗った色。
 public struct Divider: PrimitiveView {
     /// 罫線を伸ばす方向。
     public var axis: Axis

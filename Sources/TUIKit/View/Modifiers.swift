@@ -65,13 +65,13 @@ public struct PaddingView<Content: View>: PrimitiveView {
 
 /// ``BorderView/content`` を枠線で囲む ``View``。
 ///
-/// 枠線と見出しの背景色は、外側の ``View/background(_:)`` で塗った色になる。
+/// 枠線と見出しの背景色は、この ``View`` を内側に含む ``View``の ``View/background(_:)`` で塗った色になる。
 public struct BorderView<Content: View>: PrimitiveView {
     /// 枠線の内側に置く ``View``。
     public var content: Content
     /// 枠線に使う文字の組み合わせ。
     public var borderStyle: BorderStyle
-    /// 枠線と見出しの文字色。`nil` なら外側で決めた primary の段。
+    /// 枠線と見出しの文字色。`nil` ならプライマリレベルの色。
     public var color: Color?
     /// 上辺に重ねる見出し。`nil` なら見出しを出さない。
     public var title: String?
@@ -81,7 +81,7 @@ public struct BorderView<Content: View>: PrimitiveView {
     /// - Parameters:
     ///   - content: 枠線の内側に置く ``View``。
     ///   - borderStyle: 枠線に使う文字の組み合わせ。
-    ///   - color: 枠線と見出しの文字色。`nil` なら外側で決めた primary の段。
+    ///   - color: 枠線と見出しの文字色。`nil` ならプライマリレベルの色。
     ///   - title: 上辺に重ねる見出し。
     public init(
         content: Content,
@@ -508,7 +508,7 @@ extension View {
     ///
     /// - Parameters:
     ///   - borderStyle: 枠線に使う文字の組み合わせ。
-    ///   - color: 枠線と見出しの文字色。`nil` なら外側で決めた primary の段。
+    ///   - color: 枠線と見出しの文字色。`nil` ならプライマリレベルの色。
     ///   - title: 上辺に重ねる見出し。
     /// - Returns: この ``View`` を ``BorderView/content`` にした ``BorderView``。
     public func border(

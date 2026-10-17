@@ -294,7 +294,7 @@ public final class TextFieldState {
 
 /// 1 行のテキスト入力欄。
 ///
-/// 文字色は外側で決めた primary の段、プレースホルダの文字色は secondary の段、背景色は外側の ``View/background(_:)`` で塗った色になる。
+/// この ``View`` を内側に含む ``View``で決めた色で描く。文字はプライマリレベルの色、プレースホルダはセカンダリレベルの色、背景は ``View/background(_:)`` で塗った色。
 public struct TextField: PrimitiveView {
     /// カーソル位置を持つ ``TextFieldState``。``Binding`` を渡さずに作った場合は内容も持つ。
     public var state: TextFieldState

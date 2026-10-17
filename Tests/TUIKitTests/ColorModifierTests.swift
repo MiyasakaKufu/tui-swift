@@ -92,7 +92,7 @@ final class ColorModifierTests: XCTestCase {
         XCTAssertEqual(render(view, width: 5, height: 3)[0, 0].style, Style(foreground: .red))
     }
 
-    // MARK: - tint
+    // MARK: - ティントカラー
 
     func testProgressBarUsesTintAndSecondary() async {
         let view = ProgressBar(value: 0.5).tint(.green).foregroundStyle(.white, .brightBlack)

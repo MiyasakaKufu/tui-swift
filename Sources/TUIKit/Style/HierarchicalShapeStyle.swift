@@ -1,6 +1,6 @@
-/// 外側の `View.foregroundStyle(_: Color)`・`View.foregroundStyle(_:_:)` が決めた文字色の、primary か secondary の段。
+/// ``HierarchicalShapeStyle`` を渡した ``View`` を内側に含む ``View`` の `View.foregroundStyle(_: Color)`・`View.foregroundStyle(_:_:)` が決めた前景スタイルの、プライマリレベルかセカンダリレベル。
 ///
-/// 自分の色を持たず、外側で決めた文字色から決まる。
+/// 自分の色を持たない。
 ///
 /// ```swift
 /// VStack {
@@ -10,22 +10,22 @@
 /// .foregroundStyle(.white, .brightBlack)
 /// ```
 ///
-/// - Note: secondary の段を `View.foregroundStyle(_:_:)` で決めていなければ、primary の段の文字色に ``TextAttributes/dim`` を足したものになる。
+/// - Note: セカンダリレベルを `View.foregroundStyle(_:_:)` で決めていなければ、プライマリレベルの文字色に ``TextAttributes/dim`` を足したものになる。
 public struct HierarchicalShapeStyle: Hashable, Sendable {
-    /// 段。
+    /// レベル。
     enum Level: Hashable, Sendable {
-        /// 1 段目。
+        /// プライマリレベル。
         case primary
-        /// 2 段目。
+        /// セカンダリレベル。
         case secondary
     }
 
-    /// この ``HierarchicalShapeStyle`` が指す段。
+    /// この ``HierarchicalShapeStyle`` が指すレベル。
     let level: Level
 
-    /// 外側で決めた文字色そのもの。どこでも決めていなければ ``Color/default``。
+    /// 前景スタイルのプライマリレベル。どの ``View`` でも決めていなければ ``Color/default``。
     public static let primary = HierarchicalShapeStyle(level: .primary)
-    /// 外側で決めた文字色の 2 段目。
+    /// 前景スタイルのセカンダリレベル。
     public static let secondary = HierarchicalShapeStyle(level: .secondary)
 }
 
@@ -33,19 +33,19 @@ public struct HierarchicalShapeStyle: Hashable, Sendable {
 enum ForegroundStyleValue: Hashable, Sendable {
     /// 色そのもの。
     case color(Color)
-    /// 外側で決めた文字色の段。
+    /// 前景スタイルのレベル。
     case hierarchical(HierarchicalShapeStyle)
 }
 
-/// ``RenderContext`` が、`RenderContext` のメソッドに `child` 引数として渡す ``View`` へ運ぶ文字色・tint・背景色。
+/// ``RenderContext`` が、`RenderContext` のメソッドに `child` 引数として渡す ``View`` へ運ぶ前景スタイル・ティントカラー・背景色。
 ///
 /// `View.foregroundStyle(_: Color)`・``View/tint(_:)``・``View/background(_:)`` が書き換え、``Text``・``ListView`` などが ``Style`` を決めるときに使う。
 struct ViewColors: Hashable, Sendable {
-    /// primary の段の ``Style``。``Style/background`` は使わない。
+    /// プライマリレベルの ``Style``。``Style/background`` は使わない。
     var primary = Style()
-    /// secondary の段の ``Style``。`nil` なら `primary` に ``TextAttributes/dim`` を足したもの。``Style/background`` は使わない。
+    /// セカンダリレベルの ``Style``。`nil` なら `primary` に ``TextAttributes/dim`` を足したもの。``Style/background`` は使わない。
     var secondary: Style?
-    /// ``View/tint(_:)`` で決めた色。`nil` なら primary の段の文字色。
+    /// ``View/tint(_:)`` で決めたティントカラー。`nil` ならプライマリレベルの文字色。
     var tint: Color?
     /// ``View/background(_:)`` で塗った背景色。
     var background = Color.default
@@ -61,9 +61,9 @@ struct ViewColors: Hashable, Sendable {
         return style
     }
 
-    /// tint の文字色に、背景色を合わせた ``Style`` を返す。
+    /// ティントカラーを文字色にし、背景色を合わせた ``Style`` を返す。
     ///
-    /// - Returns: ``ViewColors/tint`` が `nil` なら primary の段の ``Style``、そうでなければ ``ViewColors/tint`` を文字色にした ``Style``。背景色は ``ViewColors/background``。
+    /// - Returns: ``ViewColors/tint`` が `nil` ならプライマリレベルの ``Style``、そうでなければ ``ViewColors/tint`` を文字色にした ``Style``。背景色は ``ViewColors/background``。
     func tintStyle() -> Style {
         guard let tint else { return style(.hierarchical(.primary)) }
         return Style(foreground: tint, background: background)
@@ -88,12 +88,12 @@ struct ViewColors: Hashable, Sendable {
         }
     }
 
-    /// 文字色を `primary` と `secondary` に決め直す。
+    /// 前景スタイルを `primary` と `secondary` に決め直す。
     ///
     /// - Parameters:
-    ///   - primary: primary の段にする文字色。
-    ///   - secondary: secondary の段にする文字色。`nil` なら、`primary` に ``TextAttributes/dim`` を足したものになる。
-    /// - Postcondition: `primary` が ``HierarchicalShapeStyle`` なら、決め直す前の段の ``Style`` が primary の段になる。
+    ///   - primary: プライマリレベルにする文字色。
+    ///   - secondary: セカンダリレベルにする文字色。`nil` なら、`primary` に ``TextAttributes/dim`` を足したものになる。
+    /// - Postcondition: `primary` が ``HierarchicalShapeStyle`` なら、決め直す前のレベルの ``Style`` がプライマリレベルになる。
     mutating func setForeground(_ primary: ForegroundStyleValue, secondary: Color?) {
         self.primary = foreground(primary)
         self.secondary = secondary.map { Style(foreground: $0) }

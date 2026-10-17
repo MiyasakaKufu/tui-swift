@@ -1,6 +1,6 @@
 /// 進捗バー。
 ///
-/// 進んだ部分の文字色は外側の ``View/tint(_:)`` で決めた色、残りの部分と百分率の文字色は外側で決めた secondary の段、背景色は外側の ``View/background(_:)`` で塗った色になる。
+/// この ``View`` を内側に含む ``View``で決めた色で描く。進んだ部分はティントカラー、残りの部分と百分率はセカンダリレベルの色、背景は ``View/background(_:)`` で塗った色。
 public struct ProgressBar: PrimitiveView {
     /// 0.0 〜 1.0 に丸められた進捗。
     public var progress: Double

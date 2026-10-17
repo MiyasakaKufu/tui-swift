@@ -1,6 +1,6 @@
 /// 文字列を表示する ``View``。
 ///
-/// 文字色は、`Text.foregroundStyle(_: Color)` などで決めていなければ、外側の `View.foregroundStyle(_: Color)` などで決めた primary の段になる。背景色は、外側の ``View/background(_:)`` で塗った色になる。
+/// この ``View`` を内側に含む ``View``で決めた色で描く。文字は、`Text.foregroundStyle(_: Color)` などで決めていなければプライマリレベルの色、背景は ``View/background(_:)`` で塗った色。
 public struct Text: PrimitiveView {
     /// 表示する文字列。
     public var content: String
@@ -14,7 +14,7 @@ public struct Text: PrimitiveView {
     ///
     /// タブは、``Text/content`` を改行で区切った行の先頭から（折り返す前に）数えた ``Cell`` の数が、次にこの値の倍数になる位置まで空白で埋められる。0 以下なら、タブは取り除かれる。
     public var tabSize: Int
-    /// `Text.foregroundStyle(_: Color)` などで決めた文字色。`nil` なら外側で決めた primary の段。
+    /// `Text.foregroundStyle(_: Color)` などで決めた文字色。`nil` ならプライマリレベルの色。
     var foreground: ForegroundStyleValue?
 
     /// 文字列と見た目を指定して ``Text`` を作る。
@@ -83,10 +83,10 @@ public struct Text: PrimitiveView {
         return copy
     }
 
-    /// 文字色を、外側で決めた文字色の `style` の段にした複製。
+    /// 文字色を、前景スタイルの `style` のレベルの色にした複製。
     ///
     /// - Parameters:
-    ///   - style: 外側で決めた文字色のうち、使う段。
+    ///   - style: 前景スタイルのうち、使うレベル。
     /// - Returns: 文字色を差し替えた複製。
     public func foregroundStyle(_ style: HierarchicalShapeStyle) -> Text {
         var copy = self

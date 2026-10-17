@@ -88,7 +88,7 @@ public struct RenderContext {
     /// - Note: `DisplayWidth` の各関数は、`ambiguous` を省くと `DisplayWidth.defaultAmbiguousWidth` で測る。文字列の幅を測るときはこの値を渡す。渡さないと、TUIKit を使う開発者が指定した扱いと測った幅が食い違い、その行の文字の ``Point/x`` がずれる。
     public let ambiguousWidth: DisplayWidth.AmbiguousWidth
 
-    /// この ``RenderContext`` を受け取る ``View`` の外側で、`View.foregroundStyle(_: Color)`・``View/tint(_:)``・``View/background(_:)`` が決めた色。
+    /// この ``RenderContext`` を受け取る ``View`` を内側に含む ``View`` の、`View.foregroundStyle(_: Color)`・``View/tint(_:)``・``View/background(_:)`` が決めた色。
     var colors = ViewColors()
 
     /// ``View`` のメソッドを直接呼び出すときに渡す ``RenderContext`` を作る。
@@ -121,7 +121,7 @@ public struct RenderContext {
     ///   - graph: `node` を持つ `ViewGraph`。
     ///   - screen: 画面全体の矩形。
     ///   - ambiguousWidth: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
-    ///   - colors: `node` の ``View`` の外側で決めた色。
+    ///   - colors: `node` の ``View`` を内側に含む ``View`` が決めた色。
     init(
         node: ViewNode,
         graph: ViewGraph,

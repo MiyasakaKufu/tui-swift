@@ -235,7 +235,7 @@ public final class ListState {
 
 /// 選択可能なリスト。
 ///
-/// 行の文字色は外側で決めた primary の段、背景色は外側の ``View/background(_:)`` で塗った色になる。選択行は、文字色を外側の ``View/tint(_:)`` で決めた色にして反転した ``Style`` で描く。
+/// この ``View`` を内側に含む ``View``で決めた色で描く。行の文字はプライマリレベルの色、背景は ``View/background(_:)`` で塗った色。選択行は、ティントカラーを文字色にして反転した ``Style`` で描く。
 public struct ListView: PrimitiveView {
     /// 各行に表示する文字列。
     public var items: [String]

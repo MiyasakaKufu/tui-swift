@@ -69,8 +69,8 @@ static var options: ApplicationOptions {
 }
 ```
 
-配色は、SwiftUI と同じく `View` の拡張メソッドで決め、内側の `View` へ伝わる。最も外側の `View` に付ければ、
-TUIKit アプリ全体の配色を一箇所で決められる。文字色は `View.foregroundStyle(_:_:)`（primary と secondary の段）、
+配色は、SwiftUI と同じく `View` の拡張メソッドで決め、その `View` の内側の `View` へ伝わる。`TerminalApp.body` が返す `View` に付ければ、
+TUIKit アプリ全体の配色を一箇所で決められる。文字色は `View.foregroundStyle(_:_:)`（プライマリレベルとセカンダリレベル）、
 `ProgressBar` の進んだ部分と `ListView` の選択行の色は `View.tint(_:)`、背景色は `View.background(_:)` で決める。
 何も決めなければ、SGR 39 / 49 で指す、端末エミュレータで選んである文字色と背景色で描く。
 
