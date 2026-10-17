@@ -85,6 +85,47 @@ var body: some View {
 }
 ```
 
+起動から終了までの局面は、`TerminalApp` のメソッドで受け取る。どれもデフォルトの実装があり、書かなければ何もしない。
+
+| 局面 | メソッド |
+| --- | --- |
+| 起動する | `init()`。端末デバイスを raw モードにする前に呼び出される |
+| 起動してから終了するまで | `TerminalApp.task(sender:)`。最初の描画の後に始まり、イベントループを抜けると打ち切られる |
+| 一時停止する・再開した | `TerminalApp.willSuspend()`・`TerminalApp.didResume()` |
+| 終了した | `TerminalApp.didTerminate(_:)`。端末デバイスを戻した後に、終了した理由（`TerminationReason`）とともに呼び出される |
+
+`TerminalApp.task(sender:)` で受け取った `MessageSender` で値を送ると、`TerminalApp.receive(_:)` に渡り、画面が描き直される。
+`ApplicationOptions.frameInterval` を設定しなくてもよい。
+
+```swift
+@main
+final class Clock: TerminalApp {
+    enum Message: Sendable { case tick }
+
+    private var seconds = 0
+
+    var body: some View {
+        Text("起動してから \(seconds) 秒")
+    }
+
+    func task(sender: MessageSender<Message>) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(1))
+            sender.send(.tick)
+        }
+    }
+
+    func receive(_ message: Message) -> EventResult {
+        seconds += 1
+        return .handled
+    }
+
+    func didTerminate(_ reason: TerminationReason) {
+        print("\(seconds) 秒で終了しました")
+    }
+}
+```
+
 罫線素片や `…` など East Asian Width が Ambiguous の文字は、初期値では `Cell` 1 個分として扱う。
 環境変数 `RUNEWIDTH_EASTASIAN` が `1` のときと、`ApplicationOptions.ambiguousWidth` を `.wide` に
 したときは `Cell` 2 個分として扱い、`View.border(_:color:title:)` の枠線は `BorderStyle.ascii`（`+-|`）へ切り替わる。

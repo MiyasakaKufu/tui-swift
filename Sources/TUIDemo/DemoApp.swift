@@ -1,3 +1,4 @@
+import Foundation
 import TUIKit
 
 /// TUIKit の主な機能を一通り触れるデモ。
@@ -27,19 +28,63 @@ final class DemoApp: TerminalApp {
         "View の重ね描きとダイアログ",
     ]
 
+    /// ``DemoApp/task(sender:)`` が送る値。
+    enum Message: Sendable {
+        /// 1 秒たった。
+        case tick
+    }
+
     private(set) var isFinished = false
-    private var progress = 0.35
+    private var progress: Double
     private var lastEventDescription = "（まだ入力はありません）"
     private var terminalSize = Size(width: 0, height: 0)
+    private var secondsSinceLaunch = 0
+    private var resumeCount = 0
+
+    /// 前回の終了時に保存した進捗を読み込んで作る。
+    init() {
+        progress = DemoState.loadProgress() ?? 0.35
+    }
 
     var body: some View {
         DemoScreen(
             items: items,
             progress: progress,
             lastEventDescription: lastEventDescription,
-            terminalSize: terminalSize
+            terminalSize: terminalSize,
+            secondsSinceLaunch: secondsSinceLaunch,
+            resumeCount: resumeCount
         )
         .tint(.green)
+    }
+
+    func task(sender: MessageSender<Message>) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(1))
+            sender.send(.tick)
+        }
+    }
+
+    func receive(_ message: Message) -> EventResult {
+        switch message {
+        case .tick:
+            secondsSinceLaunch += 1
+        }
+        return .handled
+    }
+
+    func willSuspend() {
+        // 保存を `didTerminate(_:)` だけに任せてはいけない。一時停止したまま SIGKILL で終わらされると呼び出されず、進捗が失われる。
+        DemoState.saveProgress(progress)
+    }
+
+    func didResume() {
+        resumeCount += 1
+    }
+
+    func didTerminate(_ reason: TerminationReason) {
+        DemoState.saveProgress(progress)
+        print("進捗 \(Int((progress * 100).rounded()))% を \(DemoState.fileURL.path) に保存しました。次の起動で読み込みます。")
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -99,6 +144,32 @@ final class DemoApp: TerminalApp {
     }
 }
 
+/// 進捗を、終了時にファイルへ保存し、起動時に読み込む型。
+private enum DemoState {
+    /// 進捗を置くファイルの URL。
+    static let fileURL = FileManager.default.temporaryDirectory.appendingPathComponent("tui-demo-progress")
+
+    /// 保存した進捗を読み込む。
+    ///
+    /// - Returns: 保存した進捗。ファイルが無いか、読めなければ `nil`。
+    static func loadProgress() -> Double? {
+        guard let text = try? String(contentsOf: fileURL, encoding: .utf8),
+              let value = Double(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        else {
+            return nil
+        }
+        return min(1.0, max(0.0, value))
+    }
+
+    /// 進捗を保存する。書き込めなければ何もしない。
+    ///
+    /// - Parameters:
+    ///   - progress: 保存する進捗。
+    static func saveProgress(_ progress: Double) {
+        try? String(progress).write(to: fileURL, atomically: true, encoding: .utf8)
+    }
+}
+
 /// 画面上端の見出し。
 private struct Header: View {
     var body: some View {
@@ -123,6 +194,8 @@ private struct DemoScreen: View {
     let progress: Double
     let lastEventDescription: String
     let terminalSize: Size
+    let secondsSinceLaunch: Int
+    let resumeCount: Int
 
     @State private var selection = 0
     @State private var name = ""
@@ -165,9 +238,12 @@ private struct DemoScreen: View {
             Text("選択中: \(items.indices.contains(selection) ? items[selection] : "-")", wrap: .word).bold()
             Text("ウィンドウサイズ: \(terminalSize.width) x \(terminalSize.height)").foregroundStyle(.secondary)
             Text("TerminalApp.handle(_:) に届いた入力: \(lastEventDescription)", wrap: .word)
+            Text("起動してから \(secondsSinceLaunch) 秒（TerminalApp.task(sender:) が 1 秒ごとに送る）", wrap: .word)
+                .foregroundStyle(.secondary)
+            Text("一時停止から再開した回数: \(resumeCount)").foregroundStyle(.secondary)
 
             VStack(spacing: 0) {
-                Text("進捗（一覧で + / - を押すと増減）").foregroundStyle(.secondary)
+                Text("進捗（一覧で + / - を押すと増減。終了時に保存）").foregroundStyle(.secondary)
                 ProgressBar(value: progress, showsPercentage: true)
             }
 
