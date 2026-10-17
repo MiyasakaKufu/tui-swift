@@ -21,7 +21,7 @@ public final class Application<Root: TerminalApp> {
     /// 別スレッドや `Task` から、``TerminalApp/Message`` の値をイベントループへ届ける ``MessageSender``。
     ///
     /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
-    /// - Note: ``TerminalApp`` に準拠する型からは、このプロパティを取得できない。
+    /// - Note: ``TerminalApp`` に準拠する型は、``TerminalApp/task(sender:)`` の `sender` 引数で同じものを受け取る。
     nonisolated public let sender: MessageSender<Root.Message>
 
     private var buffer: Buffer
@@ -29,7 +29,10 @@ public final class Application<Root: TerminalApp> {
     private var reportedSize = Size.zero
     /// ``TerminalApp/update(elapsed:)`` の `elapsed` 引数を測り始めた時刻。
     private var lastFrameTime = 0.0
-    private var isRunning = false
+    /// ``Application/stop()`` か、一時停止からの再開の失敗で決まった、イベントループを抜ける理由。
+    private var stopReason: TerminationReason?
+    /// ``TerminalApp/task(sender:)`` を実行している `Task`。
+    private var appTask: Task<Void, Never>?
     private var hasRun = false
 
     /// 端末デバイスの termios と、端末エミュレータへ送ったモードを戻した後に、プロセスを止めるクロージャ。
@@ -62,8 +65,8 @@ public final class Application<Root: TerminalApp> {
 
     /// ループを終了させる。イベントハンドラの中からも呼び出せる。
     public func stop() {
-        isRunning = false
-        // ループを起こさずに済ませてはいけない。`Task` から呼び出されたとき、ループは次の `LoopEvent` を待ったまま `isRunning` を読み直さず、キーが届くまで終わらない。
+        if stopReason == nil { stopReason = .stopped }
+        // ループを起こさずに済ませてはいけない。`Task` から呼び出されたとき、ループは次の `LoopEvent` を待ったまま `Application.stopReason` を読み直さず、キーが届くまで終わらない。
         eventQueue.post(.wake)
     }
 
@@ -96,6 +99,7 @@ public final class Application<Root: TerminalApp> {
     /// - Note: `ApplicationOptions.suspendsOnControlZ` が有効なら、``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+Z で自動的に呼び出される。
     public func suspend() {
         terminal.deactivate()
+        root.willSuspend()
         stopProcess()
         // 自分で送った SIGTSTP と、再開の SIGCONT をループで二重に処理しない。
         _ = SignalWatcher.consumeSuspend()
@@ -123,6 +127,7 @@ public final class Application<Root: TerminalApp> {
     /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの端末デバイスのウィンドウサイズで `.resize` を通知する。
     ///   戻るときは端末デバイスの termios と、端末エミュレータへ送ったモードを起動前へ戻し、カーソルを表示に戻す。
+    /// - Postcondition: 戻るときは、``TerminalApp/task(sender:)`` を実行している `Task` を打ち切って終わるのを待ち、その後に ``TerminalApp/didTerminate(_:)`` を呼び出している。
     /// - Precondition: 1 つの ``Application`` で呼び出せるのは 1 回だけ。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
@@ -132,8 +137,20 @@ public final class Application<Root: TerminalApp> {
         guard terminal.isTerminal else { throw TerminalError.notATerminal }
 
         try terminal.enableRawMode()
-        defer { terminal.restore() }
+        let reason = await runEventLoop()
+        terminal.restore()
 
+        // `TerminalApp.task(sender:)` の `Task` を待つのを、`Terminal.restore()` より前へ移してはいけない。打ち切りに応じるのが遅い処理があると、その間、端末デバイスが raw モードのまま、キーを受け付けない画面が残る。
+        await appTask?.value
+        root.didTerminate(reason)
+    }
+
+    /// 端末エミュレータへ送るモードを切り替えて、イベントループを抜けるまで回す。
+    ///
+    /// - Returns: イベントループを抜けた理由。
+    /// - Precondition: 端末デバイスが raw モードであること。
+    /// - Postcondition: 戻るときは、``TerminalApp/task(sender:)`` を実行している `Task` を打ち切り、入力を読むスレッドが終わっている。
+    private func runEventLoop() async -> TerminationReason {
         SignalWatcher.install()
 
         if options.usesKeyboardProtocol, supportsKeyboardProtocol() {
@@ -151,10 +168,10 @@ public final class Application<Root: TerminalApp> {
         buffer.resize(to: terminal.size())
         renderer.invalidate()
 
+        stopReason = nil
         reportedSize = buffer.size
         _ = root.handle(.resize(buffer.size))
 
-        isRunning = true
         lastFrameTime = monotonicSeconds()
 
         let inputStopped = startReadingInput()
@@ -162,67 +179,13 @@ public final class Application<Root: TerminalApp> {
             eventQueue.post(.wake)
         } else {
             draw()
+            let root = self.root
+            let sender = self.sender
+            appTask = Task { await root.task(sender: sender) }
         }
 
-        // `LoopEvent` を 1 つ取り出すたびに描き直してはいけない。ループより速く溜まると、
-        // 溜まった数だけ描き直しが走り、後から届いたキーが `handle(_:)` に届くまでの遅れが伸び続ける。
-        loop: for await _ in eventQueue.arrivals {
-            // 先頭で `TerminalApp.isFinished` を読むのをやめてはいけない。最初の `.resize` か `View.onChange(of:_:)` のクロージャで `true` になったときに、`TerminalApp.update(elapsed:)` を呼び出して描き直してから終わる。
-            if root.isFinished { break loop }
-
-            let events = eventQueue.take()
-            if events.isEmpty { continue loop }
-
-            var isIdle = events.allSatisfy { event in
-                if case .idle = event { return true }
-                return false
-            }
-            for event in events where isRunning {
-                switch event {
-                case .inputs(let inputs):
-                    for input in inputs {
-                        if !deliver(input) { break loop }
-                    }
-                case .message(let message):
-                    _ = root.receive(message)
-                    if root.isFinished { break loop }
-                case .wake, .idle:
-                    break
-                }
-            }
-
-            if SignalWatcher.consumeTermination() { break loop }
-
-            if SignalWatcher.consumeSuspend() {
-                isIdle = false
-                suspend()
-                if !isRunning { break loop }
-            }
-
-            // SIGCONT の確認を消したり、`SignalWatcher.consumeSuspend()` の分岐の中へまとめたりしてはいけない。
-            // 捕まえられない SIGSTOP で止められたときは SIGTSTP のハンドラが動かず、`SignalWatcher.consumeSuspend()` が `true` にならない。再開しても `Application.resumeTerminal()` が呼び出されず、端末デバイスの termios と、端末エミュレータへ送ったモードを設定し直さないまま描き続ける。
-            if SignalWatcher.consumeContinue() {
-                isIdle = false
-                resumeTerminal()
-                if !isRunning { break loop }
-            }
-
-            // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
-            let sizeBeforeSynchronizing = reportedSize
-            if !synchronizeSize() { break loop }
-
-            // 何も起きていない `.idle` で先へ進んではいけない。`ApplicationOptions.frameInterval` が `nil` でも `TerminalApp.update(elapsed:)` が一定の間隔で呼び出され、描き直すたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
-            if isIdle, reportedSize == sizeBeforeSynchronizing { continue loop }
-
-            let now = monotonicSeconds()
-            root.update(elapsed: now - lastFrameTime)
-            lastFrameTime = now
-
-            if !isRunning || root.isFinished { break loop }
-            draw()
-        }
-
-        isRunning = false
+        let reason = await processEvents()
+        appTask?.cancel()
 
         // `startReadingInput()` が作ったスレッドの終了を待たずに戻ってはいけない。
         // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
@@ -235,6 +198,78 @@ public final class Application<Root: TerminalApp> {
         await Task { for await _ in inputStopped {} }.value
 
         terminal.setCursorVisible(true)
+        return reason
+    }
+
+    /// `LoopEventQueue` から `LoopEvent` を取り出して渡し、描き直すことを、イベントループを抜けるまで繰り返す。
+    ///
+    /// - Returns: イベントループを抜けた理由。
+    private func processEvents() async -> TerminationReason {
+        // `LoopEvent` を 1 つ取り出すたびに描き直してはいけない。ループより速く溜まると、
+        // 溜まった数だけ描き直しが走り、後から届いたキーが `handle(_:)` に届くまでの遅れが伸び続ける。
+        for await _ in eventQueue.arrivals {
+            // 先頭で `Application.pendingTermination` を読むのをやめてはいけない。最初の `.resize` か `View.onChange(of:_:)` のクロージャで `TerminalApp.isFinished` が `true` になったときに、`TerminalApp.update(elapsed:)` を呼び出して描き直してから終わる。
+            if let reason = pendingTermination { return reason }
+
+            let events = eventQueue.take()
+            if events.isEmpty { continue }
+
+            var isIdle = events.allSatisfy { event in
+                if case .idle = event { return true }
+                return false
+            }
+            for event in events {
+                switch event {
+                case .inputs(let inputs):
+                    for input in inputs {
+                        if let reason = deliver(input) { return reason }
+                    }
+                case .message(let message):
+                    _ = root.receive(message)
+                    if let reason = pendingTermination { return reason }
+                case .wake, .idle:
+                    break
+                }
+            }
+
+            if let signalNumber = SignalWatcher.consumeTermination() { return .signal(signalNumber) }
+
+            if SignalWatcher.consumeSuspend() {
+                isIdle = false
+                suspend()
+                if let reason = pendingTermination { return reason }
+            }
+
+            // SIGCONT の確認を消したり、`SignalWatcher.consumeSuspend()` の分岐の中へまとめたりしてはいけない。
+            // 捕まえられない SIGSTOP で止められたときは SIGTSTP のハンドラが動かず、`SignalWatcher.consumeSuspend()` が `true` にならない。再開しても `Application.resumeTerminal()` が呼び出されず、端末デバイスの termios と、端末エミュレータへ送ったモードを設定し直さないまま描き続ける。
+            if SignalWatcher.consumeContinue() {
+                isIdle = false
+                resumeTerminal()
+                if let reason = pendingTermination { return reason }
+            }
+
+            // SIGWINCH の処理だけに任せると、シグナルを取りこぼしたときサイズが追従しなくなる。
+            let sizeBeforeSynchronizing = reportedSize
+            synchronizeSize()
+            if let reason = pendingTermination { return reason }
+
+            // 何も起きていない `.idle` で先へ進んではいけない。`ApplicationOptions.frameInterval` が `nil` でも `TerminalApp.update(elapsed:)` が一定の間隔で呼び出され、描き直すたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
+            if isIdle, reportedSize == sizeBeforeSynchronizing { continue }
+
+            let now = monotonicSeconds()
+            root.update(elapsed: now - lastFrameTime)
+            lastFrameTime = now
+
+            if let reason = pendingTermination { return reason }
+            draw()
+        }
+        return pendingTermination ?? .cancelled
+    }
+
+    /// イベントループを今抜けるなら、その理由。抜けないなら `nil`。
+    private var pendingTermination: TerminationReason? {
+        if let stopReason { return stopReason }
+        return root.isFinished ? .finished : nil
     }
 
     /// 端末デバイスからバイト列を読み、組み立てた ``InputEvent`` を `LoopEventQueue` へ入れるスレッドを作る。
@@ -294,8 +329,8 @@ public final class Application<Root: TerminalApp> {
     ///
     /// - Parameters:
     ///   - event: 渡す ``InputEvent``。
-    /// - Returns: ループを続けるなら `true`。``View`` か ``TerminalApp/handle(_:)`` へ渡した後に ``TerminalApp/isFinished`` が `true` なら `false`。
-    private func deliver(_ event: InputEvent) -> Bool {
+    /// - Returns: イベントループを抜けるなら、その理由。続けるなら `nil`。
+    private func deliver(_ event: InputEvent) -> TerminationReason? {
         let isHandledByView: Bool
         switch event {
         case .key(let keyEvent):
@@ -307,22 +342,22 @@ public final class Application<Root: TerminalApp> {
         case .resize, .focus:
             isHandledByView = false
         }
-        if root.isFinished { return false }
-        if isHandledByView { return true }
+        if let reason = pendingTermination { return reason }
+        if isHandledByView { return nil }
 
         let result = root.handle(event)
-        if root.isFinished { return false }
+        if let reason = pendingTermination { return reason }
 
         switch result {
         case .handled:
-            return true
+            return nil
         case .ignored:
             if options.suspends(onUnhandled: event) {
                 suspend()
-                return isRunning
+                return pendingTermination
             }
             // `ApplicationOptions.quits(onUnhandled:)` を見ずにループを続けてはいけない。raw モードでは `ISIG` を切っているので、Ctrl+C は SIGINT にならずこの `InputEvent` として届く。`TerminalApp.handle(_:)` が Ctrl+C を扱わない TUIKit アプリを、`ApplicationOptions.quitsOnControlC` が `true` でも Ctrl+C で止められなくなる。
-            return !options.quits(onUnhandled: event)
+            return options.quits(onUnhandled: event) ? .controlC : nil
         }
     }
 
@@ -330,13 +365,13 @@ public final class Application<Root: TerminalApp> {
     ///
     /// - Postcondition: 画面全体を描き直し、改めて `.resize` を通知する。
     ///   止まっていた時間は ``TerminalApp/update(elapsed:)`` の `elapsed` 引数に含めない。
-    ///   ``Terminal/reactivate()`` がエラーを投げたらループを終える。
+    ///   ``Terminal/reactivate()`` がエラーを投げたら ``TerminalApp/didResume()`` を呼び出さず、ループを終える。
     private func resumeTerminal() {
         do {
             try terminal.reactivate()
         } catch {
             // `Terminal.reactivate()` が失敗したまま続けると、壊れた画面へ描き続けることになる。
-            isRunning = false
+            stopReason = .resumeFailed
             return
         }
 
@@ -345,15 +380,15 @@ public final class Application<Root: TerminalApp> {
         // 止まっている間のサイズ変更では SIGWINCH が届かない。次のループで取り直す。
         reportedSize = .zero
         lastFrameTime = monotonicSeconds()
+        root.didResume()
     }
 
     /// 端末デバイスのウィンドウサイズの変化を検出し、``Buffer`` を作り直して `.resize` を通知する。
     ///
-    /// - Returns: ループを続けるなら `true`。
     /// - Postcondition: 同じサイズについて `.resize` が二重に通知されることはない。
-    private func synchronizeSize() -> Bool {
+    private func synchronizeSize() {
         let size = terminal.size()
-        guard size != reportedSize else { return true }
+        guard size != reportedSize else { return }
 
         reportedSize = size
         if size != buffer.size {
@@ -361,7 +396,6 @@ public final class Application<Root: TerminalApp> {
             renderer.invalidate()
         }
         _ = root.handle(.resize(size))
-        return !root.isFinished
     }
 
     /// ``TerminalApp/body`` を ``Buffer`` に書き込み、``Renderer`` で端末デバイスへ書き出す。

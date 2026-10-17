@@ -88,6 +88,49 @@ public protocol TerminalApp: AnyObject {
     ///     初回は ``Application/run()`` が最初の `.resize` を通知した時点から測り、一時停止していた時間は含めない。
     /// - Note: ``InputEvent``・``TerminalApp/Message`` を処理するたびに呼び出され、``ApplicationOptions/frameInterval`` を設定したときは、入力が無くてもその間隔で呼び出される。最初の `Application.draw()` の前には呼び出されない。
     func update(elapsed: Double)
+
+    /// イベントループが回っている間、非同期の処理を実行する。
+    ///
+    /// ``Application`` は、最初の `Application.draw()` の 1 回の後にこのメソッドを `Task` の中で呼び出し、イベントループを抜けると、その `Task` を打ち切る。
+    /// 画面に出すものは `sender` で送り、``TerminalApp/receive(_:)`` で受け取る。
+    ///
+    ///     func task(sender: MessageSender<Message>) async {
+    ///         for await line in lines {
+    ///             sender.send(.received(line))
+    ///         }
+    ///     }
+    ///
+    /// - Parameters:
+    ///   - sender: ``TerminalApp/Message`` の値をイベントループへ送る ``MessageSender``。別の `Task` や別スレッドへ渡してよい。
+    /// - Note: プロパティへ代入しただけでは描き直さない。次に ``InputEvent`` か ``TerminalApp/Message`` が届くまで、画面に出ない。
+    /// - Note: 最初の `.resize` で ``TerminalApp/isFinished`` が `true` になったときは、呼び出さない。
+    /// - Note: 打ち切られた後に送った値は届かない（``MessageSender/send(_:)`` が `false` を返す）。
+    /// - Warning: ``Application/run()`` は、この `Task` が終わるのを待ってから戻る。打ち切りに応じない処理（`Task.isCancelled` を見ずに回り続けるループなど）を書くと、端末デバイスの termios を戻した後も ``Application/run()`` が戻らず、プロセスが終わらない。
+    func task(sender: MessageSender<Message>) async
+
+    /// 一時停止する直前に、一時停止することを受け取る。
+    ///
+    /// 端末デバイスの termios と、端末エミュレータへ送ったモードを戻した後に呼び出される。
+    ///
+    /// - Note: 一時停止したまま SIGKILL などで終わらされると、``TerminalApp/didTerminate(_:)`` は呼び出されない。失いたくない値は、ここで書き出す。
+    /// - Note: 捕まえられない SIGSTOP で止められたときは呼び出されない。再開したときの ``TerminalApp/didResume()`` だけが呼び出される。
+    func willSuspend()
+
+    /// 一時停止から再開したことを受け取る。
+    ///
+    /// 端末デバイスを raw モードへ戻した後、描き直す前に呼び出される。
+    ///
+    /// - Note: 端末デバイスを raw モードへ戻せなかったときは呼び出さず、イベントループを抜けて ``TerminalApp/didTerminate(_:)`` に `.resumeFailed` を渡す。
+    func didResume()
+
+    /// イベントループを抜けたことを、その理由とともに受け取る。
+    ///
+    /// 端末デバイスの termios と、端末エミュレータへ送ったモードを戻し、``TerminalApp/task(sender:)`` が終わった後に呼び出される。``Application`` が呼び出す、このインスタンスのメソッドのうち最後のもの。標準出力へ書き出したものは、シェルの画面に残る。
+    ///
+    /// - Parameters:
+    ///   - reason: イベントループを抜けた理由。
+    /// - Note: ``Application/run()`` がイベントループを回す前にエラーを投げたときは呼び出されない。
+    func didTerminate(_ reason: TerminationReason)
 }
 
 extension TerminalApp {
@@ -122,6 +165,24 @@ extension TerminalApp {
     ///   - elapsed: 前に ``TerminalApp/update(elapsed:)`` を呼び出してからの経過秒数。
     ///     初回は ``Application/run()`` が最初の `.resize` を通知した時点から測り、一時停止していた時間は含めない。
     public func update(elapsed: Double) {}
+
+    /// 何もしない。
+    ///
+    /// - Parameters:
+    ///   - sender: ``TerminalApp/Message`` の値をイベントループへ送る ``MessageSender``。
+    public func task(sender: MessageSender<Message>) async {}
+
+    /// 何もしない。
+    public func willSuspend() {}
+
+    /// 何もしない。
+    public func didResume() {}
+
+    /// 何もしない。
+    ///
+    /// - Parameters:
+    ///   - reason: イベントループを抜けた理由。
+    public func didTerminate(_ reason: TerminationReason) {}
 
     /// 引数のないイニシャライザで作ったインスタンスと ``TerminalApp/options`` で ``Application`` を起動し、終了するまでイベントループを回す。
     ///
