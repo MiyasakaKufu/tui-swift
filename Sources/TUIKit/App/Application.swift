@@ -58,6 +58,7 @@ public final class Application<Root: TerminalApp> {
         self.eventQueue = eventQueue
         self.sender = MessageSender(eventQueue: eventQueue)
         context.focus.stopsDelivering = { root.isFinished }
+        context.hover.isEnabled = options.mouseTracking == .motion
     }
 
     /// ループを終了させる。イベントハンドラの中からも呼び出せる。
@@ -328,10 +329,12 @@ public final class Application<Root: TerminalApp> {
 
     /// 一時停止から戻り、端末デバイスの termios と、端末エミュレータへ送ったモードを設定し直す。
     ///
-    /// - Postcondition: 画面全体を描き直し、改めて `.resize` を通知する。
+    /// - Postcondition: 画面全体を描き直し、改めて `.resize` を通知する。マウスポインタの位置は分からなくなったものとする。
     ///   止まっていた時間は ``TerminalApp/update(elapsed:)`` の `elapsed` 引数に含めない。
     ///   ``Terminal/reactivate()`` がエラーを投げたらループを終える。
     private func resumeTerminal() {
+        // マウスポインタの位置を残してはいけない。止まっている間に動いても `.mouse` は届かないので、再開した後に上にない `View` を上にあるとみなし続ける。
+        context.forgetPointer()
         do {
             try terminal.reactivate()
         } catch {
@@ -367,7 +370,7 @@ public final class Application<Root: TerminalApp> {
     /// ``TerminalApp/body`` を ``Buffer`` に書き込み、``Renderer`` で端末デバイスへ書き出す。
     ///
     /// - Precondition: `Application.synchronizeSize()` によって ``Buffer`` が端末デバイスのウィンドウサイズに追従している。
-    /// - Postcondition: たどった後にフォーカスが変わったか、``View/onChange(of:_:)`` が値の変化を見つけたら、もう 1 回描く。そのもう 1 回では、さらには描かない。
+    /// - Postcondition: たどった後にフォーカスが変わったか、``View/onChange(of:_:)`` が値の変化を見つけたか、描画した後にマウスポインタが上にある ``View`` が変わったら、もう 1 回描く。そのもう 1 回では、さらには描かない。
     /// - Postcondition: 端末エミュレータのカーソルは、``TerminalApp/cursorPosition`` が `nil` 以外ならその位置に、`nil` ならフォーカスを持つ ``TextField`` が示す位置に置く。どちらも無ければ隠す。
     private func draw() {
         context.draw({ root.body }, into: &buffer, ambiguousWidth: options.ambiguousWidth) { buffer in

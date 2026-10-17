@@ -56,10 +56,13 @@
 | `View` に準拠する型の格納プロパティに `@State` として付け、そのプロパティを `Application.draw()` をまたいで残す型 | `State` | プロパティは `ViewNode` が持つ。`$` で得る `Binding` は `State.projectedValue` |
 | `TextField`・`ListView` のうち、`InputEvent` の `.key`・`.paste` を最初に受け取る `View` がそうであること | フォーカス | 端末エミュレータのウィンドウが入力を受け取ること（`.focus`）は「端末エミュレータのフォーカス」と書き、「フォーカス」を単独で使わない |
 | Tab・Shift+Tab・クリック・`@FocusState` を付けたプロパティへの代入でフォーカスが移る `View` | フォーカスを受け取る `View` | 今は `TextField` と `ListView` |
+| 端末エミュレータがマウスの位置として `MouseEvent.position` で知らせる、画面上の位置を指す印 | マウスポインタ | 「マウスカーソル」「カーソル」は使わない。「カーソル」は端末エミュレータのカーソルと `TextFieldState.cursor` を指す |
+| マウスポインタの位置でいちばん手前に `Buffer` へ書き込んだ `View` と、それを内側に含む `View` | マウスポインタが上にある `View` | `InputEvent` の `.mouse` を当てるのと同じ規則で決める。この `View` が変わったときに、`View.onHover(perform:)` のクロージャが呼び出される |
 | `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` が `beforeRender` に渡す `View` の一覧の順 | たどった順 | Tab の順と、フォーカスを与える先を決める |
 | `View` に準拠する型の格納プロパティに `@FocusState` として付け、フォーカスを持つ `View` を表し、代入でフォーカスを移す型 | `FocusState` | 値は `FocusController` が保持するフォーカスから求める。`$` で得るのは `FocusState.Binding` |
-| `Application` が持ち、`ViewGraph` と `FocusController` をまとめるクラス | `ApplicationContext` | internal |
+| `Application` が持ち、`ViewGraph` と `FocusController` と `HoverController` をまとめるクラス | `ApplicationContext` | internal |
 | フォーカスを保持し、たどった `View` の一覧からフォーカスを決め、`InputEvent` を `View` へ渡すクラス | `FocusController` | internal。`ViewGraph` を参照しない |
+| マウスポインタの位置を保持し、マウスポインタが上にある `View` が変わったら `View.onHover(perform:)` のクロージャを呼び出すクラス | `HoverController` | internal。`ApplicationOptions.mouseTracking` が `.motion` でなければ位置を保持しない |
 | `ViewGraph` が、`State` などを結び付けるときと描画するときに `View` へ渡すもの | `ViewEnvironment` | internal。今は `FocusController` だけを持つ |
 | `View` の拡張として定義された `View.padding(_: EdgeInsets)`・`View.border(_:color:title:)` などのメソッド | `View` の拡張メソッド | 個々のメソッドは名前で書く |
 | `Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型 | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型」 |

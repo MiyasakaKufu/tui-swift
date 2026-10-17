@@ -1,4 +1,4 @@
-/// ``Application`` が持ち、`ViewGraph` と `FocusController` をまとめるクラス。
+/// ``Application`` が持ち、`ViewGraph` と `FocusController` と `HoverController` をまとめるクラス。
 @MainActor
 final class ApplicationContext {
     /// `ViewNode` を `ViewPath` ごとに保持する `ViewGraph`。
@@ -6,6 +6,9 @@ final class ApplicationContext {
 
     /// フォーカスを保持する `FocusController`。
     let focus = FocusController()
+
+    /// マウスポインタの位置を保持する `HoverController`。
+    let hover = HoverController()
 
     /// `ApplicationContext` を作る。
     init() {
@@ -24,7 +27,7 @@ final class ApplicationContext {
     ///   - buffer: 描画先の ``Buffer``。画面全体として扱い、描く前に空にする。
     ///   - ambiguousWidth: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
     ///   - present: 描き終えた ``Buffer`` を受け取るクロージャ。
-    /// - Postcondition: たどった後にフォーカスが変わったか、``View/onChange(of:_:)`` が値の変化を見つけたら、もう 1 回描いて `present` に渡している。そのもう 1 回では、さらには描かない。
+    /// - Postcondition: たどった後にフォーカスが変わったか、``View/onChange(of:_:)`` が値の変化を見つけたか、描画した後にマウスポインタが上にある ``View`` が変わったら、もう 1 回描いて `present` に渡している。そのもう 1 回では、さらには描かない。
     func draw<V: View>(
         _ makeView: () -> V,
         into buffer: inout Buffer,
@@ -41,10 +44,12 @@ final class ApplicationContext {
                     (visitedView.view as? any ChangeObservingViewProtocol)?.detectChange(in: visitedView.node)
                 }
                 focusChanged = focus.decideFocus(visiting: visited)
+                hover.collect(visited, index: focus.index)
             }
             for action in changeActions { action() }
+            let hoverChanged = hover.update(hitRegions: graph.hitRegions)
             present(buffer)
-            guard allowsFollowUp, focusChanged || !changeActions.isEmpty else { return }
+            guard allowsFollowUp, focusChanged || hoverChanged || !changeActions.isEmpty else { return }
             allowsFollowUp = false
         }
     }
@@ -67,13 +72,19 @@ final class ApplicationContext {
         focus.deliverPaste(event)
     }
 
-    /// `event` を、直前の描画で ``Buffer`` へ書き込んだ ``View`` の矩形とともに `FocusController.deliver(_:hitRegions:)` へ渡す。
+    /// マウスポインタの位置を `event` の位置に変えてから、`event` を、直前の描画で ``Buffer`` へ書き込んだ ``View`` の矩形とともに `FocusController.deliver(_:hitRegions:)` へ渡す。
     ///
     /// - Parameters:
     ///   - event: 渡す `MouseEvent`。
     /// - Returns: `FocusController.deliver(_:hitRegions:)` の戻り値。
     func deliver(_ event: MouseEvent) -> Bool {
-        focus.deliver(event, hitRegions: graph.hitRegions)
+        hover.movePointer(to: event.position, hitRegions: graph.hitRegions)
+        return focus.deliver(event, hitRegions: graph.hitRegions)
+    }
+
+    /// マウスポインタの位置が分からなくなったものとし、マウスポインタが上にあった ``View`` の ``View/onHover(perform:)`` のクロージャへ `false` を渡す。
+    func forgetPointer() {
+        hover.movePointer(to: nil, hitRegions: graph.hitRegions)
     }
 }
 
