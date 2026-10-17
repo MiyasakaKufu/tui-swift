@@ -76,9 +76,12 @@ TUIKit アプリ全体の配色を一箇所で決められる。文字色は `Vi
 
 ```swift
 var body: some View {
-    Screen()
-        .foregroundStyle(.white, .brightBlack)
-        .tint(.cyan)
+    VStack {
+        Text("名前")
+        Text("補足").foregroundStyle(.secondary)
+        ProgressBar(value: 0.4)
+    }
+    .tint(.cyan)
 }
 ```
 

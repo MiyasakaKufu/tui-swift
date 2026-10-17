@@ -39,7 +39,6 @@ final class DemoApp: TerminalApp {
             lastEventDescription: lastEventDescription,
             terminalSize: terminalSize
         )
-        .foregroundStyle(.default, .brightBlack)
         .tint(.green)
     }
 
