@@ -77,7 +77,10 @@ void ctui_crash_restorer_restore(void);
 /// ウィンドウサイズ変更の合図を立てる。
 void ctui_signal_set_window_resize(void);
 /// 終了の合図を立てる。
-void ctui_signal_set_termination(void);
+///
+/// - Parameters:
+///   - signal_number: 届いた終了シグナルの番号。0 は渡さない。
+void ctui_signal_set_termination(int signal_number);
 /// 一時停止の合図を立てる。
 void ctui_signal_set_suspend(void);
 /// 再開の合図を立てる。
@@ -89,7 +92,7 @@ void ctui_signal_set_continue(void);
 int ctui_signal_consume_window_resize(void);
 /// 終了の合図を取り出して下ろす。
 ///
-/// - Returns: 立っていれば 1、立っていなければ 0。
+/// - Returns: 立っていれば最後に届いた終了シグナルの番号、立っていなければ 0。
 int ctui_signal_consume_termination(void);
 /// 一時停止の合図を取り出して下ろす。
 ///

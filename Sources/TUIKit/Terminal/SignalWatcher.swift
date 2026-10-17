@@ -17,7 +17,7 @@ private func handleWindowResizeSignal(_ signalNumber: Int32) {
 }
 
 private func handleTerminationSignal(_ signalNumber: Int32) {
-    ctui_signal_set_termination()
+    ctui_signal_set_termination(signalNumber)
     wakeUpPoll()
 }
 
@@ -92,13 +92,14 @@ public enum SignalWatcher {
         return ctui_signal_consume_window_resize() != 0
     }
 
-    /// 終了シグナルの通知を受け取る。
+    /// 終了シグナルの通知を受け取り、届いたシグナルの番号を返す。
     ///
     /// - Returns: 前回の呼び出し以降に SIGTERM / SIGHUP / SIGINT / SIGQUIT の
-    ///   いずれかが届いていれば `true`。
+    ///   いずれかが届いていれば、最後に届いたシグナルの番号。届いていなければ `nil`。
     /// - Postcondition: 同じ通知を二度受け取ることはない。
-    public static func consumeTermination() -> Bool {
-        return ctui_signal_consume_termination() != 0
+    public static func consumeTermination() -> Int32? {
+        let signalNumber = ctui_signal_consume_termination()
+        return signalNumber != 0 ? signalNumber : nil
     }
 
     /// 一時停止シグナルの通知を受け取る。

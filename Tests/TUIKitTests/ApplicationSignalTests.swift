@@ -68,13 +68,13 @@ final class ApplicationSignalTests: XCTestCase {
 
         raise(SIGINT)
 
-        XCTAssertTrue(SignalWatcher.consumeTermination(), "SIGINT が終了として扱われていない")
+        XCTAssertEqual(SignalWatcher.consumeTermination(), SIGINT, "SIGINT が終了として扱われていない")
         XCTAssertTrue(isReadable(descriptor), "SIGINT で `poll(2)` の待ちが起こされない")
         discard(descriptor)
 
         raise(SIGQUIT)
 
-        XCTAssertTrue(SignalWatcher.consumeTermination(), "SIGQUIT が終了として扱われていない")
+        XCTAssertEqual(SignalWatcher.consumeTermination(), SIGQUIT, "SIGQUIT が終了として扱われていない")
         XCTAssertTrue(isReadable(descriptor), "SIGQUIT で `poll(2)` の待ちが起こされない")
         discard(descriptor)
     }

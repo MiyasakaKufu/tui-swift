@@ -168,7 +168,7 @@ static volatile sig_atomic_t ctui_wakeup_read_descriptor = -1;
 static volatile sig_atomic_t ctui_wakeup_write_descriptor = -1;
 
 void ctui_signal_set_window_resize(void) { ctui_window_resize_flag = 1; }
-void ctui_signal_set_termination(void) { ctui_termination_flag = 1; }
+void ctui_signal_set_termination(int signal_number) { ctui_termination_flag = signal_number; }
 void ctui_signal_set_suspend(void) { ctui_suspend_flag = 1; }
 void ctui_signal_set_continue(void) { ctui_continue_flag = 1; }
 
@@ -179,7 +179,11 @@ static int ctui_consume(volatile sig_atomic_t *flag) {
 }
 
 int ctui_signal_consume_window_resize(void) { return ctui_consume(&ctui_window_resize_flag); }
-int ctui_signal_consume_termination(void) { return ctui_consume(&ctui_termination_flag); }
+int ctui_signal_consume_termination(void) {
+    int signal_number = (int)ctui_termination_flag;
+    ctui_termination_flag = 0;
+    return signal_number;
+}
 int ctui_signal_consume_suspend(void) { return ctui_consume(&ctui_suspend_flag); }
 int ctui_signal_consume_continue(void) { return ctui_consume(&ctui_continue_flag); }
 
