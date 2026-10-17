@@ -125,7 +125,7 @@ final class FocusController: FocusProviding {
                 focusedNodeID: focusedNodeID,
                 isFocusRemovedByAssignment: isFocusRemovedByAssignment
             )
-            focusedNodeID = index.firstEnabledTarget?.nodeID
+            focusedNodeID = index.firstAcceptingTarget?.nodeID
             isFocusRemovedByAssignment = false
         }
 
@@ -136,12 +136,12 @@ final class FocusController: FocusProviding {
             }
         }
 
-        if let focused = focusedNodeID, !index.isEnabledTarget(focused) {
-            focusedNodeID = index.firstEnabledTarget?.nodeID
+        if let focused = focusedNodeID, !index.isAcceptingTarget(focused) {
+            focusedNodeID = index.firstAcceptingTarget?.nodeID
         }
 
         if focusedNodeID == nil, !isFocusRemovedByAssignment {
-            focusedNodeID = index.firstEnabledTarget?.nodeID
+            focusedNodeID = index.firstAcceptingTarget?.nodeID
         }
 
         return focusedNodeID != previousFocus
@@ -157,7 +157,7 @@ final class FocusController: FocusProviding {
             focusedNodeID = nil
             return
         }
-        focusedNodeID = index.isEnabledTarget(savedNodeID) ? savedNodeID : index.firstEnabledTarget?.nodeID
+        focusedNodeID = index.isAcceptingTarget(savedNodeID) ? savedNodeID : index.firstAcceptingTarget?.nodeID
     }
 
     /// フォーカスを `nodeID` の ``View`` へ移す。
@@ -238,7 +238,7 @@ final class FocusController: FocusProviding {
             if target.handle(.key(event)) { return .handled }
 
             let handlers = index.keyPressHandlers
-                .filter { !$0.isBehindSheet && $0.path.contains(target.path) && $0.accepts(event) }
+                .filter { $0.acceptsInput && $0.path.contains(target.path) && $0.accepts(event) }
                 .sorted { $0.path.depth > $1.path.depth }
             for handler in handlers {
                 let result = handler.action()
@@ -268,11 +268,12 @@ final class FocusController: FocusProviding {
     ///   - hitRegions: 直前の描画で ``View`` が ``Buffer`` へ書き込んだ矩形。書き込んだ順に並ぶ。
     /// - Returns: 渡した ``View`` が処理したら `true`。渡す先が無ければ `false`。
     /// - Postcondition: `event` がボタンの押下で、渡す先があれば、渡す前にフォーカスをそこへ移している。
+    /// - Postcondition: その位置でいちばん手前に書き込んだ ``View`` が `FocusIndex.acceptsInput(at:)` で `false` になるなら、どの ``View`` にも渡さず、その下に書き込んだ ``View`` にも渡さず、フォーカスも変えない。
     func deliver(_ event: MouseEvent, hitRegions: [HitRegion]) -> Bool {
         guard let region = hitRegions.last(where: { $0.rect.contains(event.position) }),
-              !index.isBehindSheet(region.path),
+              index.acceptsInput(at: region.path),
               let target = index.targets
-                .filter({ !$0.isBehindSheet && $0.path.contains(region.path) })
+                .filter({ $0.acceptsInput && $0.path.contains(region.path) })
                 .max(by: { $0.path.depth < $1.path.depth })
         else { return false }
 
@@ -283,10 +284,10 @@ final class FocusController: FocusProviding {
         return target.handle(.mouse(event))
     }
 
-    /// フォーカスを持ち、``View/sheet(isPresented:content:)`` の `content:` の後ろに無い ``View`` の `FocusTarget`。
+    /// フォーカスを持ち、`FocusTarget.acceptsInput` が `true` の ``View`` の `FocusTarget`。
     private var focusedTarget: FocusTarget? {
         guard let focusedNodeID else { return nil }
-        return index.targets.first { $0.nodeID == focusedNodeID && !$0.isBehindSheet }
+        return index.targets.first { $0.nodeID == focusedNodeID && $0.acceptsInput }
     }
 
     /// フォーカスを受け取る ``View`` の間で、たどった順にフォーカスを移す。
@@ -295,7 +296,7 @@ final class FocusController: FocusProviding {
     ///   - forward: たどった順の後ろへ移すなら `true`、前へ移すなら `false`。
     /// - Returns: フォーカスを受け取る ``View`` が 1 つも無ければ `false`。
     private func moveFocus(forward: Bool) -> Bool {
-        let targets = index.targets.filter { !$0.isBehindSheet }
+        let targets = index.targets.filter(\.acceptsInput)
         guard !targets.isEmpty else { return false }
         let next: Int
         if let current = targets.firstIndex(where: { $0.nodeID == focusedNodeID }) {
@@ -337,8 +338,8 @@ struct FocusIndex {
     private(set) var keyPressHandlers: [KeyPressHandler] = []
     /// `content:` を表示している ``SheetView`` の `ViewNode.id`。
     private(set) var presentedSheets: Set<Int> = []
-    /// `content:` を表示している ``SheetView`` の後ろにある ``View`` の `ViewPath` が始まる `ViewPath`。
-    private var behindSheetPaths: [ViewPath] = []
+    /// `FocusIndex.acceptsInput(at:)` が `false` を返す ``View`` の `ViewPath` が始まる `ViewPath`。``View/disabled(_:)`` に `true` を渡した ``DisabledView`` の `ViewPath` と、`content:` を表示している ``SheetView`` の後ろにある ``View`` の `ViewPath`。
+    private var blockedPaths: [ViewPath] = []
 
     /// 空の `FocusIndex` を作る。
     init() {}
@@ -351,17 +352,20 @@ struct FocusIndex {
         for visitedView in visited {
             let view = visitedView.view
             let node = visitedView.node
-            let isBehindSheet = isBehindSheet(node.path)
+            if let disabling = view as? any DisablingView, disabling.disablesContent {
+                blockedPaths.append(node.path)
+            }
+            let acceptsInput = acceptsInput(at: node.path)
 
             if let sheet = view as? any SheetPresentingView, sheet.isPresentingSheet {
                 presentedSheets.insert(node.id)
-                behindSheetPaths.append(sheet.pathBehindSheet(from: node.path))
+                blockedPaths.append(sheet.pathBehindSheet(from: node.path))
             }
             if let focusable = view as? any FocusableView {
                 targets.append(FocusTarget(
                     nodeID: node.id,
                     path: node.path,
-                    isBehindSheet: isBehindSheet,
+                    acceptsInput: acceptsInput,
                     handle: { focusable.handleFocusedEvent($0) }
                 ))
             }
@@ -377,34 +381,34 @@ struct FocusIndex {
                 keyPressHandlers.append(KeyPressHandler(
                     path: node.path,
                     key: handler.handledKey,
-                    isBehindSheet: isBehindSheet,
+                    acceptsInput: acceptsInput,
                     action: handler.keyAction
                 ))
             }
         }
     }
 
-    /// ``View/sheet(isPresented:content:)`` の `content:` の後ろに無い、フォーカスを受け取る ``View`` のうち、たどった順で先頭のもの。
-    var firstEnabledTarget: FocusTarget? {
-        targets.first { !$0.isBehindSheet }
+    /// `FocusTarget.acceptsInput` が `true` の、フォーカスを受け取る ``View`` のうち、たどった順で先頭のもの。
+    var firstAcceptingTarget: FocusTarget? {
+        targets.first(where: \.acceptsInput)
     }
 
-    /// `nodeID` の ``View`` が、``View/sheet(isPresented:content:)`` の `content:` の後ろに無い、フォーカスを受け取る ``View`` かを返す。
+    /// `nodeID` の ``View`` が、`FocusTarget.acceptsInput` が `true` の、フォーカスを受け取る ``View`` かを返す。
     ///
     /// - Parameters:
     ///   - nodeID: 調べる `ViewNode.id`。
     /// - Returns: そうなら `true`。
-    func isEnabledTarget(_ nodeID: Int) -> Bool {
-        targets.contains { $0.nodeID == nodeID && !$0.isBehindSheet }
+    func isAcceptingTarget(_ nodeID: Int) -> Bool {
+        targets.contains { $0.nodeID == nodeID && $0.acceptsInput }
     }
 
-    /// `path` の ``View`` が、``View/sheet(isPresented:content:)`` の `content:` の後ろにあるかを返す。
+    /// `path` の ``View`` へ ``InputEvent`` を渡してよいかを返す。
     ///
     /// - Parameters:
     ///   - path: 調べる ``View`` の `ViewPath`。
-    /// - Returns: 後ろにあれば `true`。
-    func isBehindSheet(_ path: ViewPath) -> Bool {
-        behindSheetPaths.contains { $0.contains(path) }
+    /// - Returns: ``View/disabled(_:)`` に `true` を渡した ``View`` の内側にも、``View/sheet(isPresented:content:)`` の `content:` の後ろにも無ければ `true`。
+    func acceptsInput(at path: ViewPath) -> Bool {
+        !blockedPaths.contains { $0.contains(path) }
     }
 
     /// `binding` が、`nodeID` の ``View`` がフォーカスを持つときに当てはまるかを返す。
@@ -412,22 +416,23 @@ struct FocusIndex {
     /// - Parameters:
     ///   - binding: 調べる `FocusBinding`。
     ///   - nodeID: フォーカスを持つ ``View`` の `ViewNode.id`。
-    /// - Returns: `binding` が ``View/focused(_:equals:)`` のものなら、その内側で、たどった順で先頭のフォーカスを受け取る ``View`` が `nodeID` のとき `true`。``View/focused(_:)`` のものなら、内側のどれかが `nodeID` のとき `true`。
+    /// - Returns: `binding` が ``View/focused(_:equals:)`` のものなら、その内側で、`FocusTarget.acceptsInput` が `true` の、たどった順で先頭のフォーカスを受け取る ``View`` が `nodeID` のとき `true`。``View/focused(_:)`` のものなら、内側のどれかが `nodeID` のとき `true`。
     func binding(_ binding: FocusBinding, matches nodeID: Int) -> Bool {
         if binding.matchesAnyDescendant {
             return targets.contains { $0.nodeID == nodeID && binding.path.contains($0.path) }
         }
-        return targets.first { binding.path.contains($0.path) }?.nodeID == nodeID
+        // `FocusTarget.acceptsInput` で絞らずに先頭を取りたくなるが、`FocusIndex.target(for:)` は絞った先頭へフォーカスを移すので、内側の先頭が `View.disabled(_:)` の内側にあると、代入で移したフォーカスがプロパティの値に表れず `nil` になる。
+        return targets.first { $0.acceptsInput && binding.path.contains($0.path) }?.nodeID == nodeID
     }
 
     /// `assignment` の移す先を返す。
     ///
     /// - Parameters:
     ///   - assignment: `@FocusState` を付けたプロパティへの代入。
-    /// - Returns: `assignment` の値を渡した ``View/focused(_:equals:)``・``View/focused(_:)`` の内側で、たどった順で先頭の、``View/sheet(isPresented:content:)`` の `content:` の後ろに無いフォーカスを受け取る ``View``。無ければ `nil`。
+    /// - Returns: `assignment` の値を渡した ``View/focused(_:equals:)``・``View/focused(_:)`` の内側で、たどった順で先頭の、`FocusTarget.acceptsInput` が `true` のフォーカスを受け取る ``View``。無ければ `nil`。
     func target(for assignment: FocusAssignment) -> FocusTarget? {
         for binding in bindings where binding.storage === assignment.storage && binding.value == assignment.value {
-            if let target = targets.first(where: { !$0.isBehindSheet && binding.path.contains($0.path) }) {
+            if let target = targets.first(where: { $0.acceptsInput && binding.path.contains($0.path) }) {
                 return target
             }
         }
@@ -442,8 +447,8 @@ struct FocusTarget {
     let nodeID: Int
     /// ``View`` の `ViewPath`。
     let path: ViewPath
-    /// ``View/sheet(isPresented:content:)`` の `content:` の後ろにあれば `true`。
-    let isBehindSheet: Bool
+    /// ``View/disabled(_:)`` に `true` を渡した ``View`` の内側にも、``View/sheet(isPresented:content:)`` の `content:` の後ろにも無ければ `true`。`false` の間はフォーカスを持たず、``InputEvent`` を受け取らない。
+    let acceptsInput: Bool
     /// ``InputEvent`` を受け取り、処理したら `true` を返すクロージャ。
     let handle: @MainActor (InputEvent) -> Bool
 }
@@ -455,8 +460,8 @@ struct KeyPressHandler {
     let path: ViewPath
     /// ``View/onKeyPress(_:action:)`` に渡された ``Key``。
     let key: Key
-    /// ``View/sheet(isPresented:content:)`` の `content:` の後ろにあれば `true`。
-    let isBehindSheet: Bool
+    /// ``View/disabled(_:)`` に `true` を渡した ``View`` の内側にも、``View/sheet(isPresented:content:)`` の `content:` の後ろにも無ければ `true`。
+    let acceptsInput: Bool
     /// ``View/onKeyPress(_:action:)`` に渡されたクロージャ。
     let action: @MainActor () -> EventResult
 

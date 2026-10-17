@@ -91,6 +91,9 @@ public struct RenderContext {
     /// この ``RenderContext`` を受け取る ``View`` を内側に含む ``View`` の、`View.foregroundStyle(_: Color)`・``View/tint(_:)``・``View/background(_:)`` が決めた色。
     var colors = ViewColors()
 
+    /// この ``RenderContext`` を受け取る ``View`` を内側に含む ``View`` のどれにも、``View/disabled(_:)`` に `true` を渡していなければ `true`。
+    var isEnabled = true
+
     /// ``View`` のメソッドを直接呼び出すときに渡す ``RenderContext`` を作る。
     ///
     /// - Parameters:
@@ -122,18 +125,21 @@ public struct RenderContext {
     ///   - screen: 画面全体の矩形。
     ///   - ambiguousWidth: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
     ///   - colors: `node` の ``View`` を内側に含む ``View`` が決めた色。
+    ///   - isEnabled: `node` の ``View`` を内側に含む ``View`` のどれにも、``View/disabled(_:)`` に `true` を渡していなければ `true`。
     init(
         node: ViewNode,
         graph: ViewGraph,
         screen: Rect,
         ambiguousWidth: DisplayWidth.AmbiguousWidth,
-        colors: ViewColors = ViewColors()
+        colors: ViewColors = ViewColors(),
+        isEnabled: Bool = true
     ) {
         self.node = node
         self.graph = graph
         self.screen = screen
         self.ambiguousWidth = ambiguousWidth
         self.colors = colors
+        self.isEnabled = isEnabled
     }
 
     /// `child` に渡す ``RenderContext`` を返す。
@@ -141,12 +147,19 @@ public struct RenderContext {
     /// - Parameters:
     ///   - child: ``RenderContext`` を `context` 引数で受け取る ``View``。
     ///   - index: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``View`` と `child` を区別する番号。
-    /// - Returns: `child` の `ViewNode` を持ち、この ``RenderContext`` と同じ ``RenderContext/colors`` を持つ ``RenderContext``。`child` が ``View/id(_:)`` で作った ``View`` なら、`ViewPath` には `index` の代わりに ``View/id(_:)`` の引数を `.key(_:)` として足す。
+    /// - Returns: `child` の `ViewNode` を持ち、この ``RenderContext`` と同じ ``RenderContext/colors``・``RenderContext/isEnabled`` を持つ ``RenderContext``。`child` が ``View/id(_:)`` で作った ``View`` なら、`ViewPath` には `index` の代わりに ``View/id(_:)`` の引数を `.key(_:)` として足す。
     /// - Postcondition: `child` の ``State`` が、`child` の `ViewNode` の記憶域へ結び付いている。
     func context(for child: some View, index: Int) -> RenderContext {
         let node = graph.node(at: path.appending(child, index: index), viewType: type(of: child))
         graph.bindState(of: child, to: node)
-        return RenderContext(node: node, graph: graph, screen: screen, ambiguousWidth: ambiguousWidth, colors: colors)
+        return RenderContext(
+            node: node,
+            graph: graph,
+            screen: screen,
+            ambiguousWidth: ambiguousWidth,
+            colors: colors,
+            isEnabled: isEnabled
+        )
     }
 
     /// ``RenderContext/colors`` だけを書き換えた ``RenderContext`` を返す。
@@ -163,6 +176,15 @@ public struct RenderContext {
     /// この ``RenderContext`` を受け取る ``View`` がフォーカスを持てば `true`。
     var isFocused: Bool {
         graph.environment.focus?.isFocused(node) ?? false
+    }
+
+    /// ``RenderContext/isEnabled`` に合わせた、``TextField``・``ListView`` が文字を書き込む ``Style`` を返す。
+    ///
+    /// - Parameters:
+    ///   - style: ``View/disabled(_:)`` に関係なく決めた ``Style``。
+    /// - Returns: ``RenderContext/isEnabled`` が `false` なら `style` に ``TextAttributes/dim`` を足した ``Style``、`true` なら `style`。
+    func controlStyle(_ style: Style) -> Style {
+        isEnabled ? style : style.adding(.dim)
     }
 
     /// この ``RenderContext`` を受け取る ``View`` が ``Buffer`` へ書き込んだ矩形を、``InputEvent`` の `.mouse` の当たり判定に加える。
