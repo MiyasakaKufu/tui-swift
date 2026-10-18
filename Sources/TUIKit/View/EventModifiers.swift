@@ -156,7 +156,7 @@ extension View {
 
     /// マウスポインタがこの ``View`` の上に来たら `true` を、上から外れたら `false` を渡して `action` を呼び出す。
     ///
-    /// マウスポインタが上にあるとみなすのは、``InputEvent`` の `.mouse` を当てるのと同じ規則で、マウスポインタの位置でいちばん手前に ``Buffer`` へ書き込んだ ``View`` が、この ``View`` か、その内側にあるとき。手前に重なった別の ``View`` に隠れた位置では、上にあるとみなさない。この ``View`` を内側に含む ``View/onHover(perform:)`` があれば、そちらにも上にあるとみなす。
+    /// マウスポインタが上にあるとみなすのは、``InputEvent`` の `.mouse` を当てるのと同じ規則で、マウスポインタの位置でいちばん手前に ``Buffer`` へ書き込んだ ``View`` が、この ``View`` か、その内側にあるとき。手前に重なった別の ``View`` に隠れた位置では、上にあるとみなさない。この ``View`` を内側に含む ``View/onHover(perform:)`` があれば、そちらにも上にあるとみなす。いちばん手前に書き込んだ ``View`` が、``View/disabled(_:)`` に `true` を渡した ``View`` の内側か、``View/sheet(isPresented:content:)`` の `content:` の後ろにあるなら、どの ``View`` も上にあるとみなさない。
     ///
     /// ```swift
     /// struct HoverLabel: View {
@@ -175,7 +175,7 @@ extension View {
     ///   - action: マウスポインタが上に来たら `true` を、上から外れたら `false` を受け取るクロージャ。
     /// - Returns: `action` を登録した ``HoverView``。
     /// - Postcondition: `true` を渡して呼び出した後は、上から外れるまで `true` を渡さず、上から外れたら一度だけ `false` を渡す。
-    /// - Note: マウスポインタが上にあるかを決めるのは、``InputEvent`` の `.mouse` が届いたときだけ。マウスポインタを動かさずに ``View`` の配置が変わっても、次に `.mouse` が届くまで `action` は呼び出さない。この ``View`` が描画されなくなったときや、``View/sheet(isPresented:content:)`` の `content:` の後ろになったときも、次に `.mouse` が届いたときに `false` を渡す。
+    /// - Note: マウスポインタが上にあるかを決めるのは、``InputEvent`` の `.mouse` が届いたときだけ。マウスポインタを動かさずに ``View`` の配置が変わっても、次に `.mouse` が届くまで `action` は呼び出さない。この ``View`` が描画されなくなったとき、``View/disabled(_:)`` に `true` を渡した ``View`` の内側になったとき、``View/sheet(isPresented:content:)`` の `content:` の後ろになったときも、次に `.mouse` が届いたときに `false` を渡す。
     /// - Note: `ApplicationOptions.mouseTracking` が ``MouseTracking/motion`` でなければ、`action` を呼び出さない。
     /// - Note: この ``View`` の内側の ``View`` が ``Buffer`` へ書き込んでいない位置（``Spacer`` が引き取った領域や、``PaddingView`` が空けた領域）は、上とみなさない。クリックが届かない位置と同じ。矩形全体を上とみなすには、``View/background(_:)`` で塗る。
     /// - Note: `action` の中では、``State``・``FocusState`` を付けたプロパティへ代入してよい。

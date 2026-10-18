@@ -210,6 +210,48 @@ final class HoverTests: XCTestCase {
         XCTAssertEqual(log.entries, ["back:true"])
     }
 
+    // MARK: - View.disabled(_:)
+
+    func testDisabledViewCallsFalseOnNextMouseEventAndIsNotHoveredWhileDisabled() async {
+        var isDisabled = false
+        let harness = FocusHarness(size: Size(width: 4, height: 1)) {
+            Text("a")
+                .onHover(perform: self.log.record("a"))
+                .disabled(isDisabled)
+        }
+        harness.move(to: Point(x: 0, y: 0))
+        log.clear()
+
+        isDisabled = true
+        harness.draw()
+        XCTAssertEqual(log.entries, [])
+
+        harness.move(to: Point(x: 0, y: 0))
+        harness.move(to: Point(x: 1, y: 0))
+        XCTAssertEqual(log.entries, ["a:false"])
+        log.clear()
+
+        isDisabled = false
+        harness.draw()
+        harness.move(to: Point(x: 0, y: 0))
+        XCTAssertEqual(log.entries, ["a:true"])
+    }
+
+    func testOnHoverOutsideDisabledViewIsNotHoveredOverDisabledContent() async {
+        let harness = FocusHarness(size: Size(width: 4, height: 2)) {
+            VStack(spacing: 0) {
+                Text("a").disabled(true)
+                Text("b")
+            }
+            .onHover(perform: self.log.record("stack"))
+        }
+
+        harness.move(to: Point(x: 0, y: 1))
+        harness.move(to: Point(x: 0, y: 0))
+
+        XCTAssertEqual(log.entries, ["stack:true", "stack:false"])
+    }
+
     // MARK: - ApplicationOptions.mouseTracking
 
     func testDisabledHoverNeverCallsAction() async {

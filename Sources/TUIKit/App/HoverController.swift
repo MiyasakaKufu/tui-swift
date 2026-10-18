@@ -6,8 +6,11 @@ final class HoverController {
     /// `false` なら、``View/onHover(perform:)`` のクロージャを呼び出さない。
     var isEnabled = true
 
-    /// 直前にたどった ``View/onHover(perform:)`` のうち、``View/sheet(isPresented:content:)`` の `content:` の後ろに無いもの。たどった順に並ぶ。
+    /// 直前にたどった ``View/onHover(perform:)``。たどった順に並ぶ。
     private var handlers: [HoverHandler] = []
+
+    /// 直前にたどった ``View`` の一覧から作った `FocusIndex`。
+    private var index = FocusIndex()
 
     /// マウスポインタが上にあるとして `true` を渡し、まだ `false` を渡していない ``View/onHover(perform:)``。最後に決め直したときのたどった順に並ぶ。
     private var hovered: [HoverHandler] = []
@@ -19,12 +22,11 @@ final class HoverController {
     ///
     /// - Parameters:
     ///   - visited: 描画より前にたどった順に並べた `VisitedView`。
-    ///   - index: `visited` から作った `FocusIndex`。``View/sheet(isPresented:content:)`` の `content:` の後ろにある ``View`` を見分けるのに使う。
+    ///   - index: `visited` から作った `FocusIndex`。マウスポインタの位置の ``View`` へ ``InputEvent`` を渡してよいかを調べるのに使う。
     func collect(_ visited: [ViewGraph.VisitedView], index: FocusIndex) {
+        self.index = index
         handlers = visited.compactMap { visitedView in
-            guard let view = visitedView.view as? any HoverHandlingView,
-                  !index.isBehindSheet(visitedView.node.path)
-            else { return nil }
+            guard let view = visitedView.view as? any HoverHandlingView else { return nil }
             return HoverHandler(nodeID: visitedView.node.id, path: visitedView.node.path, action: view.hoverAction)
         }
     }
@@ -34,7 +36,7 @@ final class HoverController {
     /// - Parameters:
     ///   - point: 届いた `MouseEvent` の位置。
     ///   - hitRegions: 直前の描画で ``View`` が ``Buffer`` へ書き込んだ矩形。書き込んだ順に並ぶ。
-    /// - Postcondition: 上から外れた ``View`` へ `false` を、内側のものから順に渡してから、上に来た ``View`` へ `true` を、外側のものから順に渡している。直前にたどられなかった ``View`` と、``View/sheet(isPresented:content:)`` の `content:` の後ろにあった ``View`` は、上から外れたものとする。
+    /// - Postcondition: 上から外れた ``View`` へ `false` を、内側のものから順に渡してから、上に来た ``View`` へ `true` を、外側のものから順に渡している。直前にたどられなかった ``View`` は、上から外れたものとする。`point` でいちばん手前に書き込んだ ``View`` が `FocusIndex.acceptsInput(at:)` で `false` になるなら、どの ``View`` も上から外れたものとする。
     func movePointer(to point: Point, hitRegions: [HitRegion]) {
         guard isEnabled else { return }
         let next = hoveredHandlers(at: point, in: hitRegions)
@@ -53,9 +55,11 @@ final class HoverController {
     /// - Parameters:
     ///   - point: マウスポインタの位置。
     ///   - hitRegions: 直前の描画で ``View`` が ``Buffer`` へ書き込んだ矩形。書き込んだ順に並ぶ。
-    /// - Returns: マウスポインタが上にある ``View/onHover(perform:)``。たどった順に並ぶ。
+    /// - Returns: マウスポインタが上にある ``View/onHover(perform:)``。たどった順に並ぶ。いちばん手前に書き込んだ ``View`` が `FocusIndex.acceptsInput(at:)` で `false` になるなら空。
     private func hoveredHandlers(at point: Point, in hitRegions: [HitRegion]) -> [HoverHandler] {
-        guard let region = hitRegions.last(where: { $0.rect.contains(point) }) else { return [] }
+        guard let region = hitRegions.last(where: { $0.rect.contains(point) }),
+              index.acceptsInput(at: region.path)
+        else { return [] }
         return handlers.filter { $0.path.contains(region.path) }
     }
 }
