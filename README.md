@@ -85,6 +85,17 @@ var body: some View {
 }
 ```
 
+`View.disabled(_:)` に `true` を渡すと、その `View` と内側の `View` は、キー・マウス・Tab によるフォーカスの移動の対象から外れる。
+外側で `true` を渡していれば、内側で `false` を渡しても外れたままになる。`TextField`・`ListView` は、文字に `TextAttributes.dim`（SGR 2）を足して描かれる。
+
+```swift
+VStack {
+    TextField(text: $name, state: nameState)
+    TextField(text: $note, state: noteState)
+}
+.disabled(isSending)
+```
+
 罫線素片や `…` など East Asian Width が Ambiguous の文字は、初期値では `Cell` 1 個分として扱う。
 環境変数 `RUNEWIDTH_EASTASIAN` が `1` のときと、`ApplicationOptions.ambiguousWidth` を `.wide` に
 したときは `Cell` 2 個分として扱い、`View.border(_:color:title:)` の枠線は `BorderStyle.ascii`（`+-|`）へ切り替わる。
