@@ -1,7 +1,7 @@
 import XCTest
 @testable import TUIKit
 
-/// 2 つ目の `TextField` だけを `View.disabled(_:)` で対象から外せる `View`。
+/// 2 つ目の `TextField` だけを、`View.disabled(_:)` で `.key`・`.mouse` と Tab によるフォーカスの移動の対象から外せる `View`。
 private struct LockableForm: View {
     enum Field: Hashable {
         case name

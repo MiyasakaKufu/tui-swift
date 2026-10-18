@@ -447,7 +447,7 @@ struct FocusTarget {
     let nodeID: Int
     /// ``View`` の `ViewPath`。
     let path: ViewPath
-    /// ``View/disabled(_:)`` に `true` を渡した ``View`` の内側にも、``View/sheet(isPresented:content:)`` の `content:` の後ろにも無ければ `true`。`false` の間はフォーカスを持たず、``InputEvent`` を受け取らない。
+    /// ``View/disabled(_:)`` に `true` を渡した ``View`` の内側にも、``View/sheet(isPresented:content:)`` の `content:` の後ろにも無ければ `true`。
     let acceptsInput: Bool
     /// ``InputEvent`` を受け取り、処理したら `true` を返すクロージャ。
     let handle: @MainActor (InputEvent) -> Bool

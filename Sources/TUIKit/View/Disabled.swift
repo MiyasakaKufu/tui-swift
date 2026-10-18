@@ -1,4 +1,6 @@
-/// ``DisabledView/isDisabled`` が `true` の間、``DisabledView/content`` と、その内側の ``View`` を、`.key`・`.mouse` と Tab によるフォーカスの移動の対象から外す ``View``。``View/disabled(_:)`` で作る。
+/// ``DisabledView/isDisabled`` が `true` の間、``DisabledView/content`` と、その内側の ``View`` を、`.key`・`.mouse` と Tab によるフォーカスの移動の対象から外す ``View``。
+///
+/// ``View/disabled(_:)`` で作る。
 public struct DisabledView<Content: View>: PrimitiveView {
     /// `.key`・`.mouse` と Tab によるフォーカスの移動の対象から外す範囲の ``View``。
     public var content: Content
@@ -36,8 +38,6 @@ public struct DisabledView<Content: View>: PrimitiveView {
 
     /// ``DisabledView/content`` を描画する。
     ///
-    /// ``DisabledView/isDisabled`` が `true` なら、内側の ``TextField``・``ListView`` は、文字に ``TextAttributes/dim`` を足した ``Style`` で描かれる。
-    ///
     /// - Parameters:
     ///   - buffer: 描画先の ``Buffer``。
     ///   - rect: 描画する矩形。
@@ -68,14 +68,12 @@ protocol DisablingView {
 }
 
 extension DisabledView: DisablingView {
-    /// ``DisabledView/isDisabled`` の値。
+    /// ``DisabledView/content`` を `.key`・`.mouse` と Tab によるフォーカスの移動の対象から外すなら `true`。
     var disablesContent: Bool { isDisabled }
 }
 
 extension View {
     /// `disabled` が `true` なら、この ``View`` と、その内側の ``View`` を、`.key`・`.mouse` と Tab によるフォーカスの移動の対象から外す。
-    ///
-    /// 外側の ``View/disabled(_:)`` に `true` を渡していれば、内側で `false` を渡しても対象から外れたままになる。``TextField``・``ListView`` は、文字に ``TextAttributes/dim``（SGR 2）を足した ``Style`` で描かれる。
     ///
     /// ```swift
     /// VStack {
@@ -88,6 +86,8 @@ extension View {
     /// - Parameters:
     ///   - disabled: この ``View`` と、その内側の ``View`` を、`.key`・`.mouse` と Tab によるフォーカスの移動の対象から外すなら `true`。
     /// - Returns: この ``View`` を ``DisabledView/content`` にした ``DisabledView``。
+    /// - Note: 外側の ``View/disabled(_:)`` に `true` を渡していれば、内側で `false` を渡しても対象から外れたままになる。
+    /// - Note: 対象から外れた ``TextField``・``ListView`` は、文字に ``TextAttributes/dim`` を足した ``Style`` で描かれる。
     /// - Note: フォーカスを持つ ``View`` が対象から外れると、外れた ``View`` をたどった最初の `Application.draw()` の 1 回で、描画より前に、たどった順で先頭の、対象から外れていないフォーカスを受け取る ``View`` へフォーカスが移る。そうした ``View`` が無ければ、どの ``View`` もフォーカスを持たず、対象に戻ったときに、たどった順で先頭のフォーカスを受け取る ``View`` へフォーカスが移る（``FocusState`` を付けたプロパティへの `nil` の代入でフォーカスを外した後を除く）。外れる前にフォーカスを持っていた ``View`` へ戻すには、``FocusState`` を付けたプロパティへ代入する。
     /// - Note: 対象から外れた ``View`` が ``Buffer`` へ書き込んだ矩形の中の `.mouse` は、その下に書き込んだ ``View`` へも渡らない。
     /// - Note: 対象から外れた ``View`` へ ``FocusState`` を付けたプロパティへの代入でフォーカスを移そうとすると、``FocusState`` のほかの代入と同じく保留し、次の `Application.draw()` の 1 回で 1 回だけ試みる。`disabled` 引数に渡す値を `false` に変えるのと同じクロージャの中で代入すれば、その 1 回でフォーカスが移る。
