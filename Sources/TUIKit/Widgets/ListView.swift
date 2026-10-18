@@ -326,6 +326,7 @@ public struct ListView: PrimitiveView {
     /// - Postcondition: `state.renderedRect` が `rect` に更新され、
     ///   スクロール位置が項目の範囲へ収められる。直前の描画から選択位置が変わっていれば、
     ///   選択が表示範囲に入るようスクロールする。
+    /// - Postcondition: ``View/disabled(_:)`` に `true` を渡した ``View`` の内側なら、選択行を含むすべての行を、文字に ``TextAttributes/dim`` を足した ``Style`` で書き込む。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
         context.recordHitRegion(rect)
@@ -347,8 +348,8 @@ public struct ListView: PrimitiveView {
             count: DisplayWidth.width(of: selectionMarker, ambiguous: context.ambiguousWidth)
         )
 
-        let style = context.colors.style(.hierarchical(.primary))
-        let selectedStyle = context.colors.tintStyle().adding(.reverse)
+        let style = context.controlStyle(context.colors.style(.hierarchical(.primary)))
+        let selectedStyle = context.controlStyle(context.colors.tintStyle().adding(.reverse))
 
         for row in 0..<rect.height {
             let index = state.scrollOffset + row

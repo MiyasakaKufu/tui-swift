@@ -396,6 +396,7 @@ public struct TextField: PrimitiveView {
     /// - Postcondition: `state.renderedCursorPoint` がカーソルの画面上の位置に更新される。
     ///   描く領域がなければ `nil` になる。
     /// - Postcondition: フォーカスを持ち、`showsCursor` が `true` なら、カーソルの位置の ``Cell`` を反転した ``Style`` で書き込む。
+    /// - Postcondition: ``View/disabled(_:)`` に `true` を渡した ``View`` の内側なら、文字に ``TextAttributes/dim`` を足した ``Style`` で書き込む。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard rect.width > 0, rect.height > 0 else {
             state.renderedCursorPoint = nil
@@ -403,7 +404,7 @@ public struct TextField: PrimitiveView {
         }
         let row = Rect(x: rect.minX, y: rect.minY, width: rect.width, height: 1)
         context.recordHitRegion(row)
-        let style = context.colors.style(.hierarchical(.primary))
+        let style = context.controlStyle(context.colors.style(.hierarchical(.primary)))
         buffer.fill(row, with: Cell(character: " ", style: style))
 
         if state.isEmpty && !placeholder.isEmpty {
@@ -414,7 +415,7 @@ public struct TextField: PrimitiveView {
                     ambiguous: context.ambiguousWidth
                 ),
                 at: Point(x: rect.minX, y: rect.minY),
-                style: context.colors.style(.hierarchical(.secondary)),
+                style: context.controlStyle(context.colors.style(.hierarchical(.secondary))),
                 clippedTo: row
             )
             // プレースホルダを表示している間はカーソルを置かずに済ませたくなるが、置かないと空の入力欄のどこに入力されるかが見えない。

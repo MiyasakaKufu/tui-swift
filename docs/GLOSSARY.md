@@ -139,6 +139,7 @@
 | `View.onKeyPress(_:action:)` | 宣言はこの 1 つだけ。修飾キーの付いた押下では `action:` のクロージャを呼び出さない（文字のキーは Shift だけなら呼び出す） |
 | `View.onChange(of:_:)` | `initial:` 引数は無い。比べるのは描画より前にたどったときの値。クロージャを呼び出したら `Application.draw()` をもう 1 回行うが、そのもう 1 回からはさらに行わない |
 | `View.sheet(isPresented:content:)` | `content:` を画面の中央に重ねる。表示している間も、どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
+| `View.disabled(_:)` | 見た目が変わるのは `TextField`・`ListView` だけで、文字に `TextAttributes.dim`（SGR 2）を足して描く。`EnvironmentValues.isEnabled` に当たるものは無い。フォーカスを持つ `View` を `.key`・`.mouse`・Tab によるフォーカスの移動の対象から外すと、たどった順で先頭の、外していないフォーカスを受け取る `View` へフォーカスが移る（SwiftUI のドキュメントに記述は無い）。どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
 | `ViewBuilder` | `[any View]` を返す |
 | `View.foregroundStyle(_: Color)`・`View.foregroundStyle(_:_:)` | 引数は `Color` か `HierarchicalShapeStyle`。`ShapeStyle` は無く、グラデーションなどは渡せない。`foregroundStyle(_:_:_:)` は無い |
 | `HierarchicalShapeStyle` | `.primary` と `.secondary` だけ。セカンダリレベルを `View.foregroundStyle(_:_:)` で決めていなければ、プライマリレベルに `TextAttributes.dim`（SGR 2）を足したものになる |
