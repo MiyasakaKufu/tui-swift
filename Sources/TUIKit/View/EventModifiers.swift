@@ -39,6 +39,39 @@ extension KeyPressView: KeyPressHandlingView {
     var keyAction: @MainActor () -> EventResult { action }
 }
 
+/// マウスポインタが ``HoverView/content`` の上に来たときと上から外れたときに、クロージャを呼び出す ``View``。``View/onHover(perform:)`` で作る。
+public struct HoverView<Content: View>: View {
+    /// マウスポインタが上にあるかを見る範囲の ``View``。
+    public var content: Content
+    /// マウスポインタが上に来たら `true` を、上から外れたら `false` を受け取るクロージャ。
+    let action: @MainActor (Bool) -> Void
+
+    /// ``HoverView`` を作る。
+    ///
+    /// - Parameters:
+    ///   - content: マウスポインタが上にあるかを見る範囲の ``View``。
+    ///   - action: マウスポインタが上に来たら `true` を、上から外れたら `false` を受け取るクロージャ。
+    init(content: Content, action: @escaping @MainActor (Bool) -> Void) {
+        self.content = content
+        self.action = action
+    }
+
+    /// マウスポインタが上にあるかを見る範囲の ``HoverView/content``。
+    public var body: Content { content }
+}
+
+/// ``View/onHover(perform:)`` で作った ``View`` が、たどったときに `HoverController` へ示すもの。
+@MainActor
+protocol HoverHandlingView {
+    /// マウスポインタが上に来たら `true` を、上から外れたら `false` を受け取るクロージャ。
+    var hoverAction: @MainActor (Bool) -> Void { get }
+}
+
+extension HoverView: HoverHandlingView {
+    /// マウスポインタが上に来たら `true` を、上から外れたら `false` を受け取るクロージャ。
+    var hoverAction: @MainActor (Bool) -> Void { action }
+}
+
 /// ``ChangeObservingView/value`` の変化を見つけてクロージャを呼び出す ``View``。``View/onChange(of:_:)`` で作る。
 public struct ChangeObservingView<Content: View, Value: Equatable>: View {
     /// ``ChangeObservingView/value`` を見張る間に描く ``View``。
@@ -119,6 +152,35 @@ extension View {
         action: @escaping @MainActor () -> EventResult
     ) -> KeyPressView<Self> {
         KeyPressView(content: self, key: key, action: action)
+    }
+
+    /// マウスポインタがこの ``View`` の上に来たら `true` を、上から外れたら `false` を渡して `action` を呼び出す。
+    ///
+    /// マウスポインタが上にあるとみなすのは、``InputEvent`` の `.mouse` を当てるのと同じ規則で、マウスポインタの位置でいちばん手前に ``Buffer`` へ書き込んだ ``View`` が、この ``View`` か、その内側にあるとき。手前に重なった別の ``View`` に隠れた位置では、上にあるとみなさない。この ``View`` を内側に含む ``View/onHover(perform:)`` があれば、そちらにも上にあるとみなす。
+    ///
+    /// ```swift
+    /// struct HoverLabel: View {
+    ///     let title: String
+    ///     @State private var isHovered = false
+    ///
+    ///     var body: some View {
+    ///         Text(title)
+    ///             .background(isHovered ? .yellow : .white)
+    ///             .onHover { isHovered = $0 }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - action: マウスポインタが上に来たら `true` を、上から外れたら `false` を受け取るクロージャ。
+    /// - Returns: `action` を登録した ``HoverView``。
+    /// - Postcondition: `true` を渡して呼び出した後は、上から外れるまで `true` を渡さず、上から外れたら一度だけ `false` を渡す。
+    /// - Note: マウスポインタが上にあるかを決めるのは、``InputEvent`` の `.mouse` が届いたときだけ。マウスポインタを動かさずに ``View`` の配置が変わっても、次に `.mouse` が届くまで `action` は呼び出さない。この ``View`` が描画されなくなったときや、``View/sheet(isPresented:content:)`` の `content:` の後ろになったときも、次に `.mouse` が届いたときに `false` を渡す。
+    /// - Note: `ApplicationOptions.mouseTracking` が ``MouseTracking/motion`` でなければ、`action` を呼び出さない。
+    /// - Note: この ``View`` の内側の ``View`` が ``Buffer`` へ書き込んでいない位置（``Spacer`` が引き取った領域や、``PaddingView`` が空けた領域）は、上とみなさない。クリックが届かない位置と同じ。矩形全体を上とみなすには、``View/background(_:)`` で塗る。
+    /// - Note: `action` の中では、``State``・``FocusState`` を付けたプロパティへ代入してよい。
+    public func onHover(perform action: @escaping @MainActor (Bool) -> Void) -> HoverView<Self> {
+        HoverView(content: self, action: action)
     }
 
     /// `value` が前の `Application.draw()` の 1 回から変わったら、その `Application.draw()` の 1 回が終わった後に `action` を呼び出す。

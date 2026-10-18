@@ -58,6 +58,7 @@ public final class Application<Root: TerminalApp> {
         self.eventQueue = eventQueue
         self.sender = MessageSender(eventQueue: eventQueue)
         context.focus.stopsDelivering = { root.isFinished }
+        context.hover.isEnabled = options.mouseTracking == .motion
     }
 
     /// ループを終了させる。イベントハンドラの中からも呼び出せる。
