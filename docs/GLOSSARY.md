@@ -56,10 +56,13 @@
 | `View` に準拠する型の格納プロパティに `@State` として付け、そのプロパティを `Application.draw()` をまたいで残す型 | `State` | プロパティは `ViewNode` が持つ。`$` で得る `Binding` は `State.projectedValue` |
 | `TextField`・`ListView` のうち、`InputEvent` の `.key`・`.paste` を最初に受け取る `View` がそうであること | フォーカス | 端末エミュレータのウィンドウが入力を受け取ること（`.focus`）は「端末エミュレータのフォーカス」と書き、「フォーカス」を単独で使わない |
 | Tab・Shift+Tab・クリック・`@FocusState` を付けたプロパティへの代入でフォーカスが移る `View` | フォーカスを受け取る `View` | 今は `TextField` と `ListView` |
+| 端末エミュレータがマウスの位置として `MouseEvent.position` で知らせる、画面上の位置を指す印 | マウスポインタ | 「マウスカーソル」「カーソル」は使わない。「カーソル」は端末エミュレータのカーソルと `TextFieldState.cursor` を指す |
+| マウスポインタの位置でいちばん手前に `Buffer` へ書き込んだ `View` と、それを内側に含む `View` | マウスポインタが上にある `View` | `InputEvent` の `.mouse` を当てるのと同じ規則で決める。`.mouse` が届いたときにこの `View` が変わっていれば、`View.onHover(perform:)` のクロージャが呼び出される |
 | `ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` が `beforeRender` に渡す `View` の一覧の順 | たどった順 | Tab の順と、フォーカスを与える先を決める |
 | `View` に準拠する型の格納プロパティに `@FocusState` として付け、フォーカスを持つ `View` を表し、代入でフォーカスを移す型 | `FocusState` | 値は `FocusController` が保持するフォーカスから求める。`$` で得るのは `FocusState.Binding` |
-| `Application` が持ち、`ViewGraph` と `FocusController` をまとめるクラス | `ApplicationContext` | internal |
+| `Application` が持ち、`ViewGraph` と `FocusController` と `HoverController` をまとめるクラス | `ApplicationContext` | internal |
 | フォーカスを保持し、たどった `View` の一覧からフォーカスを決め、`InputEvent` を `View` へ渡すクラス | `FocusController` | internal。`ViewGraph` を参照しない |
+| `MouseEvent` が届くたびにマウスポインタが上にある `View` を決め、変わったら `View.onHover(perform:)` のクロージャを呼び出すクラス | `HoverController` | internal。`ApplicationOptions.mouseTracking` が `.motion` でなければ呼び出さない |
 | `ViewGraph` が、`State` などを結び付けるときと描画するときに `View` へ渡すもの | `ViewEnvironment` | internal。今は `FocusController` だけを持つ |
 | `View` の拡張として定義された `View.padding(_: EdgeInsets)`・`View.border(_:color:title:)` などのメソッド | `View` の拡張メソッド | 個々のメソッドは名前で書く |
 | `Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型 | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型」 |
@@ -136,6 +139,7 @@
 | `View.onKeyPress(_:action:)` | 宣言はこの 1 つだけ。修飾キーの付いた押下では `action:` のクロージャを呼び出さない（文字のキーは Shift だけなら呼び出す） |
 | `View.onChange(of:_:)` | `initial:` 引数は無い。比べるのは描画より前にたどったときの値。クロージャを呼び出したら `Application.draw()` をもう 1 回行うが、そのもう 1 回からはさらに行わない |
 | `View.sheet(isPresented:content:)` | `content:` を画面の中央に重ねる。表示している間も、どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
+| `View.disabled(_:)` | 見た目が変わるのは `TextField`・`ListView` だけで、文字に `TextAttributes.dim`（SGR 2）を足して描く。`EnvironmentValues.isEnabled` に当たるものは無い。フォーカスを持つ `View` を `.key`・`.mouse`・Tab によるフォーカスの移動の対象から外すと、たどった順で先頭の、外していないフォーカスを受け取る `View` へフォーカスが移る（SwiftUI のドキュメントに記述は無い）。どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
 | `ViewBuilder` | `[any View]` を返す |
 | `View.foregroundStyle(_: Color)`・`View.foregroundStyle(_:_:)` | 引数は `Color` か `HierarchicalShapeStyle`。`ShapeStyle` は無く、グラデーションなどは渡せない。`foregroundStyle(_:_:_:)` は無い |
 | `HierarchicalShapeStyle` | `.primary` と `.secondary` だけ。セカンダリレベルを `View.foregroundStyle(_:_:)` で決めていなければ、プライマリレベルに `TextAttributes.dim`（SGR 2）を足したものになる |

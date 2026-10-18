@@ -85,6 +85,17 @@ var body: some View {
 }
 ```
 
+`View.disabled(_:)` に `true` を渡すと、その `View` と内側の `View` は、キー・マウス・Tab によるフォーカスの移動の対象から外れる。
+外側で `true` を渡していれば、内側で `false` を渡しても外れたままになる。`TextField`・`ListView` は、文字に `TextAttributes.dim`（SGR 2）を足して描かれる。
+
+```swift
+VStack {
+    TextField(text: $name, state: nameState)
+    TextField(text: $note, state: noteState)
+}
+.disabled(isSending)
+```
+
 起動から終了までの局面は、`TerminalApp` のメソッドで受け取る。どれもデフォルトの実装があり、書かなければ何もしない。
 
 | 局面 | メソッド |

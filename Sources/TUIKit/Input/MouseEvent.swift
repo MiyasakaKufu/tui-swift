@@ -6,7 +6,7 @@ public enum MouseTracking: Hashable, Sendable {
     case buttons
     /// ボタンを押していない間の移動（`.move`）も受け取る。
     ///
-    /// - Note: マウスポインタが ``Cell`` 1 個分動くたびにイベントが届く。ホバーの強調やツールチップのように、移動そのものを使う TUIKit アプリだけが選ぶ。
+    /// - Note: マウスポインタが ``Cell`` 1 個分動くたびにイベントが届く。``View/onHover(perform:)`` のように、移動そのものを使う TUIKit アプリだけが選ぶ。``View/onHover(perform:)`` のクロージャは、これを選んだときだけ呼び出される。
     case motion
 }
 

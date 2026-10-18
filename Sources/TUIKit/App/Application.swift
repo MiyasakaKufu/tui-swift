@@ -61,6 +61,8 @@ public final class Application<Root: TerminalApp> {
         self.eventQueue = eventQueue
         self.sender = MessageSender(eventQueue: eventQueue)
         context.focus.stopsDelivering = { root.isFinished }
+        // `.motion` 以外でも有効にしたくなるが、`.buttons` ではボタンを離した後の移動が届かないので、押した位置の `View` に `true` を渡したまま、次にボタンを押すかホイールを回すまで `false` を渡せない。
+        context.hover.isEnabled = options.mouseTracking == .motion
     }
 
     /// ループを終了させる。イベントハンドラの中からも呼び出せる。
