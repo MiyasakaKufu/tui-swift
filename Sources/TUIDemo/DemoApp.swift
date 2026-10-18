@@ -25,6 +25,7 @@ final class DemoApp: TerminalApp {
         "Tab とクリックによるフォーカスの移動",
         "ウィンドウサイズ変更への追従",
         "View の重ね描きとダイアログ",
+        "マウスポインタが上にある View の強調",
     ]
 
     private(set) var isFinished = false
@@ -224,12 +225,25 @@ private struct Footer: View {
     var body: some View {
         HStack(spacing: 2) {
             for hint in hints {
-                Text(" \(hint) ").foregroundStyle(.black).background(.white)
+                HintLabel(text: hint)
             }
             Spacer()
         }
         .frame(height: 1)
         .flexible(horizontal: 1, vertical: 0)
+    }
+}
+
+/// 操作の一覧の 1 項目。マウスポインタが上にある間だけ色を変える。
+private struct HintLabel: View {
+    let text: String
+    @State private var isHovered = false
+
+    var body: some View {
+        Text(" \(text) ")
+            .foregroundStyle(.black)
+            .background(isHovered ? .yellow : .white)
+            .onHover { isHovered = $0 }
     }
 }
 

@@ -223,6 +223,54 @@ final class ApplicationBugReproductionTests: XCTestCase {
         )
     }
 
+    /// `View.onHover(perform:)` のクロージャは、`ApplicationOptions.mouseTracking` が `.motion` のときだけ呼び出される。
+    func testHoverFollowsPointerOnlyWithMotionTracking() async throws {
+        for tracking in [MouseTracking.motion, .buttons] {
+            var masterDescriptor: Int32 = -1
+            var slaveDescriptor: Int32 = -1
+            let openResult = ctui_test_open_pty(&masterDescriptor, &slaveDescriptor)
+            try XCTSkipIf(openResult != 0, "疑似端末を開けない環境のため飛ばす")
+            let master = masterDescriptor
+            let slave = slaveDescriptor
+            defer {
+                close(slave)
+                close(master)
+            }
+
+            XCTAssertEqual(setTerminalSize(master, Size(width: 80, height: 24)), 0)
+
+            // 端末デバイスへの書き出しが詰まるとループが止まるので、master から読み捨て続ける。
+            let drain = OutputDrain(descriptor: master)
+            drain.start()
+            defer { drain.stop() }
+
+            let app = HoverRecordingApp()
+            let application = Application(
+                root: app,
+                options: ApplicationOptions(
+                    usesAlternateScreen: false,
+                    mouseTracking: tracking,
+                    frameInterval: 1.0 / 60
+                ),
+                terminal: Terminal(input: slave, output: slave)
+            )
+            app.onTimeout = { [weak application] in application?.stop() }
+
+            // raw モードの設定は入力待ちのバイト列を捨てるため、ループが回り始めてから送る。
+            let hasStartedLoop = app.hasStartedLoop
+            let sender = Thread {
+                guard hasStartedLoop.wait(timeout: 5) else { return }
+                writeBytes(master, Array("\u{1B}[<0;1;1M\u{1B}[<0;1;1m".utf8))
+            }
+            sender.start()
+
+            try await application.run()
+
+            XCTAssertEqual(app.releaseCount, 1, "\(tracking) のときにボタンを離したことが届いていない")
+            XCTAssertEqual(app.hovers, tracking == .motion ? [true] : [], "\(tracking) のとき")
+        }
+    }
+
     /// 対応する端末エミュレータでは kitty keyboard protocol を有効にし、Ctrl+I と Tab を区別する。
     func testApplicationEnablesKeyboardProtocolWhenSupported() async throws {
         var masterDescriptor: Int32 = -1
@@ -550,6 +598,43 @@ private final class MouseRecordingApp: TerminalApp {
         guard case .mouse(let mouseEvent) = event else { return .ignored }
         mouseEvents.append(mouseEvent)
         if mouseEvent.action == .move { isFinished = true }
+        return .handled
+    }
+
+    func update(elapsed: Double) {
+        hasStartedLoop.set()
+        elapsedTotal += elapsed
+        if elapsedTotal > 5 { onTimeout() }
+    }
+}
+
+/// `View.onHover(perform:)` のクロージャに渡された値を記録し、ボタンを離したことが届いたら終了する `TerminalApp` に準拠する型。
+private final class HoverRecordingApp: TerminalApp {
+
+    /// `View.onHover(perform:)` のクロージャに渡された値を、渡された順に並べたもの。
+    private(set) var hovers: [Bool] = []
+    /// 届いた `.release` の数。
+    private(set) var releaseCount = 0
+    /// `Application` を終了するかどうか。
+    private(set) var isFinished = false
+    /// イベントループが 1 周したら立つ。
+    let hasStartedLoop = Latch()
+
+    /// ボタンを離したことが届かないまま時間切れになったときに `TerminalApp.update(elapsed:)` が呼び出すクロージャ。
+    var onTimeout: () -> Void = {}
+
+    private var elapsedTotal = 0.0
+
+    var body: some View {
+        Text("ホバーの確認").onHover { [unowned self] in hovers.append($0) }
+    }
+
+    func handle(_ event: InputEvent) -> EventResult {
+        guard case .mouse(let mouseEvent) = event else { return .ignored }
+        if mouseEvent.action == .release {
+            releaseCount += 1
+            isFinished = true
+        }
         return .handled
     }
 

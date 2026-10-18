@@ -87,6 +87,15 @@ final class FocusHarness<V: View> {
         return handled
     }
 
+    /// マウスポインタを、ボタンを押さずに `point` へ動かしてから描く。
+    ///
+    /// - Parameters:
+    ///   - point: 動かす先の位置。
+    func move(to point: Point) {
+        _ = context.deliver(MouseEvent(position: point, button: .none, action: .move))
+        draw()
+    }
+
     /// `text` を貼り付けてから描く。
     ///
     /// - Parameters:

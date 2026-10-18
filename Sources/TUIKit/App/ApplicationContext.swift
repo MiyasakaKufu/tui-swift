@@ -1,4 +1,4 @@
-/// ``Application`` が持ち、`ViewGraph` と `FocusController` をまとめるクラス。
+/// ``Application`` が持ち、`ViewGraph` と `FocusController` と `HoverController` をまとめるクラス。
 @MainActor
 final class ApplicationContext {
     /// `ViewNode` を `ViewPath` ごとに保持する `ViewGraph`。
@@ -6,6 +6,9 @@ final class ApplicationContext {
 
     /// フォーカスを保持する `FocusController`。
     let focus = FocusController()
+
+    /// `MouseEvent` が届くたびにマウスポインタが上にある ``View`` を決める `HoverController`。
+    let hover = HoverController()
 
     /// `ApplicationContext` を作る。
     init() {
@@ -41,6 +44,7 @@ final class ApplicationContext {
                     (visitedView.view as? any ChangeObservingViewProtocol)?.detectChange(in: visitedView.node)
                 }
                 focusChanged = focus.decideFocus(visiting: visited)
+                hover.collect(visited, index: focus.index)
             }
             for action in changeActions { action() }
             present(buffer)
@@ -67,13 +71,14 @@ final class ApplicationContext {
         focus.deliverPaste(event)
     }
 
-    /// `event` を、直前の描画で ``Buffer`` へ書き込んだ ``View`` の矩形とともに `FocusController.deliver(_:hitRegions:)` へ渡す。
+    /// `event` の位置でマウスポインタが上にある ``View`` を `HoverController.movePointer(to:hitRegions:)` で決め直してから、`event` を、直前の描画で ``Buffer`` へ書き込んだ ``View`` の矩形とともに `FocusController.deliver(_:hitRegions:)` へ渡す。
     ///
     /// - Parameters:
     ///   - event: 渡す `MouseEvent`。
     /// - Returns: `FocusController.deliver(_:hitRegions:)` の戻り値。
     func deliver(_ event: MouseEvent) -> Bool {
-        focus.deliver(event, hitRegions: graph.hitRegions)
+        hover.movePointer(to: event.position, hitRegions: graph.hitRegions)
+        return focus.deliver(event, hitRegions: graph.hitRegions)
     }
 }
 
