@@ -21,7 +21,7 @@ public final class Application<Root: TerminalApp> {
     /// 別スレッドや `Task` から、``TerminalApp/Message`` の値をイベントループへ届ける ``MessageSender``。
     ///
     /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
-    /// - Note: ``TerminalApp`` に準拠する型からは、このプロパティを取得できない。
+    /// - Note: ``TerminalApp`` に準拠する型は、``TerminalApp/task(sender:)`` の `sender` 引数で同じものを受け取る。
     nonisolated public let sender: MessageSender<Root.Message>
 
     private var buffer: Buffer
@@ -31,6 +31,8 @@ public final class Application<Root: TerminalApp> {
     private var lastFrameTime = 0.0
     private var isRunning = false
     private var hasRun = false
+    /// ``TerminalApp/task(sender:)`` を実行している `Task`。
+    private var appTask: Task<Void, Never>?
 
     /// 端末デバイスの termios と、端末エミュレータへ送ったモードを戻した後に、プロセスを止めるクロージャ。
     ///
@@ -125,6 +127,7 @@ public final class Application<Root: TerminalApp> {
     /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの端末デバイスのウィンドウサイズで `.resize` を通知する。
     ///   戻るときは端末デバイスの termios と、端末エミュレータへ送ったモードを起動前へ戻し、カーソルを表示に戻す。
+    /// - Postcondition: 戻るときは、``TerminalApp/task(sender:)`` を実行している `Task` を打ち切り、端末デバイスの termios と端末エミュレータへ送ったモードを戻した後に、その `Task` が終わるのを待っている。
     /// - Precondition: 1 つの ``Application`` で呼び出せるのは 1 回だけ。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
@@ -134,8 +137,18 @@ public final class Application<Root: TerminalApp> {
         guard terminal.isTerminal else { throw TerminalError.notATerminal }
 
         try terminal.enableRawMode()
-        defer { terminal.restore() }
+        await runEventLoop()
+        terminal.restore()
 
+        // `TerminalApp.task(sender:)` の `Task` を待つのを、`Terminal.restore()` より前へ移してはいけない。打ち切りに応じるのが遅い処理があると、その間、端末デバイスが raw モードのまま、キーを受け付けない画面が残る。
+        await appTask?.value
+    }
+
+    /// 端末エミュレータへ送るモードを切り替えて、イベントループを抜けるまで回す。
+    ///
+    /// - Precondition: 端末デバイスが raw モードであること。
+    /// - Postcondition: 戻るときは、``TerminalApp/task(sender:)`` を実行している `Task` を打ち切り、入力を読むスレッドが終わっている。
+    private func runEventLoop() async {
         SignalWatcher.install()
 
         if options.usesKeyboardProtocol, supportsKeyboardProtocol() {
@@ -164,6 +177,7 @@ public final class Application<Root: TerminalApp> {
             eventQueue.post(.wake)
         } else {
             draw()
+            appTask = Task { [root, sender] in await root.task(sender: sender) }
         }
 
         // `LoopEvent` を 1 つ取り出すたびに描き直してはいけない。ループより速く溜まると、
@@ -225,6 +239,7 @@ public final class Application<Root: TerminalApp> {
         }
 
         isRunning = false
+        appTask?.cancel()
 
         // `startReadingInput()` が作ったスレッドの終了を待たずに戻ってはいけない。
         // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。

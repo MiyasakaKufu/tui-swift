@@ -37,6 +37,11 @@ final class TerminalAppTests: XCTestCase {
         XCTAssertFalse(DisplayOnlyApp().isFinished)
     }
 
+    /// デフォルトの実装の `TerminalApp.task(sender:)` は、打ち切られるのを待たずに戻る。
+    func testDefaultTaskReturnsWithoutWaitingForCancellation() async {
+        await DisplayOnlyApp().task(sender: MessageSender(eventQueue: LoopEventQueue()))
+    }
+
     func testBodyRendersThroughStaticType() async {
         var buffer = Buffer(size: Size(width: 10, height: 1))
         DisplayOnlyApp().body.renderAsRoot(into: &buffer, rect: buffer.bounds)

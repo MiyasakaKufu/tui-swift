@@ -88,6 +88,24 @@ public protocol TerminalApp: AnyObject {
     ///     初回は ``Application/run()`` が最初の `.resize` を通知した時点から測り、一時停止していた時間は含めない。
     /// - Note: ``InputEvent``・``TerminalApp/Message`` を処理するたびに呼び出され、``ApplicationOptions/frameInterval`` を設定したときは、入力が無くてもその間隔で呼び出される。最初の `Application.draw()` の前には呼び出されない。
     func update(elapsed: Double)
+
+    /// イベントループが回っている間、非同期の処理を実行する。
+    ///
+    /// ``Application`` は、最初の `Application.draw()` の 1 回の後にこのメソッドを `Task` の中で呼び出し、イベントループを抜けると、その `Task` を打ち切る。
+    /// 画面に出すものは `sender` で送り、``TerminalApp/receive(_:)`` で受け取る。
+    ///
+    ///     func task(sender: MessageSender<Message>) async {
+    ///         let items = await loadItems()
+    ///         sender.send(.loaded(items))
+    ///     }
+    ///
+    /// - Parameters:
+    ///   - sender: ``TerminalApp/Message`` の値をイベントループへ送る ``MessageSender``。別の `Task` や別スレッドへ渡してよい。
+    /// - Note: プロパティへ代入しただけでは描き直さない。次に ``InputEvent`` か ``TerminalApp/Message`` が届くか、``ApplicationOptions/frameInterval`` の時間が経つまで、画面に出ない。
+    /// - Note: 最初の `.resize` で ``TerminalApp/isFinished`` が `true` になったときは、呼び出さない。
+    /// - Note: 打ち切られた後に送った値は、``TerminalApp/receive(_:)`` へ届かない。
+    /// - Warning: ``Application/run()`` は、端末デバイスの termios と端末エミュレータへ送ったモードを戻した後、この `Task` が終わるのを待ってから戻る。打ち切りに応じない処理（`Task.isCancelled` を見ずに回り続けるループなど）を書くと、``Application/run()`` が戻らず、プロセスが終わらない。
+    func task(sender: MessageSender<Message>) async
 }
 
 extension TerminalApp {
@@ -122,6 +140,12 @@ extension TerminalApp {
     ///   - elapsed: 前に ``TerminalApp/update(elapsed:)`` を呼び出してからの経過秒数。
     ///     初回は ``Application/run()`` が最初の `.resize` を通知した時点から測り、一時停止していた時間は含めない。
     public func update(elapsed: Double) {}
+
+    /// 何もしない。
+    ///
+    /// - Parameters:
+    ///   - sender: ``TerminalApp/Message`` の値をイベントループへ送る ``MessageSender``。
+    public func task(sender: MessageSender<Message>) async {}
 
     /// 引数のないイニシャライザで作ったインスタンスと ``TerminalApp/options`` で ``Application`` を起動し、終了するまでイベントループを回す。
     ///
