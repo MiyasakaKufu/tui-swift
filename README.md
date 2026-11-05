@@ -96,6 +96,56 @@ VStack {
 .disabled(isSending)
 ```
 
+ファイルの読み込みや通信のように時間のかかる処理は、`TerminalApp.task(sender:)` の中で行う。`Application` は最初の描画の後に
+`Task` の中でこのメソッドを呼び出し、イベントループを抜けるとその `Task` を打ち切る。結果は引数の `MessageSender` で送り、
+`TerminalApp.receive(_:)` で受け取る。送った値を `TerminalApp.receive(_:)` へ渡した後に描き直すので、`ApplicationOptions.frameInterval` を
+設定して終わったかを確かめに行く必要はない。
+
+```swift
+enum Message: Sendable {
+    case loaded([String])
+}
+
+private var items: [String] = []
+
+func task(sender: MessageSender<Message>) async {
+    let loaded = await fetchItems()
+    sender.send(.loaded(loaded))
+}
+
+func receive(_ message: Message) -> EventResult {
+    switch message {
+    case .loaded(let loaded):
+        items = loaded
+        return .handled
+    }
+}
+```
+
+`TerminalApp.task(sender:)` の中でプロパティへ代入しただけでは描き直されないので、画面に出す値は `MessageSender` で送る。
+キーを押したときなどに処理を始めるなら、`TerminalApp.task(sender:)` の中で `AsyncStream` を読み続け、`TerminalApp.handle(_:)` からそこへ依頼を積む。
+`Task` を `TerminalApp.handle(_:)` から作ると、`Application` はその `Task` を打ち切れない。
+
+```swift
+private let (requests, requestContinuation) = AsyncStream<String>.makeStream()
+private var query = ""
+
+func task(sender: MessageSender<Message>) async {
+    for await request in requests {
+        sender.send(.loaded(await search(request)))
+    }
+}
+
+func handle(_ event: InputEvent) -> EventResult {
+    guard case .key(let key) = event, key.key == .enter else { return .ignored }
+    requestContinuation.yield(query)
+    return .handled
+}
+```
+
+`Application.run()` は、端末デバイスを元に戻した後、`TerminalApp.task(sender:)` の `Task` が終わるのを待ってから戻る。打ち切りに応じない処理を書くと、
+プロセスが終わらない。
+
 罫線素片や `…` など East Asian Width が Ambiguous の文字は、初期値では `Cell` 1 個分として扱う。
 環境変数 `RUNEWIDTH_EASTASIAN` が `1` のときと、`ApplicationOptions.ambiguousWidth` を `.wide` に
 したときは `Cell` 2 個分として扱い、`View.border(_:color:title:)` の枠線は `BorderStyle.ascii`（`+-|`）へ切り替わる。
