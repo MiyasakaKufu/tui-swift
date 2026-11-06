@@ -104,7 +104,7 @@ public protocol TerminalApp: AnyObject {
     /// - Note: プロパティへ代入しただけでは描き直さない。次に ``InputEvent`` か ``TerminalApp/Message`` が届くか、``ApplicationOptions/frameInterval`` の時間が経つまで、画面に出ない。
     /// - Note: 最初の `.resize` で ``TerminalApp/isFinished`` が `true` になったときは、呼び出さない。
     /// - Note: 打ち切られた後に送った値は、``TerminalApp/receive(_:)`` へ届かない。
-    /// - Warning: ``Application/run()`` は、端末デバイスの termios と端末エミュレータへ送ったモードを戻した後、この `Task` が終わるのを待ってから戻る。打ち切りに応じない処理（`Task.isCancelled` を見ずに回り続けるループなど）を書くと、``Application/run()`` が戻らず、プロセスが終わらない。
+    /// - Note: ``Application/run()`` は、この `Task` を打ち切った後、終わるのを待たずに戻る。`@main` で起動したときは、打ち切られた後の処理が走る前にプロセスが終わることがある。
     func task(sender: MessageSender<Message>) async
 }
 

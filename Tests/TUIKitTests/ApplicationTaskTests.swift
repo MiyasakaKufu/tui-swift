@@ -57,8 +57,8 @@ final class ApplicationTaskTests: XCTestCase {
         XCTAssertEqual(drawCountAtStart, 1)
     }
 
-    /// イベントループを抜けると `TerminalApp.task(sender:)` の `Task` が打ち切られ、`Application.run()` はそれが終わってから戻る。
-    func testTaskIsCancelledAndFinishesBeforeRunReturns() async throws {
+    /// イベントループを抜けると、`TerminalApp.task(sender:)` の `Task` が打ち切られる。
+    func testTaskIsCancelledWhenLoopEnds() async throws {
         let pty = try TaskPseudoTerminal()
         defer { pty.close() }
 
@@ -68,10 +68,7 @@ final class ApplicationTaskTests: XCTestCase {
             app.record("task:end:cancelled=\(Task.isCancelled)")
         }
         let application = Application(root: app, options: testOptions, terminal: pty.terminal())
-        let loop = Task {
-            try await application.run()
-            app.record("run:returned")
-        }
+        let loop = Task { try await application.run() }
 
         let started = await waitUntil { app.records.contains("task:start") }
         XCTAssertTrue(started, "TerminalApp.task(sender:) が呼び出されない")
@@ -79,11 +76,13 @@ final class ApplicationTaskTests: XCTestCase {
         writeByte(pty.master, UInt8(ascii: "q"))
         try await waitForLoop(loop)
 
-        XCTAssertEqual(app.records, ["task:start", "task:end:cancelled=true", "run:returned"])
+        let ended = await waitUntil { app.records.count >= 2 }
+        XCTAssertTrue(ended, "TerminalApp.task(sender:) の Task が打ち切られない")
+        XCTAssertEqual(app.records, ["task:start", "task:end:cancelled=true"])
     }
 
-    /// `TerminalApp.task(sender:)` が打ち切りに応じない間も、`Application.run()` は端末デバイスの termios を起動前へ戻しており、その処理が終わるまで戻らない。
-    func testTerminalIsRestoredWhileTaskIgnoresCancellation() async throws {
+    /// `TerminalApp.task(sender:)` が打ち切りに応じなくても、`Application.run()` はその処理が終わるのを待たずに戻る。
+    func testRunReturnsWithoutWaitingForTaskThatIgnoresCancellation() async throws {
         let pty = try TaskPseudoTerminal()
         defer { pty.close() }
 
@@ -92,26 +91,28 @@ final class ApplicationTaskTests: XCTestCase {
         // `Task.sleep` で待ってはいけない。打ち切られるとすぐに戻るので、打ち切りに応じない処理にならない。
         app.work = { _ in
             await withCheckedContinuation { release = $0 }
+            app.record("task:end")
         }
         let application = Application(root: app, options: testOptions, terminal: pty.terminal())
-        let loop = Task {
-            try await application.run()
-            app.record("run:returned")
-        }
+        let loop = Task { try await application.run() }
 
         let started = await waitUntil { release != nil }
         XCTAssertTrue(started, "TerminalApp.task(sender:) が呼び出されない")
-        XCTAssertFalse(isCanonical(pty.slave), "イベントループを回している間に raw モードになっていない")
+
+        // 一定時間後に処理を終わらせるのをやめてはいけない。`Application.run()` が処理の終わりを待つ実装に戻ると、このテストは失敗せずに止まり続ける。
+        let fallback = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            release?.resume()
+            release = nil
+        }
+        defer { fallback.cancel() }
 
         writeByte(pty.master, UInt8(ascii: "q"))
-        let restored = await waitUntil { isCanonical(pty.slave) }
-        XCTAssertTrue(restored, "TerminalApp.task(sender:) が終わるまで、端末デバイスが raw モードのまま残っている")
-        XCTAssertFalse(app.records.contains("run:returned"), "TerminalApp.task(sender:) が終わる前に Application.run() が戻った")
-
-        release?.resume()
         try await waitForLoop(loop)
 
-        XCTAssertEqual(app.records, ["task:start", "run:returned"])
+        XCTAssertEqual(app.records, ["task:start"], "Application.run() が TerminalApp.task(sender:) の終わりを待った")
+        release?.resume()
+        release = nil
     }
 
     /// 打ち切られた後に `MessageSender.send(_:)` で送った値は届かず、`false` が返る。
@@ -134,6 +135,8 @@ final class ApplicationTaskTests: XCTestCase {
         writeByte(pty.master, UInt8(ascii: "q"))
         try await waitForLoop(loop)
 
+        let sent = await waitUntil { acceptedAfterCancellation != nil }
+        XCTAssertTrue(sent, "打ち切られた後に送っていない")
         XCTAssertEqual(acceptedAfterCancellation, false)
         XCTAssertFalse(app.records.contains("receive:loaded"))
     }
@@ -298,17 +301,6 @@ private final class TaskPseudoTerminal {
         closeDescriptor(slave)
         closeDescriptor(master)
     }
-}
-
-/// 端末デバイスが canonical モード（raw モードでない）かを返す。
-///
-/// - Parameters:
-///   - descriptor: 調べる端末デバイスのファイル記述子。
-/// - Returns: `ICANON` が立っていれば `true`。
-private func isCanonical(_ descriptor: Int32) -> Bool {
-    var attributes = termios()
-    guard tcgetattr(descriptor, &attributes) == 0 else { return false }
-    return attributes.c_lflag & tcflag_t(ICANON) != 0
 }
 
 // クラスの中から `close(2)` は直接呼び出せない。メンバーの `close()` が先に見つかる。

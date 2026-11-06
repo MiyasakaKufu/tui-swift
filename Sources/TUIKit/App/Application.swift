@@ -127,7 +127,7 @@ public final class Application<Root: TerminalApp> {
     /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの端末デバイスのウィンドウサイズで `.resize` を通知する。
     ///   戻るときは端末デバイスの termios と、端末エミュレータへ送ったモードを起動前へ戻し、カーソルを表示に戻す。
-    /// - Postcondition: 戻るときは、``TerminalApp/task(sender:)`` を実行している `Task` を打ち切り、端末デバイスの termios と端末エミュレータへ送ったモードを戻した後に、その `Task` が終わるのを待っている。
+    /// - Postcondition: 戻るときは、``TerminalApp/task(sender:)`` を実行している `Task` を打ち切っている。その `Task` が終わるのは待たない。
     /// - Precondition: 1 つの ``Application`` で呼び出せるのは 1 回だけ。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
@@ -137,18 +137,8 @@ public final class Application<Root: TerminalApp> {
         guard terminal.isTerminal else { throw TerminalError.notATerminal }
 
         try terminal.enableRawMode()
-        await runEventLoop()
-        terminal.restore()
+        defer { terminal.restore() }
 
-        // `TerminalApp.task(sender:)` の `Task` を待つのを、`Terminal.restore()` より前へ移してはいけない。打ち切りに応じるのが遅い処理があると、その間、端末デバイスが raw モードのまま、キーを受け付けない画面が残る。
-        await appTask?.value
-    }
-
-    /// 端末エミュレータへ送るモードを切り替えて、イベントループを抜けるまで回す。
-    ///
-    /// - Precondition: 端末デバイスが raw モードであること。
-    /// - Postcondition: 戻るときは、``TerminalApp/task(sender:)`` を実行している `Task` を打ち切り、入力を読むスレッドが終わっている。
-    private func runEventLoop() async {
         SignalWatcher.install()
 
         if options.usesKeyboardProtocol, supportsKeyboardProtocol() {
@@ -239,6 +229,7 @@ public final class Application<Root: TerminalApp> {
         }
 
         isRunning = false
+        // `appTask` が終わるのを待ってはいけない。打ち切りに応じない処理があると、TUIKit アプリが `TerminalApp.isFinished` で終了を宣言しても `Application.run()` が戻らない。
         appTask?.cancel()
 
         // `startReadingInput()` が作ったスレッドの終了を待たずに戻ってはいけない。
