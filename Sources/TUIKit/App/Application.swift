@@ -21,7 +21,7 @@ public final class Application<Root: TerminalApp> {
     /// 別スレッドや `Task` から、``TerminalApp/Message`` の値をイベントループへ届ける ``MessageSender``。
     ///
     /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
-    /// - Note: ``TerminalApp`` に準拠する型からは、このプロパティを取得できない。
+    /// - Note: ``TerminalApp`` に準拠する型は、``TerminalApp/task(sender:)`` の `sender` 引数で同じものを受け取る。
     nonisolated public let sender: MessageSender<Root.Message>
 
     private var buffer: Buffer
@@ -31,6 +31,8 @@ public final class Application<Root: TerminalApp> {
     private var lastFrameTime = 0.0
     private var isRunning = false
     private var hasRun = false
+    /// ``TerminalApp/task(sender:)`` を実行している `Task`。
+    private var appTask: Task<Void, Never>?
 
     /// 端末デバイスの termios と、端末エミュレータへ送ったモードを戻した後に、プロセスを止めるクロージャ。
     ///
@@ -125,6 +127,7 @@ public final class Application<Root: TerminalApp> {
     /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの端末デバイスのウィンドウサイズで `.resize` を通知する。
     ///   戻るときは端末デバイスの termios と、端末エミュレータへ送ったモードを起動前へ戻し、カーソルを表示に戻す。
+    /// - Postcondition: 戻るときは、``TerminalApp/task(sender:)`` を実行している `Task` を打ち切っている。その `Task` が終わるのは待たない。
     /// - Precondition: 1 つの ``Application`` で呼び出せるのは 1 回だけ。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
@@ -164,6 +167,7 @@ public final class Application<Root: TerminalApp> {
             eventQueue.post(.wake)
         } else {
             draw()
+            appTask = Task { [root, sender] in await root.task(sender: sender) }
         }
 
         // `LoopEvent` を 1 つ取り出すたびに描き直してはいけない。ループより速く溜まると、
@@ -225,6 +229,8 @@ public final class Application<Root: TerminalApp> {
         }
 
         isRunning = false
+        // `appTask` が終わるのを待ってはいけない。打ち切りに応じない処理があると、TUIKit アプリが `TerminalApp.isFinished` で終了を宣言しても `Application.run()` が戻らない。
+        appTask?.cancel()
 
         // `startReadingInput()` が作ったスレッドの終了を待たずに戻ってはいけない。
         // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。

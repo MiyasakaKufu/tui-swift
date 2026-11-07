@@ -6,6 +6,7 @@ import TUIKit
 @main
 final class DemoApp: TerminalApp {
     static var options: ApplicationOptions {
+        // `ApplicationOptions.frameInterval` を設定してはいけない。一覧が読み込み終わった時点で描き直されたのか、その間隔で描き直されたのかが、このデモで見分けられなくなる。
         ApplicationOptions(
             mouseTracking: .motion,
             reportsFocus: true,
@@ -14,7 +15,20 @@ final class DemoApp: TerminalApp {
         )
     }
 
-    private let items = [
+    /// ``DemoApp/task(sender:)`` が送る値。
+    enum Message: Sendable {
+        /// 一覧を読み込み終わった。
+        case itemsLoaded([String])
+    }
+
+    /// 一覧を読み込み終わるまで出す項目。
+    private static let placeholderItems = ["一覧を読み込んでいます…"]
+
+    /// 一覧の読み込みにかかる時間。通信の待ちを模している。
+    private static let simulatedLoadDuration = Duration.milliseconds(800)
+
+    /// 読み込み終わった一覧。
+    private static let loadedItems = [
         "差分レンダリング",
         "全角文字・絵文字の幅計算",
         "キー入力とマウスの解析",
@@ -26,8 +40,10 @@ final class DemoApp: TerminalApp {
         "ウィンドウサイズ変更への追従",
         "View の重ね描きとダイアログ",
         "マウスポインタが上にある View の強調",
+        "TerminalApp.task(sender:) で読み込んだ一覧の表示",
     ]
 
+    private var items = DemoApp.placeholderItems
     private(set) var isFinished = false
     private var progress = 0.35
     private var lastEventDescription = "（まだ入力はありません）"
@@ -41,6 +57,19 @@ final class DemoApp: TerminalApp {
             terminalSize: terminalSize
         )
         .tint(.green)
+    }
+
+    func task(sender: MessageSender<Message>) async {
+        try? await Task.sleep(for: DemoApp.simulatedLoadDuration)
+        sender.send(.itemsLoaded(DemoApp.loadedItems))
+    }
+
+    func receive(_ message: Message) -> EventResult {
+        switch message {
+        case .itemsLoaded(let loaded):
+            items = loaded
+            return .handled
+        }
     }
 
     func handle(_ event: InputEvent) -> EventResult {

@@ -93,7 +93,8 @@ final class OutputDrain: Sendable {
         recorded.withLock { $0.removeAll() }
     }
 
-    private var output: String {
+    /// それまでに読んで覚えた内容。
+    var output: String {
         recorded.withLock { String(decoding: $0, as: UTF8.self) }
     }
 
