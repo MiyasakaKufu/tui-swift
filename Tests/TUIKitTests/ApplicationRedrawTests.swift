@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import TUIKit
 
-/// TUIKit が呼び出したコードの外で状態を変えても、`ApplicationOptions.frameInterval` なしで描き直されるかを、疑似端末（pty）の上で確かめる。
+/// TUIKit が呼び出したコードの外で状態を変えても、キーなどの `InputEvent` を待たずに描き直されるかを、疑似端末（pty）の上で確かめる。
 @MainActor
 final class ApplicationRedrawTests: XCTestCase {
 

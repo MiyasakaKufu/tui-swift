@@ -6,7 +6,6 @@ import TUIKit
 @main
 struct DemoApp: TerminalApp {
     static var options: ApplicationOptions {
-        // `ApplicationOptions.frameInterval` を設定してはいけない。一覧が読み込み終わった時点で描き直されたのか、その間隔で描き直されたのかが、このデモで見分けられなくなる。
         ApplicationOptions(
             mouseTracking: .motion,
             reportsFocus: true,

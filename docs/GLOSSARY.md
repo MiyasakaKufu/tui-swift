@@ -33,8 +33,8 @@
 | TUIKit を使って作ったプログラム（`Sources/TUIDemo` のデモを含む） | TUIKit アプリ | 「アプリ」を単独で使わない |
 | TUIKit を使ってプログラムを書く人 | TUIKit を使う開発者 | |
 | TUIKit アプリを端末エミュレータで操作する人 | TUIKit アプリを端末エミュレータで操作する人 | |
-| `Application` の起動時に渡す、`ApplicationOptions.mouseTracking`・`ApplicationOptions.frameInterval` などのプロパティを持つ型 | `ApplicationOptions` | 個々のプロパティは名前で書く |
-| `Application.draw()` の 1 回の呼び出し | `Application.draw()` の 1 回 | `ApplicationOptions.frameInterval` は、この呼び出しの間隔 |
+| `Application` の起動時に渡す、`ApplicationOptions.mouseTracking`・`ApplicationOptions.reportsFocus` などのプロパティを持つ型 | `ApplicationOptions` | 個々のプロパティは名前で書く |
+| `Application.draw()` の 1 回の呼び出し | `Application.draw()` の 1 回 | |
 
 ## `View`
 

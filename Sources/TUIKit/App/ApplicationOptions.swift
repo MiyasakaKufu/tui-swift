@@ -28,8 +28,6 @@ public struct ApplicationOptions: Sendable {
     ///
     /// - Note: 終了時と一時停止時に、端末エミュレータの設定どおりの形へ戻す。
     public var cursorShape: CursorShape?
-    /// 入力がなくても一定間隔で再描画する（秒）。`nil` なら入力があるまで待つ。
-    public var frameInterval: Double?
     /// ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+C で ``Application`` を終了する。
     ///
     /// - Note: raw モードでは `ISIG` を無効にしているため Ctrl+C は SIGINT にならない。
@@ -57,7 +55,6 @@ public struct ApplicationOptions: Sendable {
     ///   - usesKeyboardProtocol: 端末エミュレータが対応していれば kitty keyboard protocol を使うか。
     ///   - windowTitle: 起動時に設定するウィンドウタイトル。`nil` なら変えない。
     ///   - cursorShape: 起動時に設定するカーソル形状。`nil` なら変えない。
-    ///   - frameInterval: 入力がなくても再描画する間隔（秒）。`nil` なら入力があるまで待つ。
     ///   - quitsOnControlC: ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+C で終了するか。
     ///   - suspendsOnControlZ: ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+Z で一時停止するか。
     ///   - ambiguousWidth: East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。
@@ -69,7 +66,6 @@ public struct ApplicationOptions: Sendable {
         usesKeyboardProtocol: Bool = true,
         windowTitle: String? = nil,
         cursorShape: CursorShape? = nil,
-        frameInterval: Double? = nil,
         quitsOnControlC: Bool = true,
         suspendsOnControlZ: Bool = true,
         ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
@@ -81,7 +77,6 @@ public struct ApplicationOptions: Sendable {
         self.usesKeyboardProtocol = usesKeyboardProtocol
         self.windowTitle = windowTitle
         self.cursorShape = cursorShape
-        self.frameInterval = frameInterval
         self.quitsOnControlC = quitsOnControlC
         self.suspendsOnControlZ = suspendsOnControlZ
         self.ambiguousWidth = ambiguousWidth
