@@ -133,6 +133,29 @@ final class ApplicationRedrawTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
+    /// 中断を挟みながら状態を変え続けても、1 秒あたりの描き直しは `ApplicationOptions.maximumFrameRate` を超えない。
+    func testContinuousUpdatesAreLimitedByMaximumFrameRate() async throws {
+        let pty = try DrainedPseudoTerminal()
+        defer { pty.close() }
+
+        var options = testOptions
+        options.maximumFrameRate = 20
+        let app = StreamingApp(duration: 0.5)
+        let application = Application(root: app, options: options, terminal: pty.terminal())
+        let loop = Task { try await application.run() }
+
+        let finished = await waitUntil { app.recorder.drawnText == "done" }
+        XCTAssertTrue(finished, "最後の値が画面に出ない")
+        let draws = app.recorder.drawCount
+
+        pty.write(UInt8(ascii: "q"))
+        try await waitForLoop(loop)
+
+        // 上限ちょうど（0.5 秒で 10 回）で比べてはいけない。最初の描画と、変え終えた後の描画が加わるので、正しく間引いていても落ちる。
+        XCTAssertLessThanOrEqual(draws, 13)
+        XCTAssertGreaterThan(draws, 2, "変えている間に描き直されていない")
+    }
+
     // MARK: - 補助
 
     /// 問い合わせを送らず、代替画面へも切り替えない設定。
@@ -308,6 +331,50 @@ private struct FocusMovingApp: TerminalApp {
         .task {
             await simulateLoading()
             focus = .second
+        }
+    }
+
+    func handle(_ event: InputEvent) -> EventResult {
+        finish(on: event, $isFinished)
+    }
+}
+
+/// `View.task(_:)` のクロージャで、`Task.yield()` を挟みながら決めた時間だけ `count` を増やし続け、終えたら `done` を描く `TerminalApp` に準拠する型。
+private struct StreamingApp: TerminalApp {
+    /// `TerminalApp.body` の評価を数える先。
+    let recorder = DrawRecorder()
+    @State private(set) var isFinished = false
+    @State private var count = 0
+    @State private var isDone = false
+    private let duration: Double
+
+    /// 増やし続ける時間を決めて作る。
+    ///
+    /// - Parameters:
+    ///   - duration: 増やし続ける秒数。
+    init(duration: Double) {
+        self.duration = duration
+    }
+
+    /// 増やし続ける時間を 0 秒にして作る。
+    init() {
+        self.init(duration: 0)
+    }
+
+    var body: some View {
+        recorder.drawCount += 1
+        recorder.drawnText = isDone ? "done" : "count=\(count)"
+        let duration = self.duration
+        let count = $count
+        let isDone = $isDone
+        return Text(recorder.drawnText).task {
+            let deadline = Date().addingTimeInterval(duration)
+            while Date() < deadline {
+                count.wrappedValue += 1
+                // `Task.yield()` を外してはいけない。ループが割り込めず、変え終えた後の 1 回しか描かれないので、上限を確かめられない。
+                await Task.yield()
+            }
+            isDone.wrappedValue = true
         }
     }
 

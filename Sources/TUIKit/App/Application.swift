@@ -29,6 +29,12 @@ public final class Application<Root: TerminalApp> {
     private var hasRun = false
     /// `Application.draw()` を呼び出した回数。
     private var drawCount = 0
+    /// 最後に `Application.draw()` を呼び出した時刻。まだ呼び出していなければ `-Double.infinity`。
+    private var lastDrawTime = -Double.infinity
+    /// `ApplicationOptions.maximumFrameRate` の間隔が経っていないために、描くのを見送っているなら `true`。
+    private var isDrawDeferred = false
+    /// 見送った描画のために、間隔が経ったらループを起こす `Task`。
+    private var deferredWake: Task<Void, Never>?
 
     /// 端末デバイスの termios と、端末エミュレータへ送ったモードを戻した後に、プロセスを止めるクロージャ。
     ///
@@ -42,6 +48,7 @@ public final class Application<Root: TerminalApp> {
     ///   - options: 起動時の設定。
     ///   - terminal: 使用する `Terminal`。省略すると標準入出力の記述子で作る。テストでは差し替える。
     /// - Precondition: `Root` はクラスではない。
+    /// - Precondition: `options` の ``ApplicationOptions/maximumFrameRate`` は 0 より大きい。
     /// - Postcondition: `root` の ``State``・``FocusState`` を付けたプロパティは、この ``Application`` が持つ記憶域に結び付いている。
     public init(
         root: Root,
@@ -56,6 +63,7 @@ public final class Application<Root: TerminalApp> {
         self.renderer = Renderer(output: terminal)
         // クラスで準拠した型を受け付けてはいけない。普通の `var` に置いた状態を変えても描き直されず、何の警告も出ない。
         precondition(!(Root.self is AnyObject.Type), "TerminalApp には構造体か列挙型で準拠する。状態は @State を付けたプロパティに置く")
+        precondition(options.maximumFrameRate > 0, "ApplicationOptions.maximumFrameRate は 0 より大きくする")
         let eventQueue = LoopEventQueue()
         self.eventQueue = eventQueue
         self.redrawTrigger = RedrawTrigger(eventQueue: eventQueue)
@@ -221,13 +229,21 @@ public final class Application<Root: TerminalApp> {
             if !synchronizeSize() { break loop }
 
             // 何も起きていない `.idle` で先へ進んではいけない。自己パイプが無いときに一定の間隔で描き直すことになり、描き直すたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
-            if isIdle, reportedSize == sizeBeforeSynchronizing { continue loop }
+            if isIdle, reportedSize == sizeBeforeSynchronizing, !isDrawDeferred { continue loop }
 
             if !isRunning || root.isFinished { break loop }
+
+            let remaining = lastDrawTime + 1 / options.maximumFrameRate - monotonicSeconds()
+            if remaining > 0 {
+                isDrawDeferred = true
+                scheduleDeferredWake(after: remaining)
+                continue loop
+            }
             draw()
         }
 
         isRunning = false
+        deferredWake?.cancel()
         // `View.task(_:)` の `Task` が終わるのを待ってはいけない。打ち切りに応じない処理があると、TUIKit アプリが `TerminalApp.isFinished` で終了を宣言しても `Application.run()` が戻らない。
         context.graph.removeAllNodes()
 
@@ -242,6 +258,21 @@ public final class Application<Root: TerminalApp> {
         await Task { for await _ in inputStopped {} }.value
 
         terminal.setCursorVisible(true)
+    }
+
+    /// `delay` 秒後に、`Application.eventQueue` へ `.wake` を入れる。
+    ///
+    /// - Parameters:
+    ///   - delay: 待つ秒数。
+    /// - Postcondition: すでに待っている `Task` があれば、新しくは作らない。
+    private func scheduleDeferredWake(after delay: Double) {
+        guard deferredWake == nil else { return }
+        let eventQueue = self.eventQueue
+        deferredWake = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            self?.deferredWake = nil
+            eventQueue.post(.wake)
+        }
     }
 
     /// 端末デバイスからバイト列を読み、組み立てた ``InputEvent`` を `LoopEventQueue` へ入れるスレッドを作る。
@@ -377,6 +408,8 @@ public final class Application<Root: TerminalApp> {
     /// - Postcondition: ``View/onChange(of:_:)`` が値の変化を見つけたら、描き終えた後にクロージャを呼び出している。
     private func draw() {
         drawCount += 1
+        lastDrawTime = monotonicSeconds()
+        isDrawDeferred = false
         let changeActions = redrawTrigger.track(generation: drawCount) {
             // `TerminalApp.isFinished` を読むのをやめてはいけない。`View.task(_:)` のクロージャで `true` にしても、それを `TerminalApp.body` が読んでいなければループが起きず、次に `InputEvent` が届くまで終わらない。
             _ = root.isFinished
