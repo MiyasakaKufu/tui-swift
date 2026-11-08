@@ -54,11 +54,12 @@ final class FocusHarness<V: View> {
         draw()
     }
 
-    /// `Application.draw()` の 1 回分を描く。
+    /// `Application.draw()` の 1 回分を描き、`View.onChange(of:_:)` が値の変化を見つけていればクロージャを呼び出す。
     func draw() {
-        context.draw(makeView, into: &buffer, ambiguousWidth: buffer.ambiguousWidth) { _ in
+        let changeActions = context.draw(makeView, into: &buffer, ambiguousWidth: buffer.ambiguousWidth) { _ in
             presentCount += 1
         }
+        for action in changeActions { action() }
     }
 
     /// `key` を渡してから描く。

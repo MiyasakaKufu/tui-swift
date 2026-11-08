@@ -1,3 +1,5 @@
+import Observation
+
 /// ``Application`` が持ち、`ViewGraph` と `FocusController` と `HoverController` をまとめるクラス。
 @MainActor
 final class ApplicationContext {
@@ -27,28 +29,36 @@ final class ApplicationContext {
     ///   - buffer: 描画先の ``Buffer``。画面全体として扱い、描く前に空にする。
     ///   - ambiguousWidth: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
     ///   - present: 描き終えた ``Buffer`` を受け取るクロージャ。
-    /// - Postcondition: たどった後にフォーカスが変わったか、``View/onChange(of:_:)`` が値の変化を見つけたら、もう 1 回描いて `present` に渡している。そのもう 1 回では、さらには描かない。
+    /// - Returns: ``View/onChange(of:_:)`` が値の変化を見つけたときに呼び出すクロージャ。見つけた順に並ぶ。
+    /// - Postcondition: たどった後にフォーカスが変わったら、もう 1 回描いて `present` に渡している。そのもう 1 回では、さらには描かない。
+    /// - Postcondition: ``View/task(_:)`` で作った ``View`` のうち、初めてたどったものの `Task` を始めている。
+    /// - Note: 戻り値のクロージャは呼び出さない。呼び出し側が、描き終えた後に呼び出す。
     func draw<V: View>(
         _ makeView: () -> V,
         into buffer: inout Buffer,
         ambiguousWidth: DisplayWidth.AmbiguousWidth,
         present: (Buffer) -> Void
-    ) {
+    ) -> [@MainActor () -> Void] {
+        var changeActions: [@MainActor () -> Void] = []
         var allowsFollowUp = true
         while true {
             buffer.clear()
-            var changeActions: [@MainActor () -> Void] = []
+            // 使っていない値に見えても、読むのをやめてはいけない。`View.task(_:)` のクロージャで `@FocusState` を付けたプロパティへ代入してもループが起きず、移したフォーカスが、次に `InputEvent` が届くまで画面に出ない。
+            _ = focus.assignmentCount.value
             var focusChanged = false
             graph.renderFrame(makeView(), into: &buffer, ambiguousWidth: ambiguousWidth) { visited in
-                changeActions = visited.compactMap { visitedView in
-                    (visitedView.view as? any ChangeObservingViewProtocol)?.detectChange(in: visitedView.node)
+                for visitedView in visited {
+                    if let observing = visitedView.view as? any ChangeObservingViewProtocol,
+                       let action = observing.detectChange(in: visitedView.node) {
+                        changeActions.append(action)
+                    }
+                    (visitedView.view as? any TaskStartingView)?.startTaskIfNeeded(in: visitedView.node)
                 }
                 focusChanged = focus.decideFocus(visiting: visited)
                 hover.collect(visited, index: focus.index)
             }
-            for action in changeActions { action() }
             present(buffer)
-            guard allowsFollowUp, focusChanged || !changeActions.isEmpty else { return }
+            guard allowsFollowUp, focusChanged else { return changeActions }
             allowsFollowUp = false
         }
     }
@@ -101,6 +111,9 @@ final class FocusController: FocusProviding {
 
     /// 直前にたどった ``View`` の一覧から作った `FocusIndex`。
     private(set) var index = FocusIndex()
+
+    /// `@FocusState` を付けたプロパティへ代入された回数。
+    let assignmentCount = AssignmentCount()
 
     /// ``View/onKeyPress(_:action:)`` のクロージャを 1 つ呼び出すたびに呼び出し、`true` を返したら残りのクロージャを呼び出さずに戻るクロージャ。
     var stopsDelivering: @MainActor () -> Bool = { false }
@@ -214,6 +227,7 @@ final class FocusController: FocusProviding {
     ///   - storage: 代入された `@FocusState` を付けたプロパティの記憶域。
     /// - Postcondition: 移す先が直前にたどった一覧に無ければ、代入を保留し、次の `Application.draw()` の 1 回で、描画より前に 1 回だけ試みる。それより前に保留していた代入は捨てる。
     func assign(_ value: AnyHashable?, to storage: any AnyFocusStateStorage) {
+        assignmentCount.increment()
         pendingAssignment = nil
         guard let value else {
             if focusedValue(of: storage) != nil {
@@ -312,6 +326,19 @@ final class FocusController: FocusProviding {
         pendingAssignment = nil
         focus(targets[next].nodeID)
         return true
+    }
+}
+
+/// `@FocusState` を付けたプロパティへ代入された回数を、`Observation` に知らせるクラス。
+@MainActor
+@Observable
+final class AssignmentCount {
+    /// 代入された回数。
+    private(set) var value = 0
+
+    /// 代入された回数を 1 つ増やす。
+    func increment() {
+        value += 1
     }
 }
 

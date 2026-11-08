@@ -1,103 +1,122 @@
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-
 import Foundation
 import XCTest
-import CTUITestSupport
 @testable import TUIKit
 
-/// `TerminalApp.task(sender:)` が呼び出される時点と打ち切られる時点、そこで送った値が画面に出るかを、疑似端末（pty）の上で確かめる。
+/// `View.task(_:)` の `Task` が始まる時点と打ち切られる時点を、疑似端末（pty）の上で確かめる。
 @MainActor
 final class ApplicationTaskTests: XCTestCase {
 
-    /// `TerminalApp.task(sender:)` で送った値で、`ApplicationOptions.frameInterval` なしでも画面が描き直される。
-    func testValueSentFromTaskRedrawsWithoutFrameInterval() async throws {
-        let pty = try TaskPseudoTerminal()
-        defer { pty.close() }
-
-        let app = TaskRecordingApp()
-        app.work = { sender in
-            sender.send(.loaded)
-        }
-        let application = Application(root: app, options: testOptions, terminal: pty.terminal())
-        let loop = Task { try await application.run() }
-
-        // 描き直されたかを、キーを書いた後で確かめてはいけない。キーで描き直されたのかどうかが分からなくなる。
-        let redrew = await waitUntil { pty.output.contains(loadedText) }
-        XCTAssertTrue(redrew, "TerminalApp.task(sender:) で送った値が届いた後に描き直されていない")
-
-        writeByte(pty.master, UInt8(ascii: "q"))
-        try await waitForLoop(loop)
-
-        XCTAssertEqual(app.records, ["task:start", "receive:loaded"])
-    }
-
-    /// `TerminalApp.task(sender:)` は、最初の `Application.draw()` の 1 回の後に始まる。
+    /// `View.task(_:)` の `Task` は、最初の `Application.draw()` の 1 回の後に始まる。
     func testTaskStartsAfterFirstDraw() async throws {
-        let pty = try TaskPseudoTerminal()
+        let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
 
         let app = TaskRecordingApp()
-        var drawCountAtStart: Int?
-        app.work = { _ in
-            drawCountAtStart = app.drawCount
+        app.recorder.work = {
+            app.recorder.drawCountAtStart = app.recorder.drawCount
         }
         let application = Application(root: app, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
-        let started = await waitUntil { drawCountAtStart != nil }
-        XCTAssertTrue(started, "TerminalApp.task(sender:) が呼び出されない")
+        let started = await waitUntil { app.recorder.drawCountAtStart != nil }
+        XCTAssertTrue(started, "View.task(_:) の Task が始まらない")
 
-        writeByte(pty.master, UInt8(ascii: "q"))
+        pty.write(UInt8(ascii: "q"))
         try await waitForLoop(loop)
 
-        XCTAssertEqual(drawCountAtStart, 1)
+        XCTAssertEqual(app.recorder.drawCountAtStart, 1)
     }
 
-    /// イベントループを抜けると、`TerminalApp.task(sender:)` の `Task` が打ち切られる。
-    func testTaskIsCancelledWhenLoopEnds() async throws {
-        let pty = try TaskPseudoTerminal()
+    /// 再描画しても、`View.task(_:)` の `Task` は始め直さない。
+    func testTaskIsNotRestartedByRedraw() async throws {
+        let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
 
         let app = TaskRecordingApp()
-        app.work = { _ in
+        let application = Application(root: app, options: testOptions, terminal: pty.terminal())
+        let loop = Task { try await application.run() }
+
+        let started = await waitUntil { app.recorder.records == ["task:start"] }
+        XCTAssertTrue(started, "View.task(_:) の Task が始まらない")
+
+        let drawsBefore = app.recorder.drawCount
+        pty.write(UInt8(ascii: "r"))
+        let redrew = await waitUntil { app.recorder.drawCount > drawsBefore }
+        XCTAssertTrue(redrew, "キーで再描画されない")
+
+        pty.write(UInt8(ascii: "q"))
+        try await waitForLoop(loop)
+
+        XCTAssertEqual(app.recorder.records, ["task:start"])
+    }
+
+    /// `View.task(_:)` を付けた `View` が描かれなくなると、その `Task` が打ち切られる。
+    func testTaskIsCancelledWhenViewDisappears() async throws {
+        let pty = try DrainedPseudoTerminal()
+        defer { pty.close() }
+
+        let app = TaskRecordingApp()
+        app.recorder.work = {
             try? await Task.sleep(nanoseconds: 60_000_000_000)
-            app.record("task:end:cancelled=\(Task.isCancelled)")
+            app.recorder.records.append("task:end:cancelled=\(Task.isCancelled)")
         }
         let application = Application(root: app, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
-        let started = await waitUntil { app.records.contains("task:start") }
-        XCTAssertTrue(started, "TerminalApp.task(sender:) が呼び出されない")
+        let started = await waitUntil { app.recorder.records.contains("task:start") }
+        XCTAssertTrue(started, "View.task(_:) の Task が始まらない")
 
-        writeByte(pty.master, UInt8(ascii: "q"))
+        pty.write(UInt8(ascii: "h"))
+        let ended = await waitUntil { app.recorder.records.count >= 2 }
+        XCTAssertTrue(ended, "View.task(_:) を付けた View が描かれなくなっても Task が打ち切られない")
+
+        pty.write(UInt8(ascii: "q"))
         try await waitForLoop(loop)
 
-        let ended = await waitUntil { app.records.count >= 2 }
-        XCTAssertTrue(ended, "TerminalApp.task(sender:) の Task が打ち切られない")
-        XCTAssertEqual(app.records, ["task:start", "task:end:cancelled=true"])
+        XCTAssertEqual(app.recorder.records, ["task:start", "task:end:cancelled=true"])
     }
 
-    /// `TerminalApp.task(sender:)` が打ち切りに応じなくても、`Application.run()` はその処理が終わるのを待たずに戻る。
+    /// イベントループを抜けると、`View.task(_:)` の `Task` が打ち切られる。
+    func testTaskIsCancelledWhenLoopEnds() async throws {
+        let pty = try DrainedPseudoTerminal()
+        defer { pty.close() }
+
+        let app = TaskRecordingApp()
+        app.recorder.work = {
+            try? await Task.sleep(nanoseconds: 60_000_000_000)
+            app.recorder.records.append("task:end:cancelled=\(Task.isCancelled)")
+        }
+        let application = Application(root: app, options: testOptions, terminal: pty.terminal())
+        let loop = Task { try await application.run() }
+
+        let started = await waitUntil { app.recorder.records.contains("task:start") }
+        XCTAssertTrue(started, "View.task(_:) の Task が始まらない")
+
+        pty.write(UInt8(ascii: "q"))
+        try await waitForLoop(loop)
+
+        let ended = await waitUntil { app.recorder.records.count >= 2 }
+        XCTAssertTrue(ended, "View.task(_:) の Task が打ち切られない")
+        XCTAssertEqual(app.recorder.records, ["task:start", "task:end:cancelled=true"])
+    }
+
+    /// `View.task(_:)` の `Task` が打ち切りに応じなくても、`Application.run()` はその処理が終わるのを待たずに戻る。
     func testRunReturnsWithoutWaitingForTaskThatIgnoresCancellation() async throws {
-        let pty = try TaskPseudoTerminal()
+        let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
 
         let app = TaskRecordingApp()
         var release: CheckedContinuation<Void, Never>?
         // `Task.sleep` で待ってはいけない。打ち切られるとすぐに戻るので、打ち切りに応じない処理にならない。
-        app.work = { _ in
+        app.recorder.work = {
             await withCheckedContinuation { release = $0 }
-            app.record("task:end")
+            app.recorder.records.append("task:end")
         }
         let application = Application(root: app, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
         let started = await waitUntil { release != nil }
-        XCTAssertTrue(started, "TerminalApp.task(sender:) が呼び出されない")
+        XCTAssertTrue(started, "View.task(_:) の Task が始まらない")
 
         // 一定時間後に処理を終わらせるのをやめてはいけない。`Application.run()` が処理の終わりを待つ実装に戻ると、このテストは失敗せずに止まり続ける。
         let fallback = Task {
@@ -107,54 +126,27 @@ final class ApplicationTaskTests: XCTestCase {
         }
         defer { fallback.cancel() }
 
-        writeByte(pty.master, UInt8(ascii: "q"))
+        pty.write(UInt8(ascii: "q"))
         try await waitForLoop(loop)
 
-        XCTAssertEqual(app.records, ["task:start"], "Application.run() が TerminalApp.task(sender:) の終わりを待った")
+        XCTAssertEqual(app.recorder.records, ["task:start"], "Application.run() が View.task(_:) の Task の終わりを待った")
         release?.resume()
         release = nil
     }
 
-    /// 打ち切られた後に `MessageSender.send(_:)` で送った値は届かず、`false` が返る。
-    func testValueSentAfterCancellationIsRejected() async throws {
-        let pty = try TaskPseudoTerminal()
-        defer { pty.close() }
-
-        let app = TaskRecordingApp()
-        var acceptedAfterCancellation: Bool?
-        app.work = { sender in
-            try? await Task.sleep(nanoseconds: 60_000_000_000)
-            acceptedAfterCancellation = sender.send(.loaded)
-        }
-        let application = Application(root: app, options: testOptions, terminal: pty.terminal())
-        let loop = Task { try await application.run() }
-
-        let started = await waitUntil { app.records.contains("task:start") }
-        XCTAssertTrue(started, "TerminalApp.task(sender:) が呼び出されない")
-
-        writeByte(pty.master, UInt8(ascii: "q"))
-        try await waitForLoop(loop)
-
-        let sent = await waitUntil { acceptedAfterCancellation != nil }
-        XCTAssertTrue(sent, "打ち切られた後に送っていない")
-        XCTAssertEqual(acceptedAfterCancellation, false)
-        XCTAssertFalse(app.records.contains("receive:loaded"))
-    }
-
-    /// 最初の `.resize` で `TerminalApp.isFinished` が `true` になったときは、`TerminalApp.task(sender:)` を呼び出さない。
+    /// 最初の `.resize` で `TerminalApp.isFinished` が `true` になったときは、`View.task(_:)` の `Task` を始めない。
     func testTaskIsNotStartedWhenFinishedOnFirstResize() async throws {
-        let pty = try TaskPseudoTerminal()
+        let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
 
-        let app = TaskRecordingApp()
-        app.finishesOnFirstResize = true
+        let app = TaskRecordingApp(finishesOnFirstResize: true)
         let application = Application(root: app, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
         try await waitForLoop(loop)
 
-        XCTAssertEqual(app.records, [])
-        XCTAssertEqual(app.drawCount, 0)
+        XCTAssertEqual(app.recorder.records, [])
+        XCTAssertEqual(app.recorder.drawCount, 0)
     }
 
     // MARK: - 補助
@@ -185,43 +177,69 @@ final class ApplicationTaskTests: XCTestCase {
     }
 }
 
-/// テストから送る値。
-private enum TaskMessage: Sendable {
-    case loaded
+// `State` を付けたプロパティに置きたくなるが、`TerminalApp.body` の中で書き込むことになり、`State` が禁じる描画の中での代入になる。
+/// テスト用の `TerminalApp` に準拠する型が、起きたことを書き込むクラス。
+@MainActor
+private final class TaskRecorder {
+    /// 起きたことを、起きた順に文字列で並べたもの。
+    var records: [String] = []
+    /// `TerminalApp.body` が評価された回数。1 回の描画で 1 回評価される。
+    var drawCount = 0
+    /// `View.task(_:)` の `Task` が始まった時点の `TaskRecorder.drawCount`。まだ始まっていなければ `nil`。
+    var drawCountAtStart: Int?
+    /// `View.task(_:)` の `Task` の中で実行する処理。
+    var work: @MainActor () async -> Void = {}
 }
 
-/// 値が届く前に画面へ出ている文字列。
-private let waitingText = "WAITING"
+/// `View.task(_:)` を付けた `Text` を描き、`h` でその `Text` を隠し、`q` で終了する `TerminalApp` に準拠する型。
+private struct TaskRecordingApp: TerminalApp {
 
-/// `TaskMessage.loaded` が届いた後に画面へ出る文字列。
-private let loadedText = "LOADED"
-
-/// `TerminalApp.task(sender:)` と `TerminalApp.receive(_:)` が呼び出された順を記録し、`q` で終了する `TerminalApp` に準拠する型。
-private final class TaskRecordingApp: TerminalApp {
-
-    /// 呼び出されたメソッドを、呼び出された順に文字列で並べたもの。
-    private(set) var records: [String] = []
-    /// `TerminalApp.body` が評価された回数。1 回の描画で 1 回評価される。
-    private(set) var drawCount = 0
+    /// 起きたことを書き込む先。
+    let recorder = TaskRecorder()
     /// `Application` を終了するかどうか。
-    private(set) var isFinished = false
-    /// `TaskMessage.loaded` を受け取ったら `true`。
-    private var hasLoaded = false
+    @State private(set) var isFinished = false
 
-    /// `TerminalApp.task(sender:)` の中で実行する処理。
-    var work: (MessageSender<TaskMessage>) async -> Void = { _ in }
-    /// 最初の `.resize` で終了するなら `true`。
-    var finishesOnFirstResize = false
+    @State private var isHidden = false
+    @State private var redrawCount = 0
+    private let finishesOnFirstResize: Bool
+
+    /// 最初の `.resize` で終了するかを決めて作る。
+    ///
+    /// - Parameters:
+    ///   - finishesOnFirstResize: 最初の `.resize` で終了するなら `true`。
+    init(finishesOnFirstResize: Bool) {
+        self.finishesOnFirstResize = finishesOnFirstResize
+    }
+
+    /// 最初の `.resize` で終了しないものとして作る。
+    init() {
+        self.init(finishesOnFirstResize: false)
+    }
 
     var body: some View {
-        drawCount += 1
-        return Text(hasLoaded ? loadedText : waitingText)
+        recorder.drawCount += 1
+        let recorder = self.recorder
+        return VStack {
+            Text("再描画 \(redrawCount)")
+            if !isHidden {
+                Text("Task あり").task {
+                    recorder.records.append("task:start")
+                    await recorder.work()
+                }
+            }
+        }
     }
 
     func handle(_ event: InputEvent) -> EventResult {
         switch event {
         case .resize:
             if finishesOnFirstResize { isFinished = true }
+            return .handled
+        case .key(let keyEvent) where keyEvent.key == .character("h"):
+            isHidden = true
+            return .handled
+        case .key(let keyEvent) where keyEvent.key == .character("r"):
+            redrawCount += 1
             return .handled
         case .key(let keyEvent) where keyEvent.key == .character("q"):
             isFinished = true
@@ -230,94 +248,4 @@ private final class TaskRecordingApp: TerminalApp {
             return .ignored
         }
     }
-
-    func receive(_ message: TaskMessage) -> EventResult {
-        hasLoaded = true
-        record("receive:loaded")
-        return .handled
-    }
-
-    func task(sender: MessageSender<TaskMessage>) async {
-        record("task:start")
-        await work(sender)
-    }
-
-    /// 呼び出されたメソッドを記録する。
-    ///
-    /// - Parameters:
-    ///   - entry: 記録する文字列。
-    func record(_ entry: String) {
-        records.append(entry)
-    }
-}
-
-/// テスト用の疑似端末。master を `OutputDrain` で読み続ける。
-private final class TaskPseudoTerminal {
-    enum Failure: Error {
-        case unavailable(errno: Int32)
-    }
-
-    let master: Int32
-    let slave: Int32
-
-    private let drain: OutputDrain
-    private var isClosed = false
-
-    init() throws {
-        var master: Int32 = -1
-        var slave: Int32 = -1
-        guard ctui_test_open_pty(&master, &slave) == 0 else {
-            throw Failure.unavailable(errno: errno)
-        }
-        self.master = master
-        self.slave = slave
-        XCTAssertEqual(ctui_test_set_terminal_size(master, 40, 6), 0)
-        drain = OutputDrain(descriptor: master, recordsOutput: true)
-        drain.start()
-    }
-
-    deinit {
-        close()
-    }
-
-    /// master から読んだ内容。
-    var output: String {
-        drain.output
-    }
-
-    /// slave を入出力に使う `Terminal` を作る。
-    ///
-    /// - Returns: slave につながった `Terminal`。
-    @MainActor
-    func terminal() -> Terminal {
-        Terminal(input: slave, output: slave)
-    }
-
-    func close() {
-        guard !isClosed else { return }
-        isClosed = true
-        // 読み取りスレッドを止める前に閉じてはいけない。`poll(2)` の中に残ったスレッドが、次に開いた疑似端末の出力を横取りする。
-        drain.stop()
-        closeDescriptor(slave)
-        closeDescriptor(master)
-    }
-}
-
-// クラスの中から `close(2)` は直接呼び出せない。メンバーの `close()` が先に見つかる。
-/// ファイル記述子を閉じる。
-///
-/// - Parameters:
-///   - descriptor: 閉じるファイル記述子。
-private func closeDescriptor(_ descriptor: Int32) {
-    _ = close(descriptor)
-}
-
-/// 記述子へ 1 バイト書く。
-///
-/// - Parameters:
-///   - descriptor: 書き込む先のファイル記述子。
-///   - byte: 書き込むバイト。
-private func writeByte(_ descriptor: Int32, _ byte: UInt8) {
-    var value = byte
-    _ = write(descriptor, &value, 1)
 }

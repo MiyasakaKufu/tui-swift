@@ -159,26 +159,26 @@ final class ApplicationSignalTests: XCTestCase {
 /// リサイズの通知を記録し、二度目の通知で終了する `TerminalApp` に準拠する型。
 ///
 /// 最初の描画で一度だけ、渡された処理を実行する。
-private final class ResizeProbe: TerminalApp, @unchecked Sendable {
+private struct ResizeProbe: TerminalApp {
     private let trigger: () -> Void
-    private var hasDrawn = false
+    private let hasDrawn = Latch()
 
-    private(set) var sizes: [Size] = []
+    @State private(set) var sizes: [Size] = []
     /// `Application` を終了するかどうか。
-    private(set) var isFinished = false
+    @State private(set) var isFinished = false
 
     init(trigger: @escaping () -> Void) {
         self.trigger = trigger
     }
 
     /// 何もしない処理を渡して作る。
-    convenience init() {
+    init() {
         self.init(trigger: {})
     }
 
     var body: some View {
-        if !hasDrawn {
-            hasDrawn = true
+        if !hasDrawn.isSet {
+            hasDrawn.set()
             trigger()
         }
         return Text("リサイズ")
@@ -194,22 +194,22 @@ private final class ResizeProbe: TerminalApp, @unchecked Sendable {
 }
 
 /// 最初の描画で一度だけ終了シグナルを送り、自分からは終了しない `TerminalApp` に準拠する型。
-private final class TerminationProbe: TerminalApp, @unchecked Sendable {
+private struct TerminationProbe: TerminalApp {
     private let trigger: () -> Void
-    private var hasDrawn = false
+    private let hasDrawn = Latch()
 
     init(trigger: @escaping () -> Void) {
         self.trigger = trigger
     }
 
     /// 何もしない処理を渡して作る。
-    convenience init() {
+    init() {
         self.init(trigger: {})
     }
 
     var body: some View {
-        if !hasDrawn {
-            hasDrawn = true
+        if !hasDrawn.isSet {
+            hasDrawn.set()
             trigger()
         }
         return Text("終了")

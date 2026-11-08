@@ -32,9 +32,9 @@ targets: [
 import TUIKit
 
 @main
-final class Counter: TerminalApp {
-    private(set) var isFinished = false
-    private var count = 0
+struct Counter: TerminalApp {
+    @State private(set) var isFinished = false
+    @State private var count = 0
 
     var body: some View {
         VStack(spacing: 1) {

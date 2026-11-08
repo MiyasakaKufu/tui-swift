@@ -15,24 +15,26 @@ public final class Application<Root: TerminalApp> {
     private let terminal: Terminal
     private let reader: InputReader
     private let renderer: Renderer
-    private let eventQueue: LoopEventQueue<Root.Message>
+    private let eventQueue: LoopEventQueue
     private let context = ApplicationContext()
-
-    /// 別スレッドや `Task` から、``TerminalApp/Message`` の値をイベントループへ届ける ``MessageSender``。
-    ///
-    /// - Note: `Application` 自体は `Sendable` ではないので、別スレッドへはこれを渡す。
-    /// - Note: ``TerminalApp`` に準拠する型は、``TerminalApp/task(sender:)`` の `sender` 引数で同じものを受け取る。
-    nonisolated public let sender: MessageSender<Root.Message>
+    /// `Application.draw()` で読んだ状態が変わったら、`Application.eventQueue` へ知らせる `RedrawTrigger`。
+    private let redrawTrigger: RedrawTrigger
+    /// ``TerminalApp`` に準拠する型の ``State``・``FocusState`` の記憶域を持つ `ViewNode`。
+    private let rootNode: ViewNode
 
     private var buffer: Buffer
     /// 最後に `.resize` として通知したサイズ。
     private var reportedSize = Size.zero
-    /// ``TerminalApp/update(elapsed:)`` の `elapsed` 引数を測り始めた時刻。
-    private var lastFrameTime = 0.0
     private var isRunning = false
     private var hasRun = false
-    /// ``TerminalApp/task(sender:)`` を実行している `Task`。
-    private var appTask: Task<Void, Never>?
+    /// `Application.draw()` を呼び出した回数。
+    private var drawCount = 0
+    /// 最後に `Application.draw()` を呼び出した時刻。まだ呼び出していなければ `-Double.infinity`。
+    private var lastDrawTime = -Double.infinity
+    /// `ApplicationOptions.maximumFrameRate` の間隔が経っていないために、描くのを見送っているなら `true`。
+    private var isDrawDeferred = false
+    /// 見送った描画のために、間隔が経ったらループを起こす `Task`。
+    private var deferredWake: Task<Void, Never>?
 
     /// 端末デバイスの termios と、端末エミュレータへ送ったモードを戻した後に、プロセスを止めるクロージャ。
     ///
@@ -45,6 +47,9 @@ public final class Application<Root: TerminalApp> {
     ///   - root: 画面を組み立て、イベントを受け取る、``TerminalApp`` に準拠する型のインスタンス。
     ///   - options: 起動時の設定。
     ///   - terminal: 使用する `Terminal`。省略すると標準入出力の記述子で作る。テストでは差し替える。
+    /// - Precondition: `Root` はクラスではない。
+    /// - Precondition: `options` の ``ApplicationOptions/maximumFrameRate`` は 0 より大きい。
+    /// - Postcondition: `root` の ``State``・``FocusState`` を付けたプロパティは、この ``Application`` が持つ記憶域に結び付いている。
     public init(
         root: Root,
         options: ApplicationOptions = .default,
@@ -56,9 +61,14 @@ public final class Application<Root: TerminalApp> {
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
-        let eventQueue = LoopEventQueue<Root.Message>()
+        // クラスで準拠した型を受け付けてはいけない。普通の `var` に置いた状態を変えても再描画されず、何の警告も出ない。
+        precondition(!(Root.self is AnyObject.Type), "TerminalApp には構造体か列挙型で準拠する。状態は @State を付けたプロパティに置く")
+        precondition(options.maximumFrameRate > 0, "ApplicationOptions.maximumFrameRate は 0 より大きくする")
+        let eventQueue = LoopEventQueue()
         self.eventQueue = eventQueue
-        self.sender = MessageSender(eventQueue: eventQueue)
+        self.redrawTrigger = RedrawTrigger(eventQueue: eventQueue)
+        self.rootNode = context.graph.makeDetachedNode()
+        context.graph.bindState(of: root, to: rootNode)
         context.focus.stopsDelivering = { root.isFinished }
         // `.motion` 以外でも有効にしたくなるが、`.buttons` ではボタンを離した後の移動が届かないので、押した位置の `View` に `true` を渡したまま、次にボタンを押すかホイールを回すまで `false` を渡せない。
         context.hover.isEnabled = options.mouseTracking == .motion
@@ -127,7 +137,7 @@ public final class Application<Root: TerminalApp> {
     /// - Throws: 入出力が端末デバイスでなければ ``TerminalError/notATerminal``、raw モードへ切り替えられなければ `TerminalError.termiosFailed(errno:)`。
     /// - Postcondition: 起動直後に一度、そのときの端末デバイスのウィンドウサイズで `.resize` を通知する。
     ///   戻るときは端末デバイスの termios と、端末エミュレータへ送ったモードを起動前へ戻し、カーソルを表示に戻す。
-    /// - Postcondition: 戻るときは、``TerminalApp/task(sender:)`` を実行している `Task` を打ち切っている。その `Task` が終わるのは待たない。
+    /// - Postcondition: 戻るときは、``View/task(_:)`` で始めた `Task` をすべて打ち切っている。その `Task` が終わるのは待たない。
     /// - Precondition: 1 つの ``Application`` で呼び出せるのは 1 回だけ。
     /// - Note: `ApplicationOptions.usesKeyboardProtocol` が有効なら、
     ///   イベントループを回す前に kitty keyboard protocol の対応状況を問い合わせる。
@@ -160,28 +170,32 @@ public final class Application<Root: TerminalApp> {
         _ = root.handle(.resize(buffer.size))
 
         isRunning = true
-        lastFrameTime = monotonicSeconds()
 
         let inputStopped = startReadingInput()
         if root.isFinished {
             eventQueue.post(.wake)
         } else {
             draw()
-            appTask = Task { [root, sender] in await root.task(sender: sender) }
         }
 
         // `LoopEvent` を 1 つ取り出すたびに描き直してはいけない。ループより速く溜まると、
         // 溜まった数だけ描き直しが走り、後から届いたキーが `handle(_:)` に届くまでの遅れが伸び続ける。
         loop: for await _ in eventQueue.arrivals {
-            // 先頭で `TerminalApp.isFinished` を読むのをやめてはいけない。最初の `.resize` か `View.onChange(of:_:)` のクロージャで `true` になったときに、`TerminalApp.update(elapsed:)` を呼び出して描き直してから終わる。
+            // 先頭で `TerminalApp.isFinished` を読むのをやめてはいけない。最初の `.resize` で `true` になったときも周回の後半へ進み、ウィンドウサイズが変わっていれば、終了を宣言した後の `TerminalApp.handle(_:)` へ `.resize` を渡す。
             if root.isFinished { break loop }
 
             let events = eventQueue.take()
             if events.isEmpty { continue loop }
 
             var isIdle = events.allSatisfy { event in
-                if case .idle = event { return true }
-                return false
+                switch event {
+                case .idle:
+                    return true
+                case .invalidated(let generation):
+                    return generation < drawCount
+                case .inputs, .wake:
+                    return false
+                }
             }
             for event in events where isRunning {
                 switch event {
@@ -189,10 +203,7 @@ public final class Application<Root: TerminalApp> {
                     for input in inputs {
                         if !deliver(input) { break loop }
                     }
-                case .message(let message):
-                    _ = root.receive(message)
-                    if root.isFinished { break loop }
-                case .wake, .idle:
+                case .invalidated, .wake, .idle:
                     break
                 }
             }
@@ -217,20 +228,24 @@ public final class Application<Root: TerminalApp> {
             let sizeBeforeSynchronizing = reportedSize
             if !synchronizeSize() { break loop }
 
-            // 何も起きていない `.idle` で先へ進んではいけない。`ApplicationOptions.frameInterval` が `nil` でも `TerminalApp.update(elapsed:)` が一定の間隔で呼び出され、描き直すたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
-            if isIdle, reportedSize == sizeBeforeSynchronizing { continue loop }
-
-            let now = monotonicSeconds()
-            root.update(elapsed: now - lastFrameTime)
-            lastFrameTime = now
+            // 何も起きていない `.idle` で先へ進んではいけない。自己パイプが無いときに一定の間隔で再描画することになり、再描画するたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
+            if isIdle, reportedSize == sizeBeforeSynchronizing, !isDrawDeferred { continue loop }
 
             if !isRunning || root.isFinished { break loop }
+
+            let remaining = lastDrawTime + 1 / options.maximumFrameRate - monotonicSeconds()
+            if remaining > 0 {
+                isDrawDeferred = true
+                scheduleDeferredWake(after: remaining)
+                continue loop
+            }
             draw()
         }
 
         isRunning = false
-        // `appTask` が終わるのを待ってはいけない。打ち切りに応じない処理があると、TUIKit アプリが `TerminalApp.isFinished` で終了を宣言しても `Application.run()` が戻らない。
-        appTask?.cancel()
+        deferredWake?.cancel()
+        // `View.task(_:)` の `Task` が終わるのを待ってはいけない。打ち切りに応じない処理があると、TUIKit アプリが `TerminalApp.isFinished` で終了を宣言しても `Application.run()` が戻らない。
+        context.graph.removeAllNodes()
 
         // `startReadingInput()` が作ったスレッドの終了を待たずに戻ってはいけない。
         // 残ったスレッドが自己パイプを読み捨て続けるので、次にシグナルを使うコードが合図を取りこぼす。
@@ -245,6 +260,21 @@ public final class Application<Root: TerminalApp> {
         terminal.setCursorVisible(true)
     }
 
+    /// `delay` 秒後に、`Application.eventQueue` へ `.wake` を入れる。
+    ///
+    /// - Parameters:
+    ///   - delay: 待つ秒数。
+    /// - Postcondition: すでに待っている `Task` があれば、新しくは作らない。
+    private func scheduleDeferredWake(after delay: Double) {
+        guard deferredWake == nil else { return }
+        let eventQueue = self.eventQueue
+        deferredWake = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            self?.deferredWake = nil
+            eventQueue.post(.wake)
+        }
+    }
+
     /// 端末デバイスからバイト列を読み、組み立てた ``InputEvent`` を `LoopEventQueue` へ入れるスレッドを作る。
     ///
     /// - Returns: スレッドが終わったときに終了する `AsyncStream`。
@@ -252,17 +282,16 @@ public final class Application<Root: TerminalApp> {
         let (stopped, stoppedContinuation) = AsyncStream<Void>.makeStream()
         let descriptor = terminal.inputDescriptor
         let wakeupDescriptor = SignalWatcher.wakeupDescriptor
-        // 自己パイプが無いときに `frameInterval` のまま待ってはいけない。`nil` なら `poll(2)` が
-        // 無期限に待ち、終了時に起こせないので `run()` が戻らない。
-        let isFallingBack = wakeupDescriptor == nil && options.frameInterval == nil
-        let timeout = isFallingBack ? wakeupFallbackInterval : options.frameInterval
-        let emptyEvent: LoopEvent<Root.Message> = isFallingBack ? .idle : .wake
+        // 自己パイプが無いときに無期限に待ってはいけない。終了時に `poll(2)` を起こせないので `run()` が戻らない。
+        let isFallingBack = wakeupDescriptor == nil
+        let timeout: Double? = isFallingBack ? wakeupFallbackInterval : nil
+        let emptyEvent: LoopEvent = isFallingBack ? .idle : .wake
         let eventQueue = self.eventQueue
 
         // まだ返していない分を引き渡さないと、`Application.supportsKeyboardProtocol()` の待ちの間に届いたキーが落ちる。待ちの間に読んだ分は、`Application.supportsKeyboardProtocol()` が使った `Application.reader` が抱えている。
         let unread = reader.takeUnreadState()
 
-        // `poll(2)` をアクタの上で呼び出してはいけない。キーが届くまでループが進まず、`MessageSender` で送られた値が処理されない。
+        // `poll(2)` をアクタの上で呼び出してはいけない。キーが届くまでループが進まず、`View.task(_:)` の `Task` で変えた状態が再描画されない。
         // `InputReader` を外で作って渡すと、非 Sendable の参照がスレッドを跨ぐ。
         Thread.detachNewThread {
             let reader = InputReader(descriptor: descriptor)
@@ -272,7 +301,7 @@ public final class Application<Root: TerminalApp> {
             while true {
                 let events = reader.wait(timeout: timeout)
 
-                let event: LoopEvent<Root.Message> = events.isEmpty ? emptyEvent : .inputs(events)
+                let event: LoopEvent = events.isEmpty ? emptyEvent : .inputs(events)
                 if !eventQueue.post(event) { break }
             }
 
@@ -337,7 +366,6 @@ public final class Application<Root: TerminalApp> {
     /// 一時停止から戻り、端末デバイスの termios と、端末エミュレータへ送ったモードを設定し直す。
     ///
     /// - Postcondition: 画面全体を描き直し、改めて `.resize` を通知する。
-    ///   止まっていた時間は ``TerminalApp/update(elapsed:)`` の `elapsed` 引数に含めない。
     ///   ``Terminal/reactivate()`` がエラーを投げたらループを終える。
     private func resumeTerminal() {
         do {
@@ -352,7 +380,6 @@ public final class Application<Root: TerminalApp> {
         renderer.invalidate()
         // 止まっている間のサイズ変更では SIGWINCH が届かない。次のループで取り直す。
         reportedSize = .zero
-        lastFrameTime = monotonicSeconds()
     }
 
     /// 端末デバイスのウィンドウサイズの変化を検出し、``Buffer`` を作り直して `.resize` を通知する。
@@ -375,16 +402,27 @@ public final class Application<Root: TerminalApp> {
     /// ``TerminalApp/body`` を ``Buffer`` に書き込み、``Renderer`` で端末デバイスへ書き出す。
     ///
     /// - Precondition: `Application.synchronizeSize()` によって ``Buffer`` が端末デバイスのウィンドウサイズに追従している。
-    /// - Postcondition: たどった後にフォーカスが変わったか、``View/onChange(of:_:)`` が値の変化を見つけたら、もう 1 回描く。そのもう 1 回では、さらには描かない。
+    /// - Postcondition: たどった後にフォーカスが変わったら、もう 1 回描く。そのもう 1 回では、さらには描かない。
     /// - Postcondition: 端末エミュレータのカーソルは、``TerminalApp/cursorPosition`` が `nil` 以外ならその位置に、`nil` ならフォーカスを持つ ``TextField`` が示す位置に置く。どちらも無ければ隠す。
+    /// - Postcondition: 描くときに読んだ状態と ``TerminalApp/isFinished`` が後で変わったら、`Application.eventQueue` へ `.invalidated` が入る。
+    /// - Postcondition: ``View/onChange(of:_:)`` が値の変化を見つけたら、描き終えた後にクロージャを呼び出している。
     private func draw() {
-        context.draw({ root.body }, into: &buffer, ambiguousWidth: options.ambiguousWidth) { buffer in
-            renderer.render(buffer, cursor: root.cursorPosition ?? context.cursorPosition)
+        drawCount += 1
+        lastDrawTime = monotonicSeconds()
+        isDrawDeferred = false
+        let changeActions = redrawTrigger.track(generation: drawCount) {
+            // `TerminalApp.isFinished` を読むのをやめてはいけない。`View.task(_:)` のクロージャで `true` にしても、それを `TerminalApp.body` が読んでいなければループが起きず、次に `InputEvent` が届くまで終わらない。
+            _ = root.isFinished
+            return context.draw({ root.body }, into: &buffer, ambiguousWidth: options.ambiguousWidth) { buffer in
+                renderer.render(buffer, cursor: root.cursorPosition ?? context.cursorPosition)
+            }
         }
+        // `RedrawTrigger.track(generation:_:)` のクロージャの中で呼び出してはいけない。その中での代入はループに知らせないので、クロージャが変えた状態が、次に `InputEvent` が届くまで画面に出ない。
+        for action in changeActions { action() }
     }
 }
 
-/// 自己パイプが無く、`frameInterval` も無いときに、`poll(2)` の待ちを切り上げる間隔（秒）。
+/// 自己パイプが無いときに、`poll(2)` の待ちを切り上げる間隔（秒）。
 ///
 /// 起こす手段が無いので、この間隔でループへ戻り、終了とシグナルを確かめる。
 private let wakeupFallbackInterval = 0.1

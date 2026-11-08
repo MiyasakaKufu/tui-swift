@@ -2,14 +2,14 @@ import XCTest
 @testable import TUIKit
 
 /// `TerminalApp.body` だけを書いた表示専用の `TerminalApp` に準拠する型。
-private final class DisplayOnlyApp: TerminalApp {
+private struct DisplayOnlyApp: TerminalApp {
     var body: some View {
         Text("こんにちは")
     }
 }
 
 /// `@main` を付けずに起動できる形だけ確かめるための `TerminalApp` に準拠する型。
-private final class MinimalApp: TerminalApp {
+private struct MinimalApp: TerminalApp {
     static var options: ApplicationOptions { ApplicationOptions(mouseTracking: .buttons) }
 
     var body: some View {
@@ -37,11 +37,6 @@ final class TerminalAppTests: XCTestCase {
         XCTAssertFalse(DisplayOnlyApp().isFinished)
     }
 
-    /// デフォルトの実装の `TerminalApp.task(sender:)` は、打ち切られるのを待たずに戻る。
-    func testDefaultTaskReturnsWithoutWaitingForCancellation() async {
-        await DisplayOnlyApp().task(sender: MessageSender(eventQueue: LoopEventQueue()))
-    }
-
     func testBodyRendersThroughStaticType() async {
         var buffer = Buffer(size: Size(width: 10, height: 1))
         DisplayOnlyApp().body.renderAsRoot(into: &buffer, rect: buffer.bounds)
@@ -53,9 +48,9 @@ final class TerminalAppTests: XCTestCase {
         XCTAssertTrue(options.usesAlternateScreen)
         XCTAssertEqual(options.mouseTracking, .disabled)
         XCTAssertTrue(options.usesBracketedPaste)
-        XCTAssertNil(options.frameInterval)
         XCTAssertTrue(options.quitsOnControlC)
         XCTAssertTrue(options.suspendsOnControlZ)
+        XCTAssertEqual(options.maximumFrameRate, 60)
     }
 
     func testQuitsOnUnhandledControlC() async {
@@ -92,7 +87,7 @@ final class TerminalAppTests: XCTestCase {
 }
 
 /// `TerminalApp.options` を書かない `TerminalApp` に準拠する型。`TerminalApp.options` のデフォルトの実装が使われる。
-private final class DefaultOptionApp: TerminalApp {
+private struct DefaultOptionApp: TerminalApp {
     var body: some View {
         Text("既定")
     }
