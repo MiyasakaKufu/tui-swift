@@ -50,6 +50,7 @@ final class TerminalAppTests: XCTestCase {
         XCTAssertTrue(options.usesBracketedPaste)
         XCTAssertTrue(options.quitsOnControlC)
         XCTAssertTrue(options.suspendsOnControlZ)
+        XCTAssertEqual(options.maximumFrameRate, 60)
     }
 
     func testQuitsOnUnhandledControlC() async {

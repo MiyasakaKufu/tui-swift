@@ -28,6 +28,13 @@ public struct ApplicationOptions: Sendable {
     ///
     /// - Note: 終了時と一時停止時に、端末エミュレータの設定どおりの形へ戻す。
     public var cursorShape: CursorShape?
+    /// 1 秒あたりに再描画する回数の上限。
+    ///
+    /// 前に描いてから `1 / maximumFrameRate` 秒が経つまでは描かず、その間に変わった状態は次の 1 回にまとめて描く。
+    ///
+    /// - Precondition: 0 より大きい。
+    /// - Note: 状態が変わるか ``InputEvent`` が届いたときにだけ描くので、何も起きていなければこの回数まで描くことはない。
+    public var maximumFrameRate: Double
     /// ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+C で ``Application`` を終了する。
     ///
     /// - Note: raw モードでは `ISIG` を無効にしているため Ctrl+C は SIGINT にならない。
@@ -55,6 +62,7 @@ public struct ApplicationOptions: Sendable {
     ///   - usesKeyboardProtocol: 端末エミュレータが対応していれば kitty keyboard protocol を使うか。
     ///   - windowTitle: 起動時に設定するウィンドウタイトル。`nil` なら変えない。
     ///   - cursorShape: 起動時に設定するカーソル形状。`nil` なら変えない。
+    ///   - maximumFrameRate: 1 秒あたりに再描画する回数の上限。
     ///   - quitsOnControlC: ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+C で終了するか。
     ///   - suspendsOnControlZ: ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+Z で一時停止するか。
     ///   - ambiguousWidth: East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。
@@ -66,6 +74,7 @@ public struct ApplicationOptions: Sendable {
         usesKeyboardProtocol: Bool = true,
         windowTitle: String? = nil,
         cursorShape: CursorShape? = nil,
+        maximumFrameRate: Double = 60,
         quitsOnControlC: Bool = true,
         suspendsOnControlZ: Bool = true,
         ambiguousWidth: DisplayWidth.AmbiguousWidth = DisplayWidth.defaultAmbiguousWidth
@@ -77,6 +86,7 @@ public struct ApplicationOptions: Sendable {
         self.usesKeyboardProtocol = usesKeyboardProtocol
         self.windowTitle = windowTitle
         self.cursorShape = cursorShape
+        self.maximumFrameRate = maximumFrameRate
         self.quitsOnControlC = quitsOnControlC
         self.suspendsOnControlZ = suspendsOnControlZ
         self.ambiguousWidth = ambiguousWidth
