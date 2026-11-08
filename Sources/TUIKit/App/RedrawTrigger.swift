@@ -31,7 +31,7 @@ final class RedrawTrigger {
     /// - Note: `body` の中での代入では入れない。
     func track<Result>(generation: Int, _ body: () -> Result) -> Result {
         current.value.store(generation, ordering: .sequentiallyConsistent)
-        // 前の見張りを外さずに済ませてはいけない。見張りは状態が変わるまで残るので、描き直すたびに、変わらない状態の見張りが溜まり続ける。
+        // 前の見張りを外さずに済ませてはいけない。見張りは状態が変わるまで残るので、再描画するたびに、変わらない状態の見張りが溜まり続ける。
         token.value += 1
         let current = self.current
         let eventQueue = self.eventQueue

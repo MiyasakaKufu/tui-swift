@@ -25,7 +25,7 @@ public enum EventResult: Hashable, Sendable {
 ///         }
 ///     }
 ///
-/// 状態は、``View`` と同じく ``State``・``FocusState`` を付けたプロパティに置く。記憶域は ``Application`` が持つ。どこで代入しても、その値を読んでいる ``View`` が描き直される。
+/// 状態は、``View`` と同じく ``State``・``FocusState`` を付けたプロパティに置く。記憶域は ``Application`` が持つ。どこで代入しても、その値を読んでいる ``View`` が再描画される。
 ///
 /// `@main` を別の型に付けている場合（CLI のコマンドを定義するライブラリを使う場合など）は、その型のメソッドから ``TerminalApp/run()-swift.method`` か ``TerminalApp/run()-swift.type.method`` を呼び出して起動する。
 ///
@@ -38,7 +38,7 @@ public enum EventResult: Hashable, Sendable {
 ///   ファイル名は型名に合わせる（`Counter.swift` など）。
 /// - Note: `static func main()` を持つ別のプロトコルに同じ型を準拠させると、`@main` がどちらの `main()` を呼び出すか決まらず、コンパイルできない。
 ///   `@main` を付ける型と ``TerminalApp`` に準拠する型を分ける。
-/// - Note: 参照型の中身を変えても、その型に `@Observable` を付けていなければ描き直されない。``State`` を付けたプロパティに置いた参照型も同じ。
+/// - Note: 参照型の中身を変えても、その型に `@Observable` を付けていなければ再描画されない。``State`` を付けたプロパティに置いた参照型も同じ。
 @MainActor
 public protocol TerminalApp {
     /// ``TerminalApp/body`` が返す ``View`` の型。準拠する型が ``TerminalApp/body`` を `some View` で書けば推論される。

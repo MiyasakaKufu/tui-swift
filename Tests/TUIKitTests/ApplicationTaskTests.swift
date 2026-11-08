@@ -27,7 +27,7 @@ final class ApplicationTaskTests: XCTestCase {
         XCTAssertEqual(app.recorder.drawCountAtStart, 1)
     }
 
-    /// 描き直しても、`View.task(_:)` の `Task` は始め直さない。
+    /// 再描画しても、`View.task(_:)` の `Task` は始め直さない。
     func testTaskIsNotRestartedByRedraw() async throws {
         let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
@@ -42,7 +42,7 @@ final class ApplicationTaskTests: XCTestCase {
         let drawsBefore = app.recorder.drawCount
         pty.write(UInt8(ascii: "r"))
         let redrew = await waitUntil { app.recorder.drawCount > drawsBefore }
-        XCTAssertTrue(redrew, "キーで描き直されない")
+        XCTAssertTrue(redrew, "キーで再描画されない")
 
         pty.write(UInt8(ascii: "q"))
         try await waitForLoop(loop)
@@ -220,7 +220,7 @@ private struct TaskRecordingApp: TerminalApp {
         recorder.drawCount += 1
         let recorder = self.recorder
         return VStack {
-            Text("描き直し \(redrawCount)")
+            Text("再描画 \(redrawCount)")
             if !isHidden {
                 Text("Task あり").task {
                     recorder.records.append("task:start")

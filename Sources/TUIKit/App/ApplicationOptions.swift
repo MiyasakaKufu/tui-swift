@@ -28,7 +28,7 @@ public struct ApplicationOptions: Sendable {
     ///
     /// - Note: 終了時と一時停止時に、端末エミュレータの設定どおりの形へ戻す。
     public var cursorShape: CursorShape?
-    /// 1 秒あたりに描き直す回数の上限。
+    /// 1 秒あたりに再描画する回数の上限。
     ///
     /// 前に描いてから `1 / maximumFrameRate` 秒が経つまでは描かず、その間に変わった状態は次の 1 回にまとめて描く。
     ///
@@ -62,7 +62,7 @@ public struct ApplicationOptions: Sendable {
     ///   - usesKeyboardProtocol: 端末エミュレータが対応していれば kitty keyboard protocol を使うか。
     ///   - windowTitle: 起動時に設定するウィンドウタイトル。`nil` なら変えない。
     ///   - cursorShape: 起動時に設定するカーソル形状。`nil` なら変えない。
-    ///   - maximumFrameRate: 1 秒あたりに描き直す回数の上限。
+    ///   - maximumFrameRate: 1 秒あたりに再描画する回数の上限。
     ///   - quitsOnControlC: ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+C で終了するか。
     ///   - suspendsOnControlZ: ``TerminalApp/handle(_:)`` が `.ignored` を返した Ctrl+Z で一時停止するか。
     ///   - ambiguousWidth: East Asian Width が Ambiguous の文字を ``Cell`` 何個分として扱うか。

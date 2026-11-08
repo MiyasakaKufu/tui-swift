@@ -260,7 +260,7 @@ extension View {
     /// - Parameters:
     ///   - action: `Task` の中で呼び出すクロージャ。
     /// - Returns: `action` を結び付けた ``TaskView``。
-    /// - Note: `action` の中で ``State`` を付けたプロパティへ代入すると、その値を読んでいる ``View`` が描き直される。
+    /// - Note: `action` の中で ``State`` を付けたプロパティへ代入すると、その値を読んでいる ``View`` が再描画される。
     /// - Note: 描かれなくなるとは、``State`` の記憶域が捨てられるのと同じ規則で、この ``View`` の記憶域が捨てられること。``Application/run()`` が戻るときにも打ち切る。
     /// - Note: 打ち切った後、`action` が終わるのを待たない。`action` は `Task.isCancelled` などで打ち切りに応じる。
     public func task(_ action: @escaping @MainActor @Sendable () async -> Void) -> TaskView<Self> {
@@ -273,9 +273,9 @@ extension View {
     ///   - value: 見張る値。
     ///   - action: `value` が変わったときに呼び出すクロージャ。
     /// - Returns: `value` を見張る ``ChangeObservingView``。
-    /// - Note: 比べるのは、描画より前にたどったときの値どうし。`action` の中で、その `Application.draw()` の 1 回で読んだ状態へ代入すると、もう 1 回描き直す。
+    /// - Note: 比べるのは、描画より前にたどったときの値どうし。`action` の中で、その `Application.draw()` の 1 回で読んだ状態へ代入すると、もう 1 回再描画する。
     /// - Note: `action` の中では、``State``・``FocusState`` を付けたプロパティへ代入してよい。
-    /// - Warning: 2 つ以上の `action` が、互いの `value` を変え続けるように代入すると、描き直しが止まらない。``InputEvent`` は描き直しの合間に処理するので止まりはしないが、CPU を使い続ける。
+    /// - Warning: 2 つ以上の `action` が、互いの `value` を変え続けるように代入すると、再描画が止まらない。``InputEvent`` は再描画の合間に処理するので止まりはしないが、CPU を使い続ける。
     public func onChange<Value: Equatable>(
         of value: Value,
         _ action: @escaping @MainActor () -> Void
@@ -289,9 +289,9 @@ extension View {
     ///   - value: 見張る値。
     ///   - action: `value` が変わったときに、変化の前の値と後の値を受け取るクロージャ。
     /// - Returns: `value` を見張る ``ChangeObservingView``。
-    /// - Note: 比べるのは、描画より前にたどったときの値どうし。`action` の中で、その `Application.draw()` の 1 回で読んだ状態へ代入すると、もう 1 回描き直す。
+    /// - Note: 比べるのは、描画より前にたどったときの値どうし。`action` の中で、その `Application.draw()` の 1 回で読んだ状態へ代入すると、もう 1 回再描画する。
     /// - Note: `action` の中では、``State``・``FocusState`` を付けたプロパティへ代入してよい。
-    /// - Warning: 2 つ以上の `action` が、互いの `value` を変え続けるように代入すると、描き直しが止まらない。``InputEvent`` は描き直しの合間に処理するので止まりはしないが、CPU を使い続ける。
+    /// - Warning: 2 つ以上の `action` が、互いの `value` を変え続けるように代入すると、再描画が止まらない。``InputEvent`` は再描画の合間に処理するので止まりはしないが、CPU を使い続ける。
     public func onChange<Value: Equatable>(
         of value: Value,
         _ action: @escaping @MainActor (_ oldValue: Value, _ newValue: Value) -> Void

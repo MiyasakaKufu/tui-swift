@@ -61,7 +61,7 @@ public final class Application<Root: TerminalApp> {
         self.terminal = terminal
         self.reader = InputReader(descriptor: terminal.inputDescriptor)
         self.renderer = Renderer(output: terminal)
-        // クラスで準拠した型を受け付けてはいけない。普通の `var` に置いた状態を変えても描き直されず、何の警告も出ない。
+        // クラスで準拠した型を受け付けてはいけない。普通の `var` に置いた状態を変えても再描画されず、何の警告も出ない。
         precondition(!(Root.self is AnyObject.Type), "TerminalApp には構造体か列挙型で準拠する。状態は @State を付けたプロパティに置く")
         precondition(options.maximumFrameRate > 0, "ApplicationOptions.maximumFrameRate は 0 より大きくする")
         let eventQueue = LoopEventQueue()
@@ -228,7 +228,7 @@ public final class Application<Root: TerminalApp> {
             let sizeBeforeSynchronizing = reportedSize
             if !synchronizeSize() { break loop }
 
-            // 何も起きていない `.idle` で先へ進んではいけない。自己パイプが無いときに一定の間隔で描き直すことになり、描き直すたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
+            // 何も起きていない `.idle` で先へ進んではいけない。自己パイプが無いときに一定の間隔で再描画することになり、再描画するたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
             if isIdle, reportedSize == sizeBeforeSynchronizing, !isDrawDeferred { continue loop }
 
             if !isRunning || root.isFinished { break loop }
@@ -291,7 +291,7 @@ public final class Application<Root: TerminalApp> {
         // まだ返していない分を引き渡さないと、`Application.supportsKeyboardProtocol()` の待ちの間に届いたキーが落ちる。待ちの間に読んだ分は、`Application.supportsKeyboardProtocol()` が使った `Application.reader` が抱えている。
         let unread = reader.takeUnreadState()
 
-        // `poll(2)` をアクタの上で呼び出してはいけない。キーが届くまでループが進まず、`View.task(_:)` の `Task` で変えた状態が描き直されない。
+        // `poll(2)` をアクタの上で呼び出してはいけない。キーが届くまでループが進まず、`View.task(_:)` の `Task` で変えた状態が再描画されない。
         // `InputReader` を外で作って渡すと、非 Sendable の参照がスレッドを跨ぐ。
         Thread.detachNewThread {
             let reader = InputReader(descriptor: descriptor)

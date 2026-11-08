@@ -2,11 +2,11 @@ import Foundation
 import XCTest
 @testable import TUIKit
 
-/// TUIKit が呼び出したコードの外で状態を変えても、キーなどの `InputEvent` を待たずに描き直されるかを、疑似端末（pty）の上で確かめる。
+/// TUIKit が呼び出したコードの外で状態を変えても、キーなどの `InputEvent` を待たずに再描画されるかを、疑似端末（pty）の上で確かめる。
 @MainActor
 final class ApplicationRedrawTests: XCTestCase {
 
-    /// `TerminalApp.body` に付けた `View.task(_:)` のクロージャで、`TerminalApp` に準拠する型の `State` を付けたプロパティへ代入すると、描き直される。
+    /// `TerminalApp.body` に付けた `View.task(_:)` のクロージャで、`TerminalApp` に準拠する型の `State` を付けたプロパティへ代入すると、再描画される。
     func testAssigningAppStateInTaskRedraws() async throws {
         let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
@@ -22,7 +22,7 @@ final class ApplicationRedrawTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
-    /// `View.onKeyPress(_:action:)` のクロージャから作った `Task` の中で、`View` の `State` を付けたプロパティへ代入すると、描き直される。
+    /// `View.onKeyPress(_:action:)` のクロージャから作った `Task` の中で、`View` の `State` を付けたプロパティへ代入すると、再描画される。
     func testAssigningViewStateInTaskFromKeyPressRedraws() async throws {
         let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
@@ -55,7 +55,7 @@ final class ApplicationRedrawTests: XCTestCase {
         XCTAssertTrue(drew, "最初の描画が終わらない")
 
         pty.write(UInt8(ascii: "+"))
-        // キーを 1 つ書いた後に、もう 1 つ書いてはいけない。そのキーで描き直されて、連鎖の最後の値が出ることになる。
+        // キーを 1 つ書いた後に、もう 1 つ書いてはいけない。そのキーで再描画されて、連鎖の最後の値が出ることになる。
         let reached = await waitUntil { app.recorder.drawnText == "third=1" }
         XCTAssertTrue(reached, "2 つ目の View.onChange(of:_:) のクロージャで変えた値が画面に出ない")
 
@@ -74,7 +74,7 @@ final class ApplicationRedrawTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
-    /// `View.task(_:)` のクロージャで `FocusState` を付けたプロパティへ代入すると、フォーカスが移り、描き直される。
+    /// `View.task(_:)` のクロージャで `FocusState` を付けたプロパティへ代入すると、フォーカスが移り、再描画される。
     func testAssigningFocusStateInTaskRedraws() async throws {
         let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
@@ -90,7 +90,7 @@ final class ApplicationRedrawTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
-    /// 1 つの `Task` の中で続けて何度代入しても、描き直すのは 1 回だけ。
+    /// 1 つの `Task` の中で続けて何度代入しても、再描画するのは 1 回だけ。
     func testManyAssignmentsWithoutSuspensionRedrawOnce() async throws {
         let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
@@ -101,7 +101,7 @@ final class ApplicationRedrawTests: XCTestCase {
 
         let finished = await waitUntil { app.recorder.drawnText == "count=100" }
         XCTAssertTrue(finished, "代入した値が画面に出ない")
-        // 待たずに数えてはいけない。余分な描き直しは後の周回で起きるので、見逃す。
+        // 待たずに数えてはいけない。余分な再描画は後の周回で起きるので、見逃す。
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(app.recorder.drawCount, 2)
 
@@ -109,7 +109,7 @@ final class ApplicationRedrawTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
-    /// `TerminalApp.handle(_:)` の中で、描くときに読んだ値へ代入しても、描き直すのは 1 回だけ。
+    /// `TerminalApp.handle(_:)` の中で、描くときに読んだ値へ代入しても、再描画するのは 1 回だけ。
     func testAssigningInHandleRedrawsOnce() async throws {
         let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
@@ -125,7 +125,7 @@ final class ApplicationRedrawTests: XCTestCase {
         pty.write(UInt8(ascii: "+"))
         let redrew = await waitUntil { app.recorder.drawnText == "count=1" }
         XCTAssertTrue(redrew, "キーで代入した値が画面に出ない")
-        // 待たずに数えてはいけない。余分な描き直しは後の周回で起きるので、見逃す。
+        // 待たずに数えてはいけない。余分な再描画は後の周回で起きるので、見逃す。
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(app.recorder.drawCount - drawsBefore, 1)
 
@@ -133,7 +133,7 @@ final class ApplicationRedrawTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
-    /// 中断を挟みながら状態を変え続けても、1 秒あたりの描き直しは `ApplicationOptions.maximumFrameRate` を超えない。
+    /// 中断を挟みながら状態を変え続けても、1 秒あたりの再描画は `ApplicationOptions.maximumFrameRate` を超えない。
     func testContinuousUpdatesAreLimitedByMaximumFrameRate() async throws {
         let pty = try DrainedPseudoTerminal()
         defer { pty.close() }
@@ -153,7 +153,7 @@ final class ApplicationRedrawTests: XCTestCase {
 
         // 上限ちょうど（0.5 秒で 10 回）で比べてはいけない。最初の描画と、変え終えた後の描画が加わるので、正しく間引いていても落ちる。
         XCTAssertLessThanOrEqual(draws, 13)
-        XCTAssertGreaterThan(draws, 2, "変えている間に描き直されていない")
+        XCTAssertGreaterThan(draws, 2, "変えている間に再描画されていない")
     }
 
     // MARK: - 補助
@@ -199,7 +199,7 @@ private func finish(on event: InputEvent, _ isFinished: Binding<Bool>) -> EventR
 
 /// 読み込みを模して少し待つ。
 private func simulateLoading() async {
-    // 待つのをやめてはいけない。最初の描画と同じ周回で値が変わり、状態の変化で描き直されたのかどうかが分からなくなる。
+    // 待つのをやめてはいけない。最初の描画と同じ周回で値が変わり、状態の変化で再描画されたのかどうかが分からなくなる。
     try? await Task.sleep(nanoseconds: 50_000_000)
 }
 

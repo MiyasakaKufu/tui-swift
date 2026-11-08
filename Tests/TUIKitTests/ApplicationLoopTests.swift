@@ -73,10 +73,10 @@ final class ApplicationLoopTests: XCTestCase {
         writeBytes(pty.master, Array("abc".utf8))
         let reached = await waitUntil(timeout: 5) { app.recorder.records.count == 3 }
         XCTAssertTrue(reached, "キーが届かない: \(app.recorder.records)")
-        // キーが届いた時点で数えてはいけない。前の描画から `ApplicationOptions.maximumFrameRate` の間隔が経っていなければ、描き直しは後に回る。
+        // キーが届いた時点で数えてはいけない。前の描画から `ApplicationOptions.maximumFrameRate` の間隔が経っていなければ、再描画は後に回る。
         let redrew = await waitUntil(timeout: 5) { app.recorder.drawCount > drawsBefore }
-        XCTAssertTrue(redrew, "キーで描き直されない")
-        // 待たずに数えてはいけない。余分な描き直しは後の周回で起きるので、見逃す。
+        XCTAssertTrue(redrew, "キーで再描画されない")
+        // 待たずに数えてはいけない。余分な再描画は後の周回で起きるので、見逃す。
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(app.recorder.drawCount - drawsBefore, 1)
 
