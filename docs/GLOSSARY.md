@@ -53,7 +53,7 @@
 | `PrimitiveView.visitChildren(_:)` で `View` を受け取る型 | `ViewVisitor` | 受け取るメソッドは `ViewVisitor.visit(_:index:)` |
 | `ViewPath` と型が同じ `View` に、`Application.draw()` をまたいで使われ続けるクラス | `ViewNode` | internal。`ViewNode.id` が同じなら、同じ `View` として扱われる |
 | `View.id(_:)` に渡した引数。`ViewPath.Component` の `.key(_:)` になる | `View.id(_:)` の引数 | |
-| `View` に準拠する型の格納プロパティに `@State` として付け、そのプロパティを `Application.draw()` をまたいで残す型 | `State` | プロパティは `ViewNode` が持つ。`$` で得る `Binding` は `State.projectedValue` |
+| `View` か `TerminalApp` に準拠する型の格納プロパティに `@State` として付け、そのプロパティを `Application.draw()` をまたいで残す型 | `State` | プロパティは `ViewNode` が持つ。`$` で得る `Binding` は `State.projectedValue` |
 | `TextField`・`ListView` のうち、`InputEvent` の `.key`・`.paste` を最初に受け取る `View` がそうであること | フォーカス | 端末エミュレータのウィンドウが入力を受け取ること（`.focus`）は「端末エミュレータのフォーカス」と書き、「フォーカス」を単独で使わない |
 | Tab・Shift+Tab・クリック・`@FocusState` を付けたプロパティへの代入でフォーカスが移る `View` | フォーカスを受け取る `View` | 今は `TextField` と `ListView` |
 | 端末エミュレータがマウスの位置として `MouseEvent.position` で知らせる、画面上の位置を指す印 | マウスポインタ | 「マウスカーソル」「カーソル」は使わない。「カーソル」は端末エミュレータのカーソルと `TextFieldState.cursor` を指す |
@@ -68,7 +68,7 @@
 | `Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型 | `ListView`・`TextField`・`ProgressBar` | まとめて書くときは「`Sources/TUIKit/Widgets/` ディレクトリにある、`View` に準拠する型」 |
 | `TextFieldState.cursor`・`ListState.scrollOffset` などを持つクラス | `ListState`・`TextFieldState` | 2 つをまとめる語は置かない |
 | 別の場所にあるプロパティの値を取得し、書き換える型 | `Binding` | |
-| `TextField` の `text:` 引数と `ListView` の `selection:` 引数に、`Binding` で渡すプロパティ。`TerminalApp` に準拠する型のインスタンスプロパティか、`View` の `@State` を付けたプロパティ | `Binding` で渡すプロパティ | |
+| `TextField` の `text:` 引数と `ListView` の `selection:` 引数に、`Binding` で渡すプロパティ。`TerminalApp` か `View` に準拠する型の、`@State` を付けたプロパティ | `Binding` で渡すプロパティ | |
 | `TextFieldState`・`ListState` が持つ、`Binding` で渡さないプロパティ | `TextFieldState.cursor`・`ListState.scrollOffset`・`ListState.renderedRect` など、それぞれの名前 | |
 | `View.foregroundStyle(_: Color)`・`View.foregroundStyle(_:_:)` が決め、`RenderContext` のメソッドに `child` 引数として渡す `View` へ伝わるスタイル | 前景スタイル | Apple Developer の日本語版の訳語（`foregroundStyle(_:)`） |
 | 前景スタイルのうち、1 番目と 2 番目のスタイル | プライマリレベル・セカンダリレベル | Apple Developer の日本語版の訳語（`foregroundStyle(_:_:)`）。コードでは `HierarchicalShapeStyle.primary`・`HierarchicalShapeStyle.secondary` で指す |
@@ -103,14 +103,12 @@
 | 直前に書き出した `Buffer` と比べ、変わった `Cell` だけを端末デバイスへ書き出す型 | `Renderer` | |
 | 端末デバイスへ書き出す `String` のうち、`hasPrefix(ANSI.escape)` が `true` のもの | `hasPrefix(ANSI.csi)` か `hasPrefix(ANSI.osc)` が `true` の `String` | 定数と関数は `ANSI` にある。`Style` の SGR も `ANSI.csi` から作る |
 
-## `InputEvent` と `TerminalApp.Message`
+## `InputEvent` と状態の変化
 
 | 指すもの | 書き方 | 補足 |
 |---|---|---|
 | `InputReader` が端末デバイスから受け取ったバイト列を `InputParser` が解釈したもの（`.key`・`.mouse` など）か、`Application` が端末デバイスの大きさの変化から作るもの（`.resize`）を表す型 | `InputEvent` | |
-| 別スレッドや `Task` から `MessageSender.send(_:)` で `Application` へ送る引数の型 | `TerminalApp.Message` | |
-| `TerminalApp.Message` を `Application` へ送る型 | `MessageSender` | |
-| `TerminalApp` に準拠する型が `TerminalApp.Message` を受け取るメソッド | `TerminalApp.receive(_:)` | |
+| `Application.draw()` の 1 回で読んだもののうち、代入されたことを `Observation` に知らせるもの | 状態 | `@State` を付けたプロパティ、`ListState`、`TextFieldState`、`@Observable` を付けた型のプロパティ。変わると `Application.draw()` を行う |
 | `TerminalApp` に準拠する型が `InputEvent` を受け取るメソッド | `TerminalApp.handle(_:)` | `ListState.handle(_:)`・`TextFieldState.handle(_: InputEvent)` は別の宣言。受け取るのは、どの `View` も処理しなかった `InputEvent` だけ |
 
 ## `Application` と `TerminalApp`
@@ -137,7 +135,7 @@
 | `Binding` | プロパティラッパーではない。`$` と `projectedValue` は無い（`$` で `Binding` を返すのは `State.projectedValue`） |
 | `FocusState` | 値の型は Optional か `Bool` に限る。代入した先がたどった `View` の一覧に無ければ、次の `Application.draw()` の 1 回で 1 回だけ試みる |
 | `View.onKeyPress(_:action:)` | 宣言はこの 1 つだけ。修飾キーの付いた押下では `action:` のクロージャを呼び出さない（文字のキーは Shift だけなら呼び出す） |
-| `View.onChange(of:_:)` | `initial:` 引数は無い。比べるのは描画より前にたどったときの値。クロージャを呼び出したら `Application.draw()` をもう 1 回行うが、そのもう 1 回からはさらに行わない |
+| `View.onChange(of:_:)` | `initial:` 引数は無い。比べるのは描画より前にたどったときの値 |
 | `View.sheet(isPresented:content:)` | `content:` を画面の中央に重ねる。表示している間も、どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
 | `View.disabled(_:)` | 見た目が変わるのは `TextField`・`ListView` だけで、文字に `TextAttributes.dim`（SGR 2）を足して描く。`EnvironmentValues.isEnabled` に当たるものは無い。フォーカスを持つ `View` を `.key`・`.mouse`・Tab によるフォーカスの移動の対象から外すと、たどった順で先頭の、外していないフォーカスを受け取る `View` へフォーカスが移る（SwiftUI のドキュメントに記述は無い）。どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
 | `ViewBuilder` | `[any View]` を返す |

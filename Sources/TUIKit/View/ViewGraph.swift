@@ -127,6 +127,22 @@ final class ViewGraph {
         return node
     }
 
+    /// どの `ViewPath` にも置かず、`ViewGraph.renderFrame(_:into:ambiguousWidth:beforeRender:)` で捨てられない `ViewNode` を作る。
+    ///
+    /// - Returns: 作った `ViewNode`。
+    func makeDetachedNode() -> ViewNode {
+        let node = ViewNode(id: nextID, path: .root, viewType: nil, frame: frame)
+        nextID += 1
+        return node
+    }
+
+    /// `ViewPath` に置いたすべての `ViewNode` を捨てる。
+    ///
+    /// - Postcondition: ``View/task(_:)`` で始めた `Task` を打ち切っている。
+    func removeAllNodes() {
+        nodes = [:]
+    }
+
     /// `view` が ``Buffer`` へ書き込んだ矩形を記録する。
     ///
     /// - Parameters:
@@ -149,10 +165,10 @@ final class ViewGraph {
     /// `view` の ``State`` と ``FocusState`` を、`node` の記憶域へ結び付ける。
     ///
     /// - Parameters:
-    ///   - view: 結び付ける ``View``。
-    ///   - node: `view` の `ViewNode`。
+    ///   - view: 結び付ける ``View`` か、``TerminalApp`` に準拠する型のインスタンス。
+    ///   - node: `view` の記憶域を持つ `ViewNode`。
     /// - Note: 見るのは `view` が直接持つ格納プロパティだけ。別の構造体の中に置いた `State` は結び付かない。
-    func bindState(of view: some View, to node: ViewNode) {
+    func bindState<Value>(of view: Value, to node: ViewNode) {
         let viewType = ObjectIdentifier(type(of: view))
         guard !typesWithoutState.contains(viewType) else { return }
 

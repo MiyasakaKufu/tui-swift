@@ -385,7 +385,8 @@ final class FocusTests: XCTestCase {
         XCTAssertEqual(harness.presentCount, 2)
     }
 
-    func testOnChangeCallsActionAfterDrawAndRedrawsOnce() async {
+    /// `ApplicationContext` は、`View.onChange(of:_:)` が変化を見つけても、もう 1 回は描かない。
+    func testOnChangeCallsActionAfterDrawWithoutRedrawing() async {
         var values: [(Int, Int)] = []
         var value = 0
         let harness = FocusHarness(size: Size(width: 10, height: 1)) {
@@ -399,10 +400,11 @@ final class FocusTests: XCTestCase {
 
         XCTAssertEqual(values.map(\.0), [0])
         XCTAssertEqual(values.map(\.1), [3])
-        XCTAssertEqual(harness.presentCount - countBefore, 2)
+        XCTAssertEqual(harness.presentCount - countBefore, 1)
     }
 
-    func testOnChangeThatChangesItsOwnValueStops() async {
+    /// `View.onChange(of:_:)` のクロージャが自分の値を変えても、`ApplicationContext` が 1 回描く間に呼び出すのは 1 回だけ。
+    func testOnChangeThatChangesItsOwnValueIsCalledOncePerDraw() async {
         final class Counter {
             var value = 0
         }
@@ -419,8 +421,8 @@ final class FocusTests: XCTestCase {
         let countBefore = harness.presentCount
         harness.draw()
 
-        XCTAssertEqual(harness.presentCount - countBefore, 2)
-        XCTAssertEqual(calls, 2)
+        XCTAssertEqual(harness.presentCount - countBefore, 1)
+        XCTAssertEqual(calls, 1)
     }
 
     // MARK: - View.sheet(isPresented:content:)

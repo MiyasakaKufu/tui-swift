@@ -9,116 +9,11 @@ import XCTest
 import CTUITestSupport
 @testable import TUIKit
 
-/// `MessageSender` で送った値と、ループの外から呼び出した `Application.stop()`・`Application.suspend()` がループへ渡るかと、`TerminalApp.isFinished` でループが終わるかを、疑似端末（pty）の上で確かめる。
+/// キーと、ループの外から呼び出した `Application.stop()`・`Application.suspend()` がループへ渡るかと、`TerminalApp.isFinished` でループが終わるかを、疑似端末（pty）の上で確かめる。
 @MainActor
-final class ApplicationMessageTests: XCTestCase {
+final class ApplicationLoopTests: XCTestCase {
 
     private var captured = ""
-
-    /// 別スレッドから送った値で、`ApplicationOptions.frameInterval` なしでも画面が更新される。
-    func testMessageFromAnotherThreadUpdatesScreenWithoutFrameInterval() async throws {
-        let pty = try PseudoTerminal()
-        defer { pty.close() }
-        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
-
-        let reader = OutputReader(descriptor: pty.master)
-        let capture = startCapturing(reader)
-        defer { capture.cancel() }
-
-        let app = MessageRecordingApp()
-        let application = Application(root: app, options: testOptions, terminal: pty.terminal())
-        let sender = application.sender
-        let loop = Task { try await application.run() }
-
-        // 最初の描画より前に送ってはいけない。`Application.run()` が始まる前に送ることになり、ループは待たずに溜まった値を受け取るので、待っているループを起こせるのかを確かめられない。
-        let drewBeforeSending = await waitUntil(timeout: 5) { app.hasDrawnOnce }
-        XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
-
-        Thread.detachNewThread { sender.send(.arrived) }
-
-        // 画面が変わるまで、キーのバイトを書いてはいけない。
-        // 送った値だけで変わることを確かめているので、キーで起きたのかどうかが分からなくなる。
-        let drew = await waitUntil(timeout: 5) { self.captured.contains(arrivedText) }
-        XCTAssertTrue(drew, "送った値が届いた後に画面が描き直されていない")
-
-        writeByte(pty.master, UInt8(ascii: "q"))
-        try await waitForLoop(loop)
-
-        XCTAssertEqual(app.messages, [.arrived])
-    }
-
-    /// 複数のスレッドから同時に送っても、すべての値が届く。
-    func testMessagesFromManyThreadsAllArrive() async throws {
-        let pty = try PseudoTerminal()
-        defer { pty.close() }
-        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
-
-        let reader = OutputReader(descriptor: pty.master)
-        let capture = startCapturing(reader)
-        defer { capture.cancel() }
-
-        let total = 200
-        let app = MessageRecordingApp(quitsAfter: total)
-        let application = Application(
-            root: app,
-            options: testOptions,
-            terminal: pty.terminal()
-        )
-        let sender = application.sender
-        let loop = Task { try await application.run() }
-
-        let drewBeforeSending = await waitUntil(timeout: 5) { app.hasDrawnOnce }
-        XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
-
-        for _ in 0..<4 {
-            Thread.detachNewThread {
-                for _ in 0..<(total / 4) { sender.send(.first) }
-            }
-        }
-
-        try await waitForLoop(loop)
-
-        XCTAssertEqual(app.messages.count, total)
-    }
-
-    /// キーと、`MessageSender` で送った値の順序が保たれる。
-    func testInputAndMessagesKeepOrder() async throws {
-        let pty = try PseudoTerminal()
-        defer { pty.close() }
-        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
-
-        let reader = OutputReader(descriptor: pty.master)
-        let capture = startCapturing(reader)
-        defer { capture.cancel() }
-
-        let app = MessageRecordingApp(quitsAfter: 4)
-        let application = Application(root: app, options: testOptions, terminal: pty.terminal())
-        let sender = application.sender
-        let loop = Task { try await application.run() }
-
-        // 最初の描画を待たずにキーのバイトを書くと届かない。
-        // raw モードへの切り替えが、まだ読まれていないバイト列を捨てる。
-        let drewBeforeSending = await waitUntil(timeout: 5) { app.hasDrawnOnce }
-        XCTAssertTrue(drewBeforeSending, "最初の描画が終わらない")
-
-        // 順序を入れ替えてはいけない。
-        // キーを先に書くと、ループがそれを読んだのと送ったのとどちらが先か決まらず、
-        // 確かめたい順序そのものが揺れる。
-        sender.send(.first)
-        writeByte(pty.master, UInt8(ascii: "a"))
-        let gotBoth = await waitUntil(timeout: 5) { app.records.count >= 2 }
-        XCTAssertTrue(gotBoth, "送った値とキーが届かない")
-
-        // キーが届くのを待たずに送ってはいけない。キーより先に積まれて、逆向きを確かめられなくなる。
-        writeByte(pty.master, UInt8(ascii: "b"))
-        let gotSecondKey = await waitUntil(timeout: 5) { app.records.count >= 3 }
-        XCTAssertTrue(gotSecondKey, "キーが届かない")
-        sender.send(.second)
-
-        try await waitForLoop(loop)
-
-        XCTAssertEqual(app.records, ["message:first", "key:a", "key:b", "message:second"])
-    }
 
     /// 端末エミュレータへの問い合わせの応答を待つ間に届いたキーも、ループへ渡る。
     func testKeysArrivingDuringTerminalQueryReachTheLoop() async throws {
@@ -130,7 +25,7 @@ final class ApplicationMessageTests: XCTestCase {
         let capture = startCapturing(reader)
         defer { capture.cancel() }
 
-        let app = MessageRecordingApp()
+        let app = LoopRecordingApp()
         let application = Application(
             root: app,
             options: ApplicationOptions(
@@ -149,36 +44,11 @@ final class ApplicationMessageTests: XCTestCase {
         // 応答は書き込まない。書き込むと待ちが早く終わり、待ちの間に届いたことにならない。
         writeByte(pty.master, UInt8(ascii: "a"))
 
-        let reached = await waitUntil(timeout: 5) { app.records == ["key:a"] }
-        XCTAssertTrue(reached, "問い合わせの間に届いたキーが落ちている: \(app.records)")
+        let reached = await waitUntil(timeout: 5) { app.recorder.records == ["key:a"] }
+        XCTAssertTrue(reached, "問い合わせの間に届いたキーが落ちている: \(app.recorder.records)")
 
         writeByte(pty.master, UInt8(ascii: "q"))
         try await waitForLoop(loop)
-    }
-
-    /// ループが動いている間の送信は受け付け、終わった後の送信は受け付けない。
-    func testSenderReportsWhetherLoopAcceptsMessages() async throws {
-        let pty = try PseudoTerminal()
-        defer { pty.close() }
-        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
-
-        let reader = OutputReader(descriptor: pty.master)
-        let capture = startCapturing(reader)
-        defer { capture.cancel() }
-
-        let app = MessageRecordingApp()
-        let application = Application(root: app, options: testOptions, terminal: pty.terminal())
-        let sender = application.sender
-        let loop = Task { try await application.run() }
-
-        let drew = await waitUntil(timeout: 5) { app.hasDrawnOnce }
-        XCTAssertTrue(drew, "最初の描画が終わらない")
-        XCTAssertTrue(sender.send(.first), "動いているループが受け付けない")
-
-        writeByte(pty.master, UInt8(ascii: "q"))
-        try await waitForLoop(loop)
-
-        XCTAssertFalse(sender.send(.second), "終わったループが受け付けている")
     }
 
     /// 1 回でまとめて届いたキーは、1 回だけ描き直す。
@@ -191,52 +61,19 @@ final class ApplicationMessageTests: XCTestCase {
         let capture = startCapturing(reader)
         defer { capture.cancel() }
 
-        let app = MessageRecordingApp()
+        let app = LoopRecordingApp()
         let application = Application(root: app, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
-        let drew = await waitUntil(timeout: 5) { app.hasDrawnOnce }
+        let drew = await waitUntil(timeout: 5) { app.recorder.hasDrawnOnce }
         XCTAssertTrue(drew, "最初の描画が終わらない")
-        let drawsBefore = app.drawCount
+        let drawsBefore = app.recorder.drawCount
 
         // 1 回の `write(2)` で書く。分けると別々の回に読まれ、まとめて届いたことにならない。
         writeBytes(pty.master, Array("abc".utf8))
-        let reached = await waitUntil(timeout: 5) { app.records.count == 3 }
-        XCTAssertTrue(reached, "キーが届かない: \(app.records)")
-        XCTAssertEqual(app.drawCount - drawsBefore, 1)
-
-        writeByte(pty.master, UInt8(ascii: "q"))
-        try await waitForLoop(loop)
-    }
-
-    /// ループより速く送った値は、送った順にすべて届き、値の数だけは描き直さない。
-    func testMessagesSentFasterThanLoopAllArriveInOrderWithOneRedraw() async throws {
-        let pty = try PseudoTerminal()
-        defer { pty.close() }
-        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
-
-        let reader = OutputReader(descriptor: pty.master)
-        let capture = startCapturing(reader)
-        defer { capture.cancel() }
-
-        let total = 100
-        let app = MessageRecordingApp()
-        let application = Application(root: app, options: testOptions, terminal: pty.terminal())
-        let sender = application.sender
-        let loop = Task { try await application.run() }
-
-        let drew = await waitUntil(timeout: 5) { app.hasDrawnOnce }
-        XCTAssertTrue(drew, "最初の描画が終わらない")
-        let drawsBefore = app.drawCount
-
-        // 送る間に `await` を挟んではいけない。ループが同じアクタの上で割り込み、
-        // すべてが溜まってから取り出されたことにならない。
-        for value in 0..<total { sender.send(.numbered(value)) }
-
-        let reached = await waitUntil(timeout: 5) { app.messages.count == total }
-        XCTAssertTrue(reached, "送った値が届かない: \(app.messages.count)")
-        XCTAssertEqual(app.messages, (0..<total).map { TestMessage.numbered($0) })
-        XCTAssertEqual(app.drawCount - drawsBefore, 1)
+        let reached = await waitUntil(timeout: 5) { app.recorder.records.count == 3 }
+        XCTAssertTrue(reached, "キーが届かない: \(app.recorder.records)")
+        XCTAssertEqual(app.recorder.drawCount - drawsBefore, 1)
 
         writeByte(pty.master, UInt8(ascii: "q"))
         try await waitForLoop(loop)
@@ -273,8 +110,8 @@ final class ApplicationMessageTests: XCTestCase {
         // `.wake` が絶えず溜まっている間、ループはアクタを明け渡さずに回ることがあり、テストの待ちが終わらない。
         try await waitForLoop(loop, timeout: 20)
 
-        let written = try XCTUnwrap(app.keyWritten, "キーを書く前にループが終わった")
-        let arrival = try XCTUnwrap(app.keyArrival, "キーが届かない")
+        let written = try XCTUnwrap(app.recorder.keyWritten, "キーを書く前にループが終わった")
+        let arrival = try XCTUnwrap(app.recorder.keyArrival, "キーが届かない")
         XCTAssertLessThan(arrival.timeIntervalSince(written), 0.5)
     }
 
@@ -288,12 +125,12 @@ final class ApplicationMessageTests: XCTestCase {
         let capture = startCapturing(reader)
         defer { capture.cancel() }
 
-        let app = MessageRecordingApp()
+        let app = LoopRecordingApp()
         let application = Application(root: app, options: testOptions, terminal: pty.terminal())
         let loop = Task { try await application.run() }
 
         // `Application.stop()` を最初の描画より前に呼び出してはいけない。`Application.run()` が始まる前に呼び出すことになり、`Application.run()` が `Application.isRunning` を立て直すので、ループが終わらない。
-        let drew = await waitUntil(timeout: 5) { app.hasDrawnOnce }
+        let drew = await waitUntil(timeout: 5) { app.recorder.hasDrawnOnce }
         XCTAssertTrue(drew, "最初の描画が終わらない")
 
         application.stop()
@@ -310,20 +147,20 @@ final class ApplicationMessageTests: XCTestCase {
         let capture = startCapturing(reader)
         defer { capture.cancel() }
 
-        let app = MessageRecordingApp()
+        let app = LoopRecordingApp()
         let application = Application(root: app, options: testOptions, terminal: pty.terminal())
         // 本当に止めるとテストプロセスまで止まるので、止める処理だけ差し替える。
         application.stopProcess = {}
         let loop = Task { try await application.run() }
 
-        let drew = await waitUntil(timeout: 5) { app.hasDrawnOnce }
+        let drew = await waitUntil(timeout: 5) { app.recorder.hasDrawnOnce }
         XCTAssertTrue(drew, "最初の描画が終わらない")
-        let drawsBefore = app.drawCount
+        let drawsBefore = app.recorder.drawCount
 
         application.suspend()
 
         // 描き直されるまで、キーのバイトを書いてはいけない。キーで描き直されたのかどうかが分からなくなる。
-        let redrew = await waitUntil(timeout: 5) { app.drawCount > drawsBefore }
+        let redrew = await waitUntil(timeout: 5) { app.recorder.drawCount > drawsBefore }
         XCTAssertTrue(redrew, "再開した後に画面が描き直されていない")
 
         writeByte(pty.master, UInt8(ascii: "q"))
@@ -349,7 +186,7 @@ final class ApplicationMessageTests: XCTestCase {
         let loop = Task { try await application.run() }
 
         try await waitForLoop(loop)
-        XCTAssertGreaterThan(app.updateCount, 0)
+        XCTAssertGreaterThan(app.recorder.updateCount, 0)
     }
 
     /// `View.onKeyPress(_:action:)` のクロージャで `TerminalApp.isFinished` を `true` にすると、同じ時点に届いていた残りのキーを渡さずにループが終わる。
@@ -367,13 +204,13 @@ final class ApplicationMessageTests: XCTestCase {
         let loop = Task { try await application.run() }
 
         // 最初の描画より前に書いてはいけない。フォーカスを持つ `View` が決まる前にキーが届き、`View.onKeyPress(_:action:)` のクロージャが呼び出されない。
-        let drew = await waitUntil(timeout: 5) { app.hasDrawnOnce }
+        let drew = await waitUntil(timeout: 5) { app.recorder.hasDrawnOnce }
         XCTAssertTrue(drew, "最初の描画が終わらない")
 
         writeBytes(pty.master, [UInt8(ascii: "a"), UInt8(ascii: "b")])
         try await waitForLoop(loop)
 
-        XCTAssertEqual(app.handledKeys, [])
+        XCTAssertEqual(app.recorder.handledKeys, [])
     }
 
     /// 最初の `.resize` を受け取った `TerminalApp.handle(_:)` で `TerminalApp.isFinished` を `true` にすると、描かずにループが終わる。
@@ -391,7 +228,7 @@ final class ApplicationMessageTests: XCTestCase {
         let loop = Task { try await application.run() }
 
         try await waitForLoop(loop)
-        XCTAssertEqual(app.drawCount, 0)
+        XCTAssertEqual(app.recorder.drawCount, 0)
     }
 
     // MARK: - 補助
@@ -435,58 +272,41 @@ final class ApplicationMessageTests: XCTestCase {
     }
 }
 
-/// テストから送る値。
-private enum TestMessage: Hashable, Sendable {
-    case arrived
-    case first
-    case second
-    case numbered(Int)
-}
-
-/// 値が届く前に画面へ出ている文字列。
+/// 画面へ出す文字列。
 private let waitingText = "WAITING"
 
-/// 値が届いた後に画面へ出る文字列。
-private let arrivedText = "ARRIVED"
-
-/// 届いた値とキーを記録し、決めた数だけ届いたら終了する `TerminalApp` に準拠する型。
-private final class MessageRecordingApp: TerminalApp {
-
-    /// 受け取った値を届いた順に並べたもの。
-    private(set) var messages: [TestMessage] = []
-    /// 受け取った値とキーを、届いた順に文字列で並べたもの。
-    private(set) var records: [String] = []
+// `State` を付けたプロパティに置きたくなるが、`TerminalApp.body` の中で書き込むことになり、`State` が禁じる描画の中での代入になる。
+/// テスト用の `TerminalApp` に準拠する型が、受け取ったものを書き込むクラス。
+@MainActor
+private final class LoopRecorder {
+    /// 受け取ったキーを、届いた順に文字列で並べたもの。
+    var records: [String] = []
+    /// `TerminalApp.handle(_:)` が受け取ったキーの文字を、届いた順に並べたもの。
+    var handledKeys: [Character] = []
     /// 最初の描画が終わったら `true`。
-    private(set) var hasDrawnOnce = false
+    var hasDrawnOnce = false
     /// `TerminalApp.body` が評価された回数。1 回の描画で 1 回評価される。
-    private(set) var drawCount = 0
+    var drawCount = 0
+    /// `TerminalApp.update(elapsed:)` が呼び出された回数。
+    var updateCount = 0
+    /// キーを書いた時刻。まだ書いていなければ `nil`。
+    var keyWritten: Date?
+    /// 書いたキーが `TerminalApp.handle(_:)` に届いた時刻。まだ届いていなければ `nil`。
+    var keyArrival: Date?
+}
+
+/// 届いたキーを記録し、`q` で終了する `TerminalApp` に準拠する型。
+private struct LoopRecordingApp: TerminalApp {
+
+    /// 受け取ったものを書き込む先。
+    let recorder = LoopRecorder()
     /// `Application` を終了するかどうか。
-    private(set) var isFinished = false
-
-    private let quitsAfter: Int
-
-    /// 受け取る件数を決めて作る。
-    ///
-    /// - Parameters:
-    ///   - quitsAfter: 記録がこの数に達したら終了する。`0` なら自分からは終了しない。
-    init(quitsAfter: Int) {
-        self.quitsAfter = quitsAfter
-    }
-
-    /// 自分からは終了しないものとして作る。
-    convenience init() {
-        self.init(quitsAfter: 0)
-    }
+    @State private(set) var isFinished = false
 
     var body: some View {
-        hasDrawnOnce = true
-        drawCount += 1
-        return Text(messages.isEmpty ? waitingText : arrivedText)
-    }
-
-    func receive(_ message: TestMessage) -> EventResult {
-        messages.append(message)
-        return record("message:\(label(of: message))")
+        recorder.hasDrawnOnce = true
+        recorder.drawCount += 1
+        return Text(waitingText)
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -499,51 +319,24 @@ private final class MessageRecordingApp: TerminalApp {
             isFinished = true
             return .handled
         }
-        return record("key:\(character)")
-    }
-
-    /// 届いたものを記録し、決めた数に達したら終了する。
-    ///
-    /// - Parameters:
-    ///   - entry: 記録する文字列。
-    /// - Returns: 常に `.handled`。
-    private func record(_ entry: String) -> EventResult {
-        records.append(entry)
-        if records.count == quitsAfter { isFinished = true }
+        recorder.records.append("key:\(character)")
         return .handled
-    }
-
-    /// 値を記録用の名前に直す。
-    ///
-    /// - Parameters:
-    ///   - message: 名前を付ける値。
-    /// - Returns: 値の名前。
-    private func label(of message: TestMessage) -> String {
-        switch message {
-        case .arrived: return "arrived"
-        case .first: return "first"
-        case .second: return "second"
-        case .numbered(let value): return "numbered:\(value)"
-        }
     }
 }
 
 /// `TerminalApp.update(elapsed:)` のたびに決めた時間だけアクタを止め、決めた回数に達したらキーを書く `TerminalApp` に準拠する型。
 ///
 /// 書いたキーが届いたら終了する。
-private final class SlowUpdatingApp: TerminalApp {
+private struct SlowUpdatingApp: TerminalApp {
 
-    /// キーを書いた時刻。まだ書いていなければ `nil`。
-    private(set) var keyWritten: Date?
-    /// 書いたキーが `TerminalApp.handle(_:)` に届いた時刻。まだ届いていなければ `nil`。
-    private(set) var keyArrival: Date?
+    /// 受け取ったものを書き込む先。
+    let recorder = LoopRecorder()
     /// `Application` を終了するかどうか。
-    private(set) var isFinished = false
+    @State private(set) var isFinished = false
 
     private let updateDuration: Double
     private let keyWrittenAfter: Int
     private let master: Int32
-    private var updateCount = 0
 
     /// 1 周の長さと、キーを書く時点を決めて作る。
     ///
@@ -558,7 +351,7 @@ private final class SlowUpdatingApp: TerminalApp {
     }
 
     /// 止めずに回し、キーを書かないものとして作る。
-    convenience init() {
+    init() {
         self.init(updateDuration: 0, keyWrittenAfter: 0, master: -1)
     }
 
@@ -567,9 +360,9 @@ private final class SlowUpdatingApp: TerminalApp {
     }
 
     func update(elapsed: Double) {
-        updateCount += 1
-        if updateCount == keyWrittenAfter {
-            keyWritten = Date()
+        recorder.updateCount += 1
+        if recorder.updateCount == keyWrittenAfter {
+            recorder.keyWritten = Date()
             writeByte(master, UInt8(ascii: "a"))
         }
         // `Thread.sleep` を外してはいけない。1 周が `ApplicationOptions.frameInterval` より短くなり、`.wake` が溜まる条件にならない。
@@ -582,45 +375,43 @@ private final class SlowUpdatingApp: TerminalApp {
         else {
             return .ignored
         }
-        keyArrival = Date()
+        recorder.keyArrival = Date()
         isFinished = true
         return .handled
     }
 }
 
 /// 最初の `TerminalApp.update(elapsed:)` で終了する `TerminalApp` に準拠する型。
-private final class UpdateFinishingApp: TerminalApp {
+private struct UpdateFinishingApp: TerminalApp {
 
+    /// 受け取ったものを書き込む先。
+    let recorder = LoopRecorder()
     /// `Application` を終了するかどうか。
-    private(set) var isFinished = false
-    /// `TerminalApp.update(elapsed:)` が呼び出された回数。
-    private(set) var updateCount = 0
+    @State private(set) var isFinished = false
 
     var body: some View {
         Text(waitingText)
     }
 
     func update(elapsed: Double) {
-        updateCount += 1
+        recorder.updateCount += 1
         isFinished = true
     }
 }
 
 /// フォーカスを受け取る `ListView` に付けた `View.onKeyPress(_:action:)` のクロージャで、`a` を受け取ったら終了する `TerminalApp` に準拠する型。
-private final class KeyPressFinishingApp: TerminalApp {
+private struct KeyPressFinishingApp: TerminalApp {
 
+    /// 受け取ったものを書き込む先。
+    let recorder = LoopRecorder()
     /// `Application` を終了するかどうか。
-    private(set) var isFinished = false
-    /// 最初の描画が終わったら `true`。
-    private(set) var hasDrawnOnce = false
-    /// `TerminalApp.handle(_:)` が受け取ったキーの文字を、届いた順に並べたもの。
-    private(set) var handledKeys: [Character] = []
+    @State private(set) var isFinished = false
 
-    private let listState = ListState()
+    @State private var listState = ListState()
 
     var body: some View {
-        hasDrawnOnce = true
-        let finish = Binding(self, \.isFinished)
+        recorder.hasDrawnOnce = true
+        let finish = $isFinished
         return ListView(items: [waitingText], state: listState)
             .onKeyPress(.character("a")) {
                 finish.wrappedValue = true
@@ -634,21 +425,21 @@ private final class KeyPressFinishingApp: TerminalApp {
         else {
             return .ignored
         }
-        handledKeys.append(character)
+        recorder.handledKeys.append(character)
         return .handled
     }
 }
 
 /// 最初の `.resize` で終了する `TerminalApp` に準拠する型。
-private final class ResizeFinishingApp: TerminalApp {
+private struct ResizeFinishingApp: TerminalApp {
 
+    /// 受け取ったものを書き込む先。
+    let recorder = LoopRecorder()
     /// `Application` を終了するかどうか。
-    private(set) var isFinished = false
-    /// `TerminalApp.body` が評価された回数。
-    private(set) var drawCount = 0
+    @State private(set) var isFinished = false
 
     var body: some View {
-        drawCount += 1
+        recorder.drawCount += 1
         return Text(waitingText)
     }
 
