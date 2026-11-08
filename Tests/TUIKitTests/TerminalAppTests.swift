@@ -48,7 +48,6 @@ final class TerminalAppTests: XCTestCase {
         XCTAssertTrue(options.usesAlternateScreen)
         XCTAssertEqual(options.mouseTracking, .disabled)
         XCTAssertTrue(options.usesBracketedPaste)
-        XCTAssertNil(options.frameInterval)
         XCTAssertTrue(options.quitsOnControlC)
         XCTAssertTrue(options.suspendsOnControlZ)
     }

@@ -38,7 +38,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         let app = ResizeRecordingApp()
         let application = Application(
             root: app,
-            options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
+            options: ApplicationOptions(usesAlternateScreen: false),
             terminal: Terminal(input: slave, output: slave)
         )
         app.hooks.onFirstKey = {
@@ -87,9 +87,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
             root: app,
             options: ApplicationOptions(
                 usesAlternateScreen: false,
-                reportsFocus: true,
-                frameInterval: 1.0 / 60
-            ),
+                reportsFocus: true),
             terminal: Terminal(input: slave, output: slave)
         )
         app.hooks.onTimeout = { [weak application] in application?.stop() }
@@ -149,7 +147,6 @@ final class ApplicationBugReproductionTests: XCTestCase {
                 options: ApplicationOptions(
                     usesAlternateScreen: false,
                     usesKeyboardProtocol: false,
-                    frameInterval: 1.0 / 60,
                     ambiguousWidth: ambiguous
                 ),
                 terminal: Terminal(input: slave, output: slave)
@@ -192,9 +189,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
             root: app,
             options: ApplicationOptions(
                 usesAlternateScreen: false,
-                mouseTracking: .motion,
-                frameInterval: 1.0 / 60
-            ),
+                mouseTracking: .motion),
             terminal: Terminal(input: slave, output: slave)
         )
         app.hooks.onTimeout = { [weak application] in application?.stop() }
@@ -249,9 +244,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
                 root: app,
                 options: ApplicationOptions(
                     usesAlternateScreen: false,
-                    mouseTracking: tracking,
-                    frameInterval: 1.0 / 60
-                ),
+                    mouseTracking: tracking),
                 terminal: Terminal(input: slave, output: slave)
             )
             app.hooks.onTimeout = { [weak application] in application?.stop() }
@@ -294,7 +287,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         let app = KeyRecordingApp(expectedCount: 2)
         let application = Application(
             root: app,
-            options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
+            options: ApplicationOptions(usesAlternateScreen: false),
             terminal: Terminal(input: slave, output: slave)
         )
         app.hooks.onTimeout = { [weak application] in application?.stop() }
@@ -351,7 +344,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         let app = KeyRecordingApp(expectedCount: 1)
         let application = Application(
             root: app,
-            options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
+            options: ApplicationOptions(usesAlternateScreen: false),
             terminal: Terminal(input: slave, output: slave)
         )
         app.hooks.onTimeout = { [weak application] in application?.stop() }
@@ -397,7 +390,7 @@ final class ApplicationBugReproductionTests: XCTestCase {
         let app = SuspendRecordingApp()
         let application = Application(
             root: app,
-            options: ApplicationOptions(usesAlternateScreen: false, frameInterval: 1.0 / 60),
+            options: ApplicationOptions(usesAlternateScreen: false),
             terminal: terminal
         )
         app.hooks.onTimeout = { [weak application] in application?.stop() }
@@ -481,9 +474,9 @@ final class ApplicationBugReproductionTests: XCTestCase {
 private final class AppHooks {
     /// 最初のキーを受け取った `TerminalApp.handle(_:)` が、戻る前に呼び出すクロージャ。
     var onFirstKey: () -> Void = {}
-    /// 入力が届かないまま時間切れになったときに `TerminalApp.update(elapsed:)` が呼び出すクロージャ。
+    /// 入力が届かないまま、最初の描画から 5 秒経ったときに呼び出すクロージャ。
     var onTimeout: () -> Void = {}
-    /// `TerminalApp.update(elapsed:)` に渡された `elapsed` の合計が 0.1 秒を超えたときに呼び出すクロージャ。
+    /// 最初の描画から 0.1 秒経ったときに呼び出すクロージャ。
     var onFramesDrawn: () -> Void = {}
     /// 起動時に続く 2 度目の `.resize`（再開後に届く最初の `.resize`）を受け取った `TerminalApp.handle(_:)` が呼び出すクロージャ。
     var onResume: () -> Void = {}
@@ -499,14 +492,12 @@ private struct ResizeRecordingApp: TerminalApp {
     @State private(set) var reportedSizes: [Size] = []
     /// `Application` を終了するかどうか。
     @State private(set) var isFinished = false
-    /// イベントループが 1 周したら立つ。
+    /// 最初の描画が終わり、イベントループが次の `LoopEvent` を待ち始めたら立つ。
     let hasStartedLoop = Latch()
 
     @State private var keyCount = 0
-    @State private var elapsedTotal = 0.0
-
     var body: some View {
-        Text("リサイズの確認")
+        Text("リサイズの確認").task { await watchLoop(hasStartedLoop, hooks) }
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -526,12 +517,6 @@ private struct ResizeRecordingApp: TerminalApp {
             return .ignored
         }
     }
-
-    func update(elapsed: Double) {
-        hasStartedLoop.set()
-        elapsedTotal += elapsed
-        if elapsedTotal > 5 { hooks.onTimeout() }
-    }
 }
 
 /// 受け取った `.focus` を記録し、フォーカスを失った時点で終了する `TerminalApp` に準拠する型。
@@ -544,13 +529,11 @@ private struct FocusRecordingApp: TerminalApp {
     @State private(set) var focusChanges: [Bool] = []
     /// `Application` を終了するかどうか。
     @State private(set) var isFinished = false
-    /// イベントループが 1 周したら立つ。
+    /// 最初の描画が終わり、イベントループが次の `LoopEvent` を待ち始めたら立つ。
     let hasStartedLoop = Latch()
 
-    @State private var elapsedTotal = 0.0
-
     var body: some View {
-        Text("フォーカスの確認")
+        Text("フォーカスの確認").task { await watchLoop(hasStartedLoop, hooks) }
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -559,32 +542,23 @@ private struct FocusRecordingApp: TerminalApp {
         if !gained { isFinished = true }
         return .handled
     }
-
-    func update(elapsed: Double) {
-        hasStartedLoop.set()
-        elapsedTotal += elapsed
-        if elapsedTotal > 5 { hooks.onTimeout() }
-    }
 }
 
-/// 枠線で囲んだ文字列を描き、`TerminalApp.update(elapsed:)` に渡された `elapsed` の合計が 0.1 秒を超えたら `onFramesDrawn` を呼び出す `TerminalApp` に準拠する型。
+/// 枠線で囲んだ文字列を描き、最初の描画から 0.1 秒経ったら `AppHooks.onFramesDrawn` を呼び出す `TerminalApp` に準拠する型。
 private struct BorderDrawingApp: TerminalApp {
 
     /// テストが後から差し替えるクロージャ。
     let hooks = AppHooks()
 
-    @State private var elapsedTotal = 0.0
-
     var body: some View {
-        Text("ab").border(.rounded)
+        Text("ab").border(.rounded).task {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            guard !Task.isCancelled else { return }
+            hooks.onFramesDrawn()
+        }
     }
 
     func handle(_ event: InputEvent) -> EventResult { .ignored }
-
-    func update(elapsed: Double) {
-        elapsedTotal += elapsed
-        if elapsedTotal > 0.1 { hooks.onFramesDrawn() }
-    }
 }
 
 /// 受け取ったマウスイベントを記録し、移動が届いたら終了する `TerminalApp` に準拠する型。
@@ -597,13 +571,11 @@ private struct MouseRecordingApp: TerminalApp {
     @State private(set) var mouseEvents: [MouseEvent] = []
     /// `Application` を終了するかどうか。
     @State private(set) var isFinished = false
-    /// イベントループが 1 周したら立つ。
+    /// 最初の描画が終わり、イベントループが次の `LoopEvent` を待ち始めたら立つ。
     let hasStartedLoop = Latch()
 
-    @State private var elapsedTotal = 0.0
-
     var body: some View {
-        Text("マウスの確認")
+        Text("マウスの確認").task { await watchLoop(hasStartedLoop, hooks) }
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -611,12 +583,6 @@ private struct MouseRecordingApp: TerminalApp {
         mouseEvents.append(mouseEvent)
         if mouseEvent.action == .move { isFinished = true }
         return .handled
-    }
-
-    func update(elapsed: Double) {
-        hasStartedLoop.set()
-        elapsedTotal += elapsed
-        if elapsedTotal > 5 { hooks.onTimeout() }
     }
 }
 
@@ -632,13 +598,11 @@ private struct HoverRecordingApp: TerminalApp {
     @State private(set) var releaseCount = 0
     /// `Application` を終了するかどうか。
     @State private(set) var isFinished = false
-    /// イベントループが 1 周したら立つ。
+    /// 最初の描画が終わり、イベントループが次の `LoopEvent` を待ち始めたら立つ。
     let hasStartedLoop = Latch()
 
-    @State private var elapsedTotal = 0.0
-
     var body: some View {
-        Text("ホバーの確認").onHover { hovers.append($0) }
+        Text("ホバーの確認").onHover { hovers.append($0) }.task { await watchLoop(hasStartedLoop, hooks) }
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -648,12 +612,6 @@ private struct HoverRecordingApp: TerminalApp {
             isFinished = true
         }
         return .handled
-    }
-
-    func update(elapsed: Double) {
-        hasStartedLoop.set()
-        elapsedTotal += elapsed
-        if elapsedTotal > 5 { hooks.onTimeout() }
     }
 }
 
@@ -667,12 +625,10 @@ private struct KeyRecordingApp: TerminalApp {
     @State private(set) var keys: [KeyEvent] = []
     /// `Application` を終了するかどうか。
     @State private(set) var isFinished = false
-    /// イベントループが 1 周したら立つ。
+    /// 最初の描画が終わり、イベントループが次の `LoopEvent` を待ち始めたら立つ。
     let hasStartedLoop = Latch()
 
     private let expectedCount: Int
-    @State private var elapsedTotal = 0.0
-
     /// 終了するまでに受け取るキーの数を決めて作る。
     ///
     /// - Parameters:
@@ -687,7 +643,7 @@ private struct KeyRecordingApp: TerminalApp {
     }
 
     var body: some View {
-        Text("キーの確認")
+        Text("キーの確認").task { await watchLoop(hasStartedLoop, hooks) }
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -695,12 +651,6 @@ private struct KeyRecordingApp: TerminalApp {
         keys.append(keyEvent)
         if keys.count >= expectedCount { isFinished = true }
         return .handled
-    }
-
-    func update(elapsed: Double) {
-        hasStartedLoop.set()
-        elapsedTotal += elapsed
-        if elapsedTotal > 5 { hooks.onTimeout() }
     }
 }
 
@@ -716,13 +666,11 @@ private struct SuspendRecordingApp: TerminalApp {
     @State private(set) var reportedSizes: [Size] = []
     /// `Application` を終了するかどうか。
     @State private(set) var isFinished = false
-    /// イベントループが 1 周したら立つ。
+    /// 最初の描画が終わり、イベントループが次の `LoopEvent` を待ち始めたら立つ。
     let hasStartedLoop = Latch()
 
-    @State private var elapsedTotal = 0.0
-
     var body: some View {
-        Text("一時停止の確認")
+        Text("一時停止の確認").task { await watchLoop(hasStartedLoop, hooks) }
     }
 
     func handle(_ event: InputEvent) -> EventResult {
@@ -733,15 +681,22 @@ private struct SuspendRecordingApp: TerminalApp {
         isFinished = true
         return .handled
     }
-
-    func update(elapsed: Double) {
-        hasStartedLoop.set()
-        elapsedTotal += elapsed
-        if elapsedTotal > 5 { hooks.onTimeout() }
-    }
 }
 
 // MARK: - 補助
+
+/// `hasStartedLoop` を立て、5 秒経っても打ち切られていなければ `hooks` の `AppHooks.onTimeout` を呼び出す。
+///
+/// - Parameters:
+///   - hasStartedLoop: 立てる `Latch`。
+///   - hooks: 呼び出すクロージャを持つ `AppHooks`。
+@MainActor
+private func watchLoop(_ hasStartedLoop: Latch, _ hooks: AppHooks) async {
+    hasStartedLoop.set()
+    try? await Task.sleep(nanoseconds: 5_000_000_000)
+    guard !Task.isCancelled else { return }
+    hooks.onTimeout()
+}
 
 private func setTerminalSize(_ descriptor: Int32, _ size: Size) -> Int32 {
     ctui_test_set_terminal_size(descriptor, Int32(size.width), Int32(size.height))

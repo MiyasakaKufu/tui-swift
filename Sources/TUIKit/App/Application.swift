@@ -25,8 +25,6 @@ public final class Application<Root: TerminalApp> {
     private var buffer: Buffer
     /// 最後に `.resize` として通知したサイズ。
     private var reportedSize = Size.zero
-    /// ``TerminalApp/update(elapsed:)`` の `elapsed` 引数を測り始めた時刻。
-    private var lastFrameTime = 0.0
     private var isRunning = false
     private var hasRun = false
     /// `Application.draw()` を呼び出した回数。
@@ -164,7 +162,6 @@ public final class Application<Root: TerminalApp> {
         _ = root.handle(.resize(buffer.size))
 
         isRunning = true
-        lastFrameTime = monotonicSeconds()
 
         let inputStopped = startReadingInput()
         if root.isFinished {
@@ -176,7 +173,7 @@ public final class Application<Root: TerminalApp> {
         // `LoopEvent` を 1 つ取り出すたびに描き直してはいけない。ループより速く溜まると、
         // 溜まった数だけ描き直しが走り、後から届いたキーが `handle(_:)` に届くまでの遅れが伸び続ける。
         loop: for await _ in eventQueue.arrivals {
-            // 先頭で `TerminalApp.isFinished` を読むのをやめてはいけない。最初の `.resize` か `View.onChange(of:_:)` のクロージャで `true` になったときに、`TerminalApp.update(elapsed:)` を呼び出して描き直してから終わる。
+            // 先頭で `TerminalApp.isFinished` を読むのをやめてはいけない。最初の `.resize` で `true` になったときも周回の後半へ進み、ウィンドウサイズが変わっていれば、終了を宣言した後の `TerminalApp.handle(_:)` へ `.resize` を渡す。
             if root.isFinished { break loop }
 
             let events = eventQueue.take()
@@ -223,12 +220,8 @@ public final class Application<Root: TerminalApp> {
             let sizeBeforeSynchronizing = reportedSize
             if !synchronizeSize() { break loop }
 
-            // 何も起きていない `.idle` で先へ進んではいけない。`ApplicationOptions.frameInterval` が `nil` でも `TerminalApp.update(elapsed:)` が一定の間隔で呼び出され、描き直すたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
+            // 何も起きていない `.idle` で先へ進んではいけない。自己パイプが無いときに一定の間隔で再描画することになり、再描画するたびに `ANSI.beginSynchronizedUpdate` などが端末デバイスへ書き出される。
             if isIdle, reportedSize == sizeBeforeSynchronizing { continue loop }
-
-            let now = monotonicSeconds()
-            root.update(elapsed: now - lastFrameTime)
-            lastFrameTime = now
 
             if !isRunning || root.isFinished { break loop }
             draw()
@@ -258,10 +251,9 @@ public final class Application<Root: TerminalApp> {
         let (stopped, stoppedContinuation) = AsyncStream<Void>.makeStream()
         let descriptor = terminal.inputDescriptor
         let wakeupDescriptor = SignalWatcher.wakeupDescriptor
-        // 自己パイプが無いときに `frameInterval` のまま待ってはいけない。`nil` なら `poll(2)` が
-        // 無期限に待ち、終了時に起こせないので `run()` が戻らない。
-        let isFallingBack = wakeupDescriptor == nil && options.frameInterval == nil
-        let timeout = isFallingBack ? wakeupFallbackInterval : options.frameInterval
+        // 自己パイプが無いときに無期限に待ってはいけない。終了時に `poll(2)` を起こせないので `run()` が戻らない。
+        let isFallingBack = wakeupDescriptor == nil
+        let timeout: Double? = isFallingBack ? wakeupFallbackInterval : nil
         let emptyEvent: LoopEvent = isFallingBack ? .idle : .wake
         let eventQueue = self.eventQueue
 
@@ -343,7 +335,6 @@ public final class Application<Root: TerminalApp> {
     /// 一時停止から戻り、端末デバイスの termios と、端末エミュレータへ送ったモードを設定し直す。
     ///
     /// - Postcondition: 画面全体を描き直し、改めて `.resize` を通知する。
-    ///   止まっていた時間は ``TerminalApp/update(elapsed:)`` の `elapsed` 引数に含めない。
     ///   ``Terminal/reactivate()`` がエラーを投げたらループを終える。
     private func resumeTerminal() {
         do {
@@ -358,7 +349,6 @@ public final class Application<Root: TerminalApp> {
         renderer.invalidate()
         // 止まっている間のサイズ変更では SIGWINCH が届かない。次のループで取り直す。
         reportedSize = .zero
-        lastFrameTime = monotonicSeconds()
     }
 
     /// 端末デバイスのウィンドウサイズの変化を検出し、``Buffer`` を作り直して `.resize` を通知する。
@@ -399,7 +389,7 @@ public final class Application<Root: TerminalApp> {
     }
 }
 
-/// 自己パイプが無く、`frameInterval` も無いときに、`poll(2)` の待ちを切り上げる間隔（秒）。
+/// 自己パイプが無いときに、`poll(2)` の待ちを切り上げる間隔（秒）。
 ///
 /// 起こす手段が無いので、この間隔でループへ戻り、終了とシグナルを確かめる。
 private let wakeupFallbackInterval = 0.1

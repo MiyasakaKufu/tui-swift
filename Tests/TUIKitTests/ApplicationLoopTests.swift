@@ -79,42 +79,6 @@ final class ApplicationLoopTests: XCTestCase {
         try await waitForLoop(loop)
     }
 
-    /// 1 周が `ApplicationOptions.frameInterval` より長くても、キーが `TerminalApp.handle(_:)` に届くまでの遅れが伸び続けない。
-    func testKeyLatencyStaysShortWhenLoopIsSlowerThanFrameInterval() async throws {
-        let pty = try PseudoTerminal()
-        defer { pty.close() }
-        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
-
-        let reader = OutputReader(descriptor: pty.master)
-        let capture = startCapturing(reader)
-        defer { capture.cancel() }
-
-        let app = SlowUpdatingApp(
-            updateDuration: 0.02,
-            keyWrittenAfter: 50,
-            master: pty.master
-        )
-        let application = Application(
-            root: app,
-            options: ApplicationOptions(
-                usesAlternateScreen: false,
-                usesBracketedPaste: false,
-                usesKeyboardProtocol: false,
-                frameInterval: 0.005
-            ),
-            terminal: pty.terminal()
-        )
-        let loop = Task { try await application.run() }
-
-        // テストメソッドの中で待ってからキーを書くように直してはいけない（キーは `SlowUpdatingApp.update(elapsed:)` が書く）。
-        // `.wake` が絶えず溜まっている間、ループはアクタを明け渡さずに回ることがあり、テストの待ちが終わらない。
-        try await waitForLoop(loop, timeout: 20)
-
-        let written = try XCTUnwrap(app.recorder.keyWritten, "キーを書く前にループが終わった")
-        let arrival = try XCTUnwrap(app.recorder.keyArrival, "キーが届かない")
-        XCTAssertLessThan(arrival.timeIntervalSince(written), 0.5)
-    }
-
     /// ループの外から呼び出した `Application.stop()` で、キーを待たずにループが終わる。
     func testStopFromOutsideLoopEndsLoopWithoutKeys() async throws {
         let pty = try PseudoTerminal()
@@ -168,26 +132,6 @@ final class ApplicationLoopTests: XCTestCase {
     }
 
     // MARK: - `TerminalApp.isFinished`
-
-    /// `TerminalApp.update(elapsed:)` で `TerminalApp.isFinished` を `true` にすると、キーを待たずにループが終わる。
-    func testFinishingInUpdateEndsLoopWithoutKeys() async throws {
-        let pty = try PseudoTerminal()
-        defer { pty.close() }
-        XCTAssertEqual(setTerminalSize(pty.master, Size(width: 40, height: 6)), 0)
-
-        let reader = OutputReader(descriptor: pty.master)
-        let capture = startCapturing(reader)
-        defer { capture.cancel() }
-
-        var options = testOptions
-        options.frameInterval = 0.02
-        let app = UpdateFinishingApp()
-        let application = Application(root: app, options: options, terminal: pty.terminal())
-        let loop = Task { try await application.run() }
-
-        try await waitForLoop(loop)
-        XCTAssertGreaterThan(app.recorder.updateCount, 0)
-    }
 
     /// `View.onKeyPress(_:action:)` のクロージャで `TerminalApp.isFinished` を `true` にすると、同じ時点に届いていた残りのキーを渡さずにループが終わる。
     func testFinishingInKeyPressActionSkipsRemainingKeys() async throws {
@@ -287,12 +231,6 @@ private final class LoopRecorder {
     var hasDrawnOnce = false
     /// `TerminalApp.body` が評価された回数。1 回の描画で 1 回評価される。
     var drawCount = 0
-    /// `TerminalApp.update(elapsed:)` が呼び出された回数。
-    var updateCount = 0
-    /// キーを書いた時刻。まだ書いていなければ `nil`。
-    var keyWritten: Date?
-    /// 書いたキーが `TerminalApp.handle(_:)` に届いた時刻。まだ届いていなければ `nil`。
-    var keyArrival: Date?
 }
 
 /// 届いたキーを記録し、`q` で終了する `TerminalApp` に準拠する型。
@@ -321,81 +259,6 @@ private struct LoopRecordingApp: TerminalApp {
         }
         recorder.records.append("key:\(character)")
         return .handled
-    }
-}
-
-/// `TerminalApp.update(elapsed:)` のたびに決めた時間だけアクタを止め、決めた回数に達したらキーを書く `TerminalApp` に準拠する型。
-///
-/// 書いたキーが届いたら終了する。
-private struct SlowUpdatingApp: TerminalApp {
-
-    /// 受け取ったものを書き込む先。
-    let recorder = LoopRecorder()
-    /// `Application` を終了するかどうか。
-    @State private(set) var isFinished = false
-
-    private let updateDuration: Double
-    private let keyWrittenAfter: Int
-    private let master: Int32
-
-    /// 1 周の長さと、キーを書く時点を決めて作る。
-    ///
-    /// - Parameters:
-    ///   - updateDuration: 1 回の `TerminalApp.update(elapsed:)` で止める時間（秒）。
-    ///   - keyWrittenAfter: `TerminalApp.update(elapsed:)` がこの回数に達したらキーを書く。
-    ///   - master: キーを書き込む pty の master の記述子。
-    init(updateDuration: Double, keyWrittenAfter: Int, master: Int32) {
-        self.updateDuration = updateDuration
-        self.keyWrittenAfter = keyWrittenAfter
-        self.master = master
-    }
-
-    /// 止めずに回し、キーを書かないものとして作る。
-    init() {
-        self.init(updateDuration: 0, keyWrittenAfter: 0, master: -1)
-    }
-
-    var body: some View {
-        Text(waitingText)
-    }
-
-    func update(elapsed: Double) {
-        recorder.updateCount += 1
-        if recorder.updateCount == keyWrittenAfter {
-            recorder.keyWritten = Date()
-            writeByte(master, UInt8(ascii: "a"))
-        }
-        // `Thread.sleep` を外してはいけない。1 周が `ApplicationOptions.frameInterval` より短くなり、`.wake` が溜まる条件にならない。
-        Thread.sleep(forTimeInterval: updateDuration)
-    }
-
-    func handle(_ event: InputEvent) -> EventResult {
-        guard case .key(let keyEvent) = event,
-              case .character("a") = keyEvent.key
-        else {
-            return .ignored
-        }
-        recorder.keyArrival = Date()
-        isFinished = true
-        return .handled
-    }
-}
-
-/// 最初の `TerminalApp.update(elapsed:)` で終了する `TerminalApp` に準拠する型。
-private struct UpdateFinishingApp: TerminalApp {
-
-    /// 受け取ったものを書き込む先。
-    let recorder = LoopRecorder()
-    /// `Application` を終了するかどうか。
-    @State private(set) var isFinished = false
-
-    var body: some View {
-        Text(waitingText)
-    }
-
-    func update(elapsed: Double) {
-        recorder.updateCount += 1
-        isFinished = true
     }
 }
 

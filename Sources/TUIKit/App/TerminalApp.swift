@@ -68,17 +68,9 @@ public protocol TerminalApp {
 
     /// ``Application`` を終了するかどうか。
     ///
-    /// - Note: ``Application`` は、``TerminalApp/handle(_:)``・``View/onKeyPress(_:action:)`` のクロージャ・``TerminalApp/update(elapsed:)`` を呼び出すたびと、イベントループが一巡するたびに読み、`true` ならイベントループを抜ける。同じ時点に届いていた残りの ``InputEvent`` は渡さない。
+    /// - Note: ``Application`` は、``TerminalApp/handle(_:)``・``View/onKeyPress(_:action:)`` のクロージャを呼び出すたびと、イベントループが一巡するたびに読み、`true` ならイベントループを抜ける。同じ時点に届いていた残りの ``InputEvent`` は渡さない。
     /// - Note: ``State`` を付けたプロパティで書けば、``View/onKeyPress(_:action:)`` のクロージャや ``View/task(_:)`` のクロージャからも `true` にできる。
     var isFinished: Bool { get }
-
-    /// `Application.draw()` の直前に、前に呼び出されてからの経過秒数を受け取る。
-    ///
-    /// - Parameters:
-    ///   - elapsed: 前に ``TerminalApp/update(elapsed:)`` を呼び出してからの経過秒数。
-    ///     初回は ``Application/run()`` が最初の `.resize` を通知した時点から測り、一時停止していた時間は含めない。
-    /// - Note: ``InputEvent`` を処理するたびと、状態が変わって再描画するたびに呼び出され、``ApplicationOptions/frameInterval`` を設定したときは、入力が無くてもその間隔で呼び出される。最初の `Application.draw()` の前には呼び出されない。
-    func update(elapsed: Double)
 }
 
 extension TerminalApp {
@@ -99,13 +91,6 @@ extension TerminalApp {
 
     /// `false`。Ctrl+C（``ApplicationOptions/quitsOnControlC``）か終了シグナルで終了する。
     public var isFinished: Bool { false }
-
-    /// 何もしない。
-    ///
-    /// - Parameters:
-    ///   - elapsed: 前に ``TerminalApp/update(elapsed:)`` を呼び出してからの経過秒数。
-    ///     初回は ``Application/run()`` が最初の `.resize` を通知した時点から測り、一時停止していた時間は含めない。
-    public func update(elapsed: Double) {}
 
     /// 引数のないイニシャライザで作ったインスタンスと ``TerminalApp/options`` で ``Application`` を起動し、終了するまでイベントループを回す。
     ///
