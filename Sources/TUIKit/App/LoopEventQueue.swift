@@ -5,14 +5,14 @@ import Synchronization
 /// どのスレッド・どの `Task` からでも入れられる。
 ///
 /// - Invariant: 溜まっている `.wake` と `.idle` は、それぞれ多くとも 1 つ。
-///   `.inputs` と `.message` は、入れた順にすべて残る。
-final class LoopEventQueue<Message: Sendable>: Sendable {
+///   `.inputs` と `.invalidated` は、入れた順にすべて残る。
+final class LoopEventQueue: Sendable {
 
     /// `Mutex` で守る、溜まっている `LoopEvent` と閉じたかどうか。
     private struct State {
-        // `.inputs` と `.message` の数に上限を付けてはいけない。溢れた分を捨てることになり、
-        // `MessageSender` で送られた値で埋まると、後から届いたキーが捨てられて終われなくなる。
-        var pending: [LoopEvent<Message>] = []
+        // `.inputs` の数に上限を付けてはいけない。溢れた分を捨てることになり、
+        // ループが遅れている間に届いたキーが `TerminalApp.handle(_:)` に届かないまま失われる。
+        var pending: [LoopEvent] = []
         var hasPendingWake = false
         var hasPendingIdle = false
         var isClosed = false
@@ -22,7 +22,7 @@ final class LoopEventQueue<Message: Sendable>: Sendable {
     let arrivals: AsyncStream<Void>
 
     private let arrivalContinuation: AsyncStream<Void>.Continuation
-    // `actor` にしたり `@MainActor` に隔離したりしてはいけない。入力スレッドと `MessageSender.send(_:)` は
+    // `actor` にしたり `@MainActor` に隔離したりしてはいけない。入力スレッドと、状態の変化を知らせる `RedrawTrigger` は
     // 同期の文脈から入れるので `Task` を介して渡すことになり、`Task` 同士の実行順が保証されないため、
     // 入れた順が崩れる。
     private let state = Mutex(State())
@@ -42,7 +42,7 @@ final class LoopEventQueue<Message: Sendable>: Sendable {
     ///   - event: 入れる `LoopEvent`。`.wake` と `.idle` は、同じものが既に溜まっていれば入れない。
     /// - Returns: 受け付けたなら `true`。`close()` の後なら `false`。
     @discardableResult
-    func post(_ event: LoopEvent<Message>) -> Bool {
+    func post(_ event: LoopEvent) -> Bool {
         let accepted: Bool = state.withLock { state in
             guard !state.isClosed else { return false }
             switch event {
@@ -52,7 +52,7 @@ final class LoopEventQueue<Message: Sendable>: Sendable {
             case .idle:
                 if !state.hasPendingIdle { state.pending.append(event) }
                 state.hasPendingIdle = true
-            case .inputs, .message:
+            case .inputs, .invalidated:
                 state.pending.append(event)
             }
             return true
@@ -68,7 +68,7 @@ final class LoopEventQueue<Message: Sendable>: Sendable {
     /// 溜まっている `LoopEvent` を、入れた順にすべて取り出す。
     ///
     /// - Returns: 取り出した `LoopEvent`。何も溜まっていなければ空。
-    func take() -> [LoopEvent<Message>] {
+    func take() -> [LoopEvent] {
         state.withLock { state in
             let events = state.pending
             state.pending = []

@@ -1,3 +1,5 @@
+import Observation
+
 /// 1 行のテキスト入力（``TextField``）が使うクラス。
 ///
 /// 内容（``TextFieldState/text``）とカーソル位置（``TextFieldState/cursor``）を扱う。内容は自分で持つか、`TextField(text:state:placeholder:style:placeholderStyle:showsCursor:)` に ``Binding`` で渡すプロパティを読み書きする。カーソル位置はどちらの場合もここに置く。
@@ -5,6 +7,7 @@
 /// - Invariant: 内容もカーソル位置も書記素クラスタ（`Character`）単位で、
 ///   国旗や ZWJ で結合した絵文字も 1 文字として数える。
 @MainActor
+@Observable
 public final class TextFieldState {
     private var ownedCharacters: [Character]
     private var textBinding: Binding<String>?
@@ -46,8 +49,9 @@ public final class TextFieldState {
     ///   - text: 初期の文字列。1 行に置けない文字は取り除かれる。
     /// - Postcondition: カーソルは末尾に来る。
     public init(text: String = "") {
-        self.ownedCharacters = TextFieldState.sanitizedCharacters(of: text)
-        self.storedCursor = ownedCharacters.count
+        let characters = TextFieldState.sanitizedCharacters(of: text)
+        self.ownedCharacters = characters
+        self.storedCursor = characters.count
     }
 
     /// 内容の読み書きを `text` へ向ける。

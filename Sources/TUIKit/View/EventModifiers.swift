@@ -72,6 +72,65 @@ extension HoverView: HoverHandlingView {
     var hoverAction: @MainActor (Bool) -> Void { action }
 }
 
+/// 初めて描かれたときに非同期のクロージャを `Task` の中で呼び出し、描かれなくなったらその `Task` を打ち切る ``View``。``View/task(_:)`` で作る。
+public struct TaskView<Content: View>: View {
+    /// `Task` を結び付ける ``View``。
+    public var content: Content
+    /// `Task` の中で呼び出すクロージャ。
+    let action: @MainActor @Sendable () async -> Void
+
+    /// ``TaskView`` を作る。
+    ///
+    /// - Parameters:
+    ///   - content: `Task` を結び付ける ``View``。
+    ///   - action: `Task` の中で呼び出すクロージャ。
+    init(content: Content, action: @escaping @MainActor @Sendable () async -> Void) {
+        self.content = content
+        self.action = action
+    }
+
+    /// `Task` を結び付けた ``TaskView/content``。
+    public var body: Content { content }
+}
+
+/// ``View/task(_:)`` で作った ``View`` が、たどったときに `ApplicationContext` へ示すもの。
+@MainActor
+protocol TaskStartingView {
+    /// `node` でまだ `Task` を始めていなければ始める。
+    ///
+    /// - Parameters:
+    ///   - node: この ``View`` の `ViewNode`。
+    func startTaskIfNeeded(in node: ViewNode)
+}
+
+extension TaskView: TaskStartingView {
+    /// `node` でまだ `Task` を始めていなければ始める。
+    ///
+    /// - Parameters:
+    ///   - node: この ``View`` の `ViewNode`。
+    /// - Postcondition: 始めた `Task` は、`node` が捨てられたときに打ち切られる。
+    func startTaskIfNeeded(in node: ViewNode) {
+        let holder = node.object(for: taskHolderLabel) { TaskHolder() }
+        guard holder.task == nil else { return }
+        let action = self.action
+        holder.task = Task { await action() }
+    }
+}
+
+// Swift の識別子に使える名前へ変えたくなるが、`View.task(_:)` を付けた `View` が同じ名前のプロパティに `@State` を付けていると、`ViewNode` の同じ記憶域を取り合い、どちらかの値が失われる。
+/// ``TaskView`` が `ViewNode` に置く記憶域の名前。
+private let taskHolderLabel = "task(_:)"
+
+/// ``TaskView`` が始めた `Task` を持ち、捨てられるときに打ち切るクラス。
+final class TaskHolder {
+    /// 始めた `Task`。まだ始めていなければ `nil`。
+    var task: Task<Void, Never>?
+
+    deinit {
+        task?.cancel()
+    }
+}
+
 /// ``ChangeObservingView/value`` の変化を見つけてクロージャを呼び出す ``View``。``View/onChange(of:_:)`` で作る。
 public struct ChangeObservingView<Content: View, Value: Equatable>: View {
     /// ``ChangeObservingView/value`` を見張る間に描く ``View``。
@@ -183,14 +242,40 @@ extension View {
         HoverView(content: self, action: action)
     }
 
+    /// この ``View`` が初めて描かれたときに `action` を `Task` の中で呼び出し、描かれなくなったらその `Task` を打ち切る。
+    ///
+    /// ```swift
+    /// struct ReportView: View {
+    ///     @State private var report = "読み込んでいます…"
+    ///
+    ///     var body: some View {
+    ///         Text(report)
+    ///             .task {
+    ///                 report = await loadReport()
+    ///             }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - action: `Task` の中で呼び出すクロージャ。
+    /// - Returns: `action` を結び付けた ``TaskView``。
+    /// - Note: `action` の中で ``State`` を付けたプロパティへ代入すると、その値を読んでいる ``View`` が再描画される。
+    /// - Note: 描かれなくなるとは、``State`` の記憶域が捨てられるのと同じ規則で、この ``View`` の記憶域が捨てられること。``Application/run()`` が戻るときにも打ち切る。
+    /// - Note: 打ち切った後、`action` が終わるのを待たない。`action` は `Task.isCancelled` などで打ち切りに応じる。
+    public func task(_ action: @escaping @MainActor @Sendable () async -> Void) -> TaskView<Self> {
+        TaskView(content: self, action: action)
+    }
+
     /// `value` が前の `Application.draw()` の 1 回から変わったら、その `Application.draw()` の 1 回が終わった後に `action` を呼び出す。
     ///
     /// - Parameters:
     ///   - value: 見張る値。
     ///   - action: `value` が変わったときに呼び出すクロージャ。
     /// - Returns: `value` を見張る ``ChangeObservingView``。
-    /// - Note: 比べるのは、描画より前にたどったときの値どうし。`action` を呼び出した後、`Application.draw()` をもう 1 回行う。そのもう 1 回で値がまた変わっても、`action` は呼び出すが、さらには描き直さない。
+    /// - Note: 比べるのは、描画より前にたどったときの値どうし。`action` の中で、その `Application.draw()` の 1 回で読んだ状態へ代入すると、もう 1 回再描画する。
     /// - Note: `action` の中では、``State``・``FocusState`` を付けたプロパティへ代入してよい。
+    /// - Warning: 2 つ以上の `action` が、互いの `value` を変え続けるように代入すると、再描画が止まらない。``InputEvent`` は再描画の合間に処理するので止まりはしないが、CPU を使い続ける。
     public func onChange<Value: Equatable>(
         of value: Value,
         _ action: @escaping @MainActor () -> Void
@@ -204,8 +289,9 @@ extension View {
     ///   - value: 見張る値。
     ///   - action: `value` が変わったときに、変化の前の値と後の値を受け取るクロージャ。
     /// - Returns: `value` を見張る ``ChangeObservingView``。
-    /// - Note: 比べるのは、描画より前にたどったときの値どうし。`action` を呼び出した後、`Application.draw()` をもう 1 回行う。そのもう 1 回で値がまた変わっても、`action` は呼び出すが、さらには描き直さない。
+    /// - Note: 比べるのは、描画より前にたどったときの値どうし。`action` の中で、その `Application.draw()` の 1 回で読んだ状態へ代入すると、もう 1 回再描画する。
     /// - Note: `action` の中では、``State``・``FocusState`` を付けたプロパティへ代入してよい。
+    /// - Warning: 2 つ以上の `action` が、互いの `value` を変え続けるように代入すると、再描画が止まらない。``InputEvent`` は再描画の合間に処理するので止まりはしないが、CPU を使い続ける。
     public func onChange<Value: Equatable>(
         of value: Value,
         _ action: @escaping @MainActor (_ oldValue: Value, _ newValue: Value) -> Void

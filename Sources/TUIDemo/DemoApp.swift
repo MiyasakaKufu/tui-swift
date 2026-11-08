@@ -4,7 +4,7 @@ import TUIKit
 ///
 ///   swift run tui-demo
 @main
-final class DemoApp: TerminalApp {
+struct DemoApp: TerminalApp {
     static var options: ApplicationOptions {
         // `ApplicationOptions.frameInterval` を設定してはいけない。一覧が読み込み終わった時点で描き直されたのか、その間隔で描き直されたのかが、このデモで見分けられなくなる。
         ApplicationOptions(
@@ -13,12 +13,6 @@ final class DemoApp: TerminalApp {
             windowTitle: "TUIKit デモ",
             cursorShape: .blinkingBar
         )
-    }
-
-    /// ``DemoApp/task(sender:)`` が送る値。
-    enum Message: Sendable {
-        /// 一覧を読み込み終わった。
-        case itemsLoaded([String])
     }
 
     /// 一覧を読み込み終わるまで出す項目。
@@ -40,14 +34,14 @@ final class DemoApp: TerminalApp {
         "ウィンドウサイズ変更への追従",
         "View の重ね描きとダイアログ",
         "マウスポインタが上にある View の強調",
-        "TerminalApp.task(sender:) で読み込んだ一覧の表示",
+        "View.task(_:) で読み込んだ一覧の表示",
     ]
 
-    private var items = DemoApp.placeholderItems
-    private(set) var isFinished = false
-    private var progress = 0.35
-    private var lastEventDescription = "（まだ入力はありません）"
-    private var terminalSize = Size(width: 0, height: 0)
+    @State private var items = DemoApp.placeholderItems
+    @State private(set) var isFinished = false
+    @State private var progress = 0.35
+    @State private var lastEventDescription = "（まだ入力はありません）"
+    @State private var terminalSize = Size(width: 0, height: 0)
 
     var body: some View {
         DemoScreen(
@@ -57,19 +51,17 @@ final class DemoApp: TerminalApp {
             terminalSize: terminalSize
         )
         .tint(.green)
-    }
-
-    func task(sender: MessageSender<Message>) async {
-        try? await Task.sleep(for: DemoApp.simulatedLoadDuration)
-        sender.send(.itemsLoaded(DemoApp.loadedItems))
-    }
-
-    func receive(_ message: Message) -> EventResult {
-        switch message {
-        case .itemsLoaded(let loaded):
-            items = loaded
-            return .handled
+        .task {
+            items = await DemoApp.loadItems()
         }
+    }
+
+    /// 通信の待ちを模して、少し待ってから一覧を返す。
+    ///
+    /// - Returns: 読み込んだ一覧。
+    private static func loadItems() async -> [String] {
+        try? await Task.sleep(for: simulatedLoadDuration)
+        return loadedItems
     }
 
     func handle(_ event: InputEvent) -> EventResult {

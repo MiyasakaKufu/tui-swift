@@ -1,7 +1,10 @@
+import Observation
+
 /// 選択位置とスクロール位置を扱う、``ListView`` が使うクラス。
 ///
 /// 選択位置は自分で持つか、`ListView(items:selection:state:style:selectedStyle:selectionMarker:marginMarker:)` に ``Binding`` で渡すプロパティを読み書きする。スクロール位置（``ListState/scrollOffset``）はどちらの場合もここに置く。
 @MainActor
+@Observable
 public final class ListState {
     private var ownedSelection: Int = 0
     private var selectionBinding: Binding<Int>?

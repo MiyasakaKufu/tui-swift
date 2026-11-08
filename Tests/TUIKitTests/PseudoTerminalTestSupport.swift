@@ -6,6 +6,9 @@ import Glibc
 
 import Foundation
 import Synchronization
+import XCTest
+import CTUITestSupport
+@testable import TUIKit
 
 /// スレッドをまたいで一度だけ立てるフラグ。
 final class Latch: Sendable {
@@ -102,4 +105,85 @@ final class OutputDrain: Sendable {
         guard recordsOutput else { return }
         recorded.withLock { $0.append(contentsOf: bytes) }
     }
+}
+
+/// テスト用の疑似端末。ウィンドウサイズを 40×6 にし、master を `OutputDrain` で読み続ける。
+final class DrainedPseudoTerminal {
+    enum Failure: Error {
+        case unavailable(errno: Int32)
+    }
+
+    let master: Int32
+    let slave: Int32
+
+    private let drain: OutputDrain
+    private var isClosed = false
+
+    init() throws {
+        var master: Int32 = -1
+        var slave: Int32 = -1
+        guard ctui_test_open_pty(&master, &slave) == 0 else {
+            throw Failure.unavailable(errno: errno)
+        }
+        self.master = master
+        self.slave = slave
+        XCTAssertEqual(ctui_test_set_terminal_size(master, 40, 6), 0)
+        drain = OutputDrain(descriptor: master, recordsOutput: true)
+        drain.start()
+    }
+
+    deinit {
+        close()
+    }
+
+    /// master から読んだ内容。
+    var output: String {
+        drain.output
+    }
+
+    /// slave を入出力に使う `Terminal` を作る。
+    ///
+    /// - Returns: slave につながった `Terminal`。
+    @MainActor
+    func terminal() -> Terminal {
+        Terminal(input: slave, output: slave)
+    }
+
+    /// master へ 1 バイト書く。
+    ///
+    /// - Parameters:
+    ///   - byte: 書き込むバイト。
+    func write(_ byte: UInt8) {
+        var value = byte
+        _ = writeDescriptor(master, &value, 1)
+    }
+
+    func close() {
+        guard !isClosed else { return }
+        isClosed = true
+        // 読み取りスレッドを止める前に閉じてはいけない。`poll(2)` の中に残ったスレッドが、次に開いた疑似端末の出力を横取りする。
+        drain.stop()
+        closeDescriptor(slave)
+        closeDescriptor(master)
+    }
+}
+
+// クラスの中から `close(2)` と `write(2)` は直接呼び出せない。メンバーの `close()`・`write(_:)` が先に見つかる。
+/// ファイル記述子を閉じる。
+///
+/// - Parameters:
+///   - descriptor: 閉じるファイル記述子。
+private func closeDescriptor(_ descriptor: Int32) {
+    _ = close(descriptor)
+}
+
+/// `write(2)` を呼び出す。
+///
+/// - Parameters:
+///   - descriptor: 書き込む先のファイル記述子。
+///   - buffer: 書き込むバイト列の先頭。
+///   - count: 書き込むバイト数。
+/// - Returns: `write(2)` の戻り値。
+private func writeDescriptor(_ descriptor: Int32, _ buffer: UnsafeRawPointer, _ count: Int) -> Int {
+    write(descriptor, buffer, count)
 }
