@@ -21,13 +21,13 @@ public struct PaddingView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``PaddingView/content`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: content, index: 0)
+        context.layoutTraits(of: ViewList.Element(content), slot: 0)
     }
 
     /// ``PaddingView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値に ``PaddingView/insets`` を足した ``Size`` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``PaddingView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値に ``PaddingView/insets`` を足した ``Size``。`proposal` は超えない。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
@@ -35,7 +35,7 @@ public struct PaddingView<Content: View>: PrimitiveView {
             width: proposal.width - insets.horizontal,
             height: proposal.height - insets.vertical
         )
-        let desired = context.sizeThatFits(of: content, index: 0, proposal: inner)
+        let desired = context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: inner)
         return Size(
             width: min(desired.width + insets.horizontal, proposal.width),
             height: min(desired.height + insets.vertical, proposal.height)
@@ -51,15 +51,15 @@ public struct PaddingView<Content: View>: PrimitiveView {
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         let inner = rect.inset(by: insets)
         guard !inner.isEmpty else { return }
-        context.render(content, index: 0, into: &buffer, rect: inner)
+        context.render(ViewList.Element(content), slot: 0, into: &buffer, rect: inner)
     }
 
-    /// ``PaddingView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    /// ``PaddingView/content`` を、`slot` 引数を 0 として `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
     }
 }
 
@@ -101,18 +101,18 @@ public struct BorderView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``BorderView/content`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: content, index: 0)
+        context.layoutTraits(of: ViewList.Element(content), slot: 0)
     }
 
     /// ``BorderView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値に、枠線の ``Cell`` 2 個分・2 行を足した ``Size`` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``BorderView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値に枠線を足した ``Size``。見出しがあれば、それが収まる幅まで広げる。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
         let inner = Size(width: proposal.width - 2, height: proposal.height - 2)
-        let desired = context.sizeThatFits(of: content, index: 0, proposal: inner)
+        let desired = context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: inner)
         var width = desired.width + 2
         if let titleText = title {
             let ambiguous = context.ambiguousWidth
@@ -142,7 +142,7 @@ public struct BorderView<Content: View>: PrimitiveView {
         drawFrame(into: &buffer, rect: rect, style: style, ambiguous: context.ambiguousWidth)
         let inner = rect.inset(by: 1)
         if !inner.isEmpty {
-            context.render(content, index: 0, into: &buffer, rect: inner)
+            context.render(ViewList.Element(content), slot: 0, into: &buffer, rect: inner)
         }
     }
 
@@ -201,12 +201,12 @@ public struct BorderView<Content: View>: PrimitiveView {
         }
     }
 
-    /// ``BorderView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    /// ``BorderView/content`` を、`slot` 引数を 0 として `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
     }
 }
 
@@ -235,17 +235,17 @@ public struct BackgroundView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``BackgroundView/content`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: content, index: 0)
+        context.layoutTraits(of: ViewList.Element(content), slot: 0)
     }
 
     /// ``BackgroundView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``BackgroundView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: content, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: proposal)
     }
 
     /// `rect` を塗ってから、背景色を ``BackgroundView/color`` にして ``BackgroundView/content`` を描画する。
@@ -259,15 +259,15 @@ public struct BackgroundView<Content: View>: PrimitiveView {
         context.recordHitRegion(rect)
         let colored = context.withColors { $0.background = color }
         buffer.fill(rect, style: colored.colors.style(.hierarchical(.primary)))
-        colored.render(content, index: 0, into: &buffer, rect: rect)
+        colored.render(ViewList.Element(content), slot: 0, into: &buffer, rect: rect)
     }
 
-    /// ``BackgroundView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    /// ``BackgroundView/content`` を、`slot` 引数を 0 として `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
     }
 }
 
@@ -316,7 +316,7 @@ public struct FrameView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``FrameView/content`` の ``View/layoutTraits(context:)`` の戻り値の、``FrameView/width`` を固定していれば ``LayoutTraits/horizontalFlex``、``FrameView/height`` を固定していれば ``LayoutTraits/verticalFlex`` を 0 にした ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        let traits = context.layoutTraits(of: content, index: 0)
+        let traits = context.layoutTraits(of: ViewList.Element(content), slot: 0)
         return LayoutTraits(
             horizontalFlex: width == nil ? traits.horizontalFlex : 0,
             verticalFlex: height == nil ? traits.verticalFlex : 0
@@ -326,11 +326,11 @@ public struct FrameView<Content: View>: PrimitiveView {
     /// 固定したサイズ、または ``FrameView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値を返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: 固定した方向は ``FrameView/width``・``FrameView/height``、固定していない方向は ``FrameView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        let desired = context.sizeThatFits(of: content, index: 0, proposal: proposal)
+        let desired = context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: proposal)
         return Size(
             width: min(width ?? desired.width, proposal.width),
             height: min(height ?? desired.height, proposal.height)
@@ -350,15 +350,15 @@ public struct FrameView<Content: View>: PrimitiveView {
         let x = rect.minX + horizontalAlignment.offset(content: contentWidth, available: rect.width)
         let y = rect.minY + verticalAlignment.offset(content: contentHeight, available: rect.height)
         let contentRect = Rect(x: x, y: y, width: contentWidth, height: contentHeight)
-        context.render(content, index: 0, into: &buffer, rect: contentRect)
+        context.render(ViewList.Element(content), slot: 0, into: &buffer, rect: contentRect)
     }
 
-    /// ``FrameView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    /// ``FrameView/content`` を、`slot` 引数を 0 として `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
     }
 }
 
@@ -389,11 +389,11 @@ public struct FlexibleView<Content: View>: PrimitiveView {
     /// ``FlexibleView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``FlexibleView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: content, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: proposal)
     }
 
     /// `rect` へ ``FlexibleView/content`` をそのまま描画する。
@@ -403,15 +403,15 @@ public struct FlexibleView<Content: View>: PrimitiveView {
     ///   - rect: 描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
-        context.render(content, index: 0, into: &buffer, rect: rect)
+        context.render(ViewList.Element(content), slot: 0, into: &buffer, rect: rect)
     }
 
-    /// ``FlexibleView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    /// ``FlexibleView/content`` を、`slot` 引数を 0 として `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
     }
 }
 
@@ -446,7 +446,7 @@ public struct AlignedView<Content: View>: PrimitiveView {
     /// `proposal` をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: `proposal` と同じサイズ。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { proposal }
@@ -459,19 +459,19 @@ public struct AlignedView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
-        let desired = context.sizeThatFits(of: content, index: 0, proposal: rect.size)
+        let desired = context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: rect.size)
             .clamped(to: rect.size)
         let x = rect.minX + horizontal.offset(content: desired.width, available: rect.width)
         let y = rect.minY + vertical.offset(content: desired.height, available: rect.height)
-        context.render(content, index: 0, into: &buffer, rect: Rect(origin: Point(x: x, y: y), size: desired))
+        context.render(ViewList.Element(content), slot: 0, into: &buffer, rect: Rect(origin: Point(x: x, y: y), size: desired))
     }
 
-    /// ``AlignedView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    /// ``AlignedView/content`` を、`slot` 引数を 0 として `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
     }
 }
 

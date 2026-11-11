@@ -6,13 +6,16 @@ public struct ViewVisitor {
     /// `ViewVisitor.node` を持つ `ViewGraph`。
     let graph: ViewGraph
 
-    /// `child` と、`child` から ``RenderContext`` のメソッドに `child` 引数として渡されうる ``View`` をたどる。
+    /// `child` の ``View`` と、その ``View`` から ``RenderContext`` のメソッドに `child` 引数として渡されうる ``View`` をたどる。
     ///
     /// - Parameters:
-    ///   - child: ``RenderContext`` のメソッドに `child` 引数として渡しうる ``View``。
-    ///   - index: `child` を ``RenderContext`` のメソッドに渡すときの `index:` 引数。
-    public func visit(_ child: some View, index: Int) {
-        let childNode = graph.node(at: node.path.appending(child, index: index), viewType: type(of: child))
-        graph.visit(child, node: childNode)
+    ///   - child: ``RenderContext`` のメソッドに `child` 引数として渡しうる ``ViewList/Element``。
+    ///   - slot: `child` を ``RenderContext`` のメソッドに渡すときの `slot` 引数。
+    public func visit(_ child: ViewList.Element, slot: Int) {
+        func visitView(_ view: some View) {
+            let childNode = graph.node(at: node.path.appending(child, slot: slot), viewType: type(of: view))
+            graph.visit(view, node: childNode)
+        }
+        visitView(child.view)
     }
 }

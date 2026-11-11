@@ -2,26 +2,49 @@
 @MainActor
 enum OverlayLayout {
 
-    /// 重ねる ``View`` に割り当てる矩形を求める。
+    /// 重ねる ``ViewList/Element`` の ``View`` に割り当てる矩形を求める。
     ///
     /// - Parameters:
-    ///   - child: 重ねて描く ``View``。
-    ///   - index: `child` を ``RenderContext`` のメソッドに渡すときの `index:` 引数。
+    ///   - element: 重ねて描く ``View`` を持つ ``ViewList/Element``。
+    ///   - slot: `element` を ``RenderContext`` のメソッドに渡すときの `slot` 引数。
     ///   - rect: 重ね先の矩形。
     ///   - horizontal: 横に寄せる向き。
     ///   - vertical: 縦に寄せる向き。
-    ///   - context: ``ZStack`` などが `context` 引数で受け取った ``RenderContext``。
-    /// - Returns: `rect` に収まる、`child` の矩形。`child` の ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` が 1 以上の方向では `rect` いっぱいになる。
+    ///   - context: ``ZStack`` が `context` 引数で受け取った ``RenderContext``。
+    /// - Returns: `rect` に収まる、`element` の ``View`` の矩形。`element` の ``View`` の ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` が 1 以上の方向では `rect` いっぱいになる。
     static func childRect(
-        for child: any View,
-        index: Int,
+        for element: ViewList.Element,
+        slot: Int,
         in rect: Rect,
         horizontal: HorizontalAlignment,
         vertical: VerticalAlignment,
         context: RenderContext
     ) -> Rect {
-        let traits = context.layoutTraits(of: child, index: index)
-        let desired = context.sizeThatFits(of: child, index: index, proposal: rect.size)
+        place(
+            traits: context.layoutTraits(of: element, slot: slot),
+            desired: context.sizeThatFits(of: element, slot: slot, proposal: rect.size),
+            in: rect,
+            horizontal: horizontal,
+            vertical: vertical
+        )
+    }
+
+    /// ``LayoutTraits`` と ``View/sizeThatFits(_:context:)`` の戻り値から、重ねる ``View`` に割り当てる矩形を求める。
+    ///
+    /// - Parameters:
+    ///   - traits: 重ねて描く ``View`` の ``LayoutTraits``。
+    ///   - desired: 重ねて描く ``View`` の ``View/sizeThatFits(_:context:)`` の戻り値。
+    ///   - rect: 重ね先の矩形。
+    ///   - horizontal: 横に寄せる向き。
+    ///   - vertical: 縦に寄せる向き。
+    /// - Returns: `rect` に収まる矩形。`traits` の ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` が 1 以上の方向では `rect` いっぱいになる。
+    private static func place(
+        traits: LayoutTraits,
+        desired: Size,
+        in rect: Rect,
+        horizontal: HorizontalAlignment,
+        vertical: VerticalAlignment
+    ) -> Rect {
         let width = traits.horizontalFlex > 0 ? rect.width : min(desired.width, rect.width)
         let height = traits.verticalFlex > 0 ? rect.height : min(desired.height, rect.height)
         return Rect(
@@ -37,8 +60,8 @@ enum OverlayLayout {
 ///
 /// ``ZStack/children`` の後ろにある ``View`` ほど手前に描かれる。下の ``View`` を確実に覆うには、重ねる ``View`` に ``View/background(_:)`` や ``Fill`` を使って領域を塗る。
 public struct ZStack: PrimitiveView {
-    /// 重ねる ``View``。先頭が最背面。
-    public var children: [any View]
+    /// 重ねる ``View`` の ``ViewList``。先頭が最背面。
+    public var children: ViewList
     /// 中の ``View`` を横に寄せる向き。
     public var horizontal: HorizontalAlignment
     /// 中の ``View`` を縦に寄せる向き。
@@ -53,7 +76,7 @@ public struct ZStack: PrimitiveView {
     public init(
         horizontal: HorizontalAlignment = .center,
         vertical: VerticalAlignment = .center,
-        @ViewBuilder content: () -> [any View]
+        @ViewBuilder content: () -> ViewList
     ) {
         self.children = content()
         self.horizontal = horizontal
@@ -63,7 +86,7 @@ public struct ZStack: PrimitiveView {
     /// 中の ``View`` の配列と寄せる向きから ``ZStack`` を作る。
     ///
     /// - Parameters:
-    ///   - children: 重ねる ``View``。先頭が最背面。
+    ///   - children: 重ねる ``View``。先頭が最背面。配列の中の位置を、``ViewBuilder`` のクロージャで書いた位置として使う。
     ///   - horizontal: 中の ``View`` を横に寄せる向き。
     ///   - vertical: 中の ``View`` を縦に寄せる向き。
     public init(
@@ -71,7 +94,7 @@ public struct ZStack: PrimitiveView {
         horizontal: HorizontalAlignment = .center,
         vertical: VerticalAlignment = .center
     ) {
-        self.children = children
+        self.children = ViewList(children)
         self.horizontal = horizontal
         self.vertical = vertical
     }
@@ -82,7 +105,7 @@ public struct ZStack: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``LayoutTraits/horizontalFlex``・``LayoutTraits/verticalFlex`` のそれぞれに、中の ``View`` での最大をとった ``LayoutTraits``。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        let traits = children.enumerated().map { context.layoutTraits(of: $1, index: $0) }
+        let traits = children.map { context.layoutTraits(of: $0, slot: 0) }
         return LayoutTraits(
             horizontalFlex: traits.map(\.horizontalFlex).max() ?? 0,
             verticalFlex: traits.map(\.verticalFlex).max() ?? 0
@@ -92,7 +115,7 @@ public struct ZStack: PrimitiveView {
     /// 中の ``View`` のうち最も大きいものに合わせたサイズを返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: 幅・高さのそれぞれで、中の ``View`` の ``View/sizeThatFits(_:context:)`` の戻り値の最大に合わせたサイズ。
     ///   `proposal` は超えない。
@@ -100,8 +123,8 @@ public struct ZStack: PrimitiveView {
         guard !children.isEmpty else { return .zero }
         var width = 0
         var height = 0
-        for (index, child) in children.enumerated() {
-            let desired = context.sizeThatFits(of: child, index: index, proposal: proposal)
+        for child in children {
+            let desired = context.sizeThatFits(of: child, slot: 0, proposal: proposal)
             width = max(width, desired.width)
             height = max(height, desired.height)
         }
@@ -116,26 +139,26 @@ public struct ZStack: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
-        for (index, child) in children.enumerated() {
+        for child in children {
             let childRect = OverlayLayout.childRect(
                 for: child,
-                index: index,
+                slot: 0,
                 in: rect,
                 horizontal: horizontal,
                 vertical: vertical,
                 context: context
             )
-            context.render(child, index: index, into: &buffer, rect: childRect)
+            context.render(child, slot: 0, into: &buffer, rect: childRect)
         }
     }
 
-    /// ``ZStack/children`` の ``View`` を、並びの中の位置を `index:` 引数として、並びの順に `visitor` に渡す。
+    /// ``ZStack/children`` の要素を、`slot` 引数を 0 として、並びの順に `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        for (index, child) in children.enumerated() {
-            visitor.visit(child, index: index)
+        for child in children {
+            visitor.visit(child, slot: 0)
         }
     }
 }
@@ -178,17 +201,17 @@ public struct OverlayView<Content: View, Overlay: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``OverlayView/content`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: content, index: 0)
+        context.layoutTraits(of: ViewList.Element(content), slot: 0)
     }
 
     /// ``OverlayView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``OverlayView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値。``OverlayView/overlay`` の大きさは影響しない。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: content, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: proposal)
     }
 
     /// ``OverlayView/content`` を描いてから、その上へ ``OverlayView/overlay`` を描画する。
@@ -199,25 +222,25 @@ public struct OverlayView<Content: View, Overlay: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         guard !rect.isEmpty else { return }
-        context.render(content, index: 0, into: &buffer, rect: rect)
+        context.render(ViewList.Element(content), slot: 0, into: &buffer, rect: rect)
         let overlayRect = OverlayLayout.childRect(
-            for: overlay,
-            index: 1,
+            for: ViewList.Element(overlay),
+            slot: 1,
             in: rect,
             horizontal: horizontal,
             vertical: vertical,
             context: context
         )
-        context.render(overlay, index: 1, into: &buffer, rect: overlayRect)
+        context.render(ViewList.Element(overlay), slot: 1, into: &buffer, rect: overlayRect)
     }
 
-    /// ``OverlayView/content`` を `index:` 引数を 0 として、``OverlayView/overlay`` を `index:` 引数を 1 として、`visitor` に渡す。
+    /// ``OverlayView/content`` を `slot` 引数を 0 として、``OverlayView/overlay`` を `slot` 引数を 1 として、`visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
-        visitor.visit(overlay, index: 1)
+        visitor.visit(ViewList.Element(content), slot: 0)
+        visitor.visit(ViewList.Element(overlay), slot: 1)
     }
 }
 
@@ -263,17 +286,17 @@ public struct ScreenOverlayView<Content: View, Overlay: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``ScreenOverlayView/content`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: content, index: 0)
+        context.layoutTraits(of: ViewList.Element(content), slot: 0)
     }
 
     /// ``ScreenOverlayView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``ScreenOverlayView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値。``ScreenOverlayView/overlay`` の大きさは影響しない。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: content, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: proposal)
     }
 
     /// ``ScreenOverlayView/content`` を描いてから、画面全体を基準に ``ScreenOverlayView/overlay`` を描画する。
@@ -283,27 +306,27 @@ public struct ScreenOverlayView<Content: View, Overlay: View>: PrimitiveView {
     ///   - rect: ``ScreenOverlayView/content`` を描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
-        context.render(content, index: 0, into: &buffer, rect: rect)
+        context.render(ViewList.Element(content), slot: 0, into: &buffer, rect: rect)
         let screen = context.screen
         guard !screen.isEmpty else { return }
         let overlayRect = OverlayLayout.childRect(
-            for: overlay,
-            index: 1,
+            for: ViewList.Element(overlay),
+            slot: 1,
             in: screen,
             horizontal: horizontal,
             vertical: vertical,
             context: context
         )
-        context.render(overlay, index: 1, into: &buffer, rect: overlayRect)
+        context.render(ViewList.Element(overlay), slot: 1, into: &buffer, rect: overlayRect)
     }
 
-    /// ``ScreenOverlayView/content`` を `index:` 引数を 0 として、``ScreenOverlayView/overlay`` を `index:` 引数を 1 として、`visitor` に渡す。
+    /// ``ScreenOverlayView/content`` を `slot` 引数を 0 として、``ScreenOverlayView/overlay`` を `slot` 引数を 1 として、`visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
-        visitor.visit(overlay, index: 1)
+        visitor.visit(ViewList.Element(content), slot: 0)
+        visitor.visit(ViewList.Element(overlay), slot: 1)
     }
 }
 

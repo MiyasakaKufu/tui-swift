@@ -40,7 +40,7 @@ public struct Text: PrimitiveView {
     /// 折り返した行を収めるサイズを返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: ``RenderContext/ambiguousWidth`` を取得するための ``RenderContext``。
     /// - Returns: 最も長い行の幅と、折り返した行数から決まるサイズ。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {

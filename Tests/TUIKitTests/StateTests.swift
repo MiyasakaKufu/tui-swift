@@ -29,7 +29,7 @@ private struct BindingProbe: PrimitiveView {
     /// `binding` を記録し、大きさを持たないことを返す。
     ///
     /// - Parameters:
-    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - proposal: `RenderContext.sizeThatFits(of:slot:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: 常に `.zero`。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
@@ -74,7 +74,7 @@ private struct PrimitiveCounter: PrimitiveView {
     /// 数の表示に要る大きさを返す。
     ///
     /// - Parameters:
-    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - proposal: `RenderContext.sizeThatFits(of:slot:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: 幅が数の桁数、高さが 1 の `Size`。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {

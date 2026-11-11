@@ -27,17 +27,17 @@ public struct ForegroundStyleView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``ForegroundStyleView/content`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: content, index: 0)
+        context.layoutTraits(of: ViewList.Element(content), slot: 0)
     }
 
     /// ``ForegroundStyleView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``ForegroundStyleView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: content, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: proposal)
     }
 
     /// 文字色を決め直してから ``ForegroundStyleView/content`` を描画する。
@@ -49,15 +49,15 @@ public struct ForegroundStyleView<Content: View>: PrimitiveView {
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         context
             .withColors { $0.setForeground(primary, secondary: secondary) }
-            .render(content, index: 0, into: &buffer, rect: rect)
+            .render(ViewList.Element(content), slot: 0, into: &buffer, rect: rect)
     }
 
-    /// ``ForegroundStyleView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    /// ``ForegroundStyleView/content`` を、`slot` 引数を 0 として `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
     }
 }
 
@@ -84,17 +84,17 @@ public struct TintView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``TintView/content`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: content, index: 0)
+        context.layoutTraits(of: ViewList.Element(content), slot: 0)
     }
 
     /// ``TintView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``TintView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: content, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: proposal)
     }
 
     /// ティントカラーを決め直してから ``TintView/content`` を描画する。
@@ -106,15 +106,15 @@ public struct TintView<Content: View>: PrimitiveView {
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
         context
             .withColors { $0.tint = tint }
-            .render(content, index: 0, into: &buffer, rect: rect)
+            .render(ViewList.Element(content), slot: 0, into: &buffer, rect: rect)
     }
 
-    /// ``TintView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    /// ``TintView/content`` を、`slot` 引数を 0 として `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
     }
 }
 
