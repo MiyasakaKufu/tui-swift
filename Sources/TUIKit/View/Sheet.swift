@@ -24,11 +24,11 @@ public struct SheetView<Content: View, SheetContent: View>: PrimitiveView {
     /// ``SheetView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値を返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``SheetView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: content, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: proposal)
     }
 
     /// ``SheetView/content`` の ``LayoutTraits`` を返す。
@@ -37,7 +37,7 @@ public struct SheetView<Content: View, SheetContent: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``SheetView/content`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: content, index: 0)
+        context.layoutTraits(of: ViewList.Element(content), slot: 0)
     }
 
     /// ``SheetView/content`` を描画し、``SheetView/isPresented`` が `true` なら画面の中央へ `content:` の ``View`` を重ねる。
@@ -47,28 +47,28 @@ public struct SheetView<Content: View, SheetContent: View>: PrimitiveView {
     ///   - rect: ``SheetView/content`` を描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
-        context.render(content, index: 0, into: &buffer, rect: rect)
+        context.render(ViewList.Element(content), slot: 0, into: &buffer, rect: rect)
         guard isPresented.wrappedValue, !context.screen.isEmpty else { return }
         let sheet = makeSheet()
         let sheetRect = OverlayLayout.childRect(
-            for: sheet,
-            index: 1,
+            for: ViewList.Element(sheet),
+            slot: 1,
             in: context.screen,
             horizontal: .center,
             vertical: .center,
             context: context
         )
-        context.render(sheet, index: 1, into: &buffer, rect: sheetRect)
+        context.render(ViewList.Element(sheet), slot: 1, into: &buffer, rect: sheetRect)
     }
 
-    /// ``SheetView/content`` を `index:` 引数を 0 として、``SheetView/isPresented`` が `true` なら `content:` の ``View`` を `index:` 引数を 1 として、`visitor` に渡す。
+    /// ``SheetView/content`` を `slot` 引数を 0 として、``SheetView/isPresented`` が `true` なら `content:` の ``View`` を `slot` 引数を 1 として、`visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
         if isPresented.wrappedValue {
-            visitor.visit(makeSheet(), index: 1)
+            visitor.visit(ViewList.Element(makeSheet()), slot: 1)
         }
     }
 }
@@ -97,7 +97,7 @@ extension SheetView: SheetPresentingView {
     ///   - path: この ``SheetView`` の `ViewPath`。
     /// - Returns: ``SheetView/content`` の `ViewPath`。
     func pathBehindSheet(from path: ViewPath) -> ViewPath {
-        path.appending(content, index: 0)
+        path.appending(ViewList.Element(content), slot: 0)
     }
 }
 

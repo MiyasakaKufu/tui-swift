@@ -1,15 +1,21 @@
-/// ``Application`` が最初にメソッドを呼び出す ``View`` から、``RenderContext`` のメソッドに `child` 引数として渡された ``View`` か、``ViewVisitor/visit(_:index:)`` に渡された ``View`` を順にたどったときの、`ViewPath.Component` の並び。
+/// ``Application`` が最初にメソッドを呼び出す ``View`` から、``RenderContext`` のメソッドか ``ViewVisitor`` に `child` 引数として渡された ``ViewList/Element`` の ``View`` を順にたどったときの、`ViewPath.Component` の並び。
 ///
-/// - Invariant: ``RenderContext`` のメソッドに `child` 引数として渡した ``View`` の `ViewPath` は、その ``RenderContext`` の `ViewPath` と、`index:` 引数（`child` が ``View/id(_:)`` で作った ``View`` なら ``View/id(_:)`` の引数）だけで決まる。
+/// - Invariant: ``RenderContext`` のメソッドに `child` 引数として渡した ``ViewList/Element`` の ``View`` の `ViewPath` は、その ``RenderContext`` の `ViewPath` と、`slot` 引数と、書いた位置（``View/id(_:)`` で作った ``View`` なら ``View/id(_:)`` の引数）だけで決まる。
 ///   同じ ``View`` を何度測っても、測っただけで描かなくても、描く途中で測り直しても、同じ ``View`` には同じ `ViewPath` が振られる。
-///   ``ViewVisitor/visit(_:index:)`` に渡した ``View`` の `ViewPath` も同じ規則で決まるので、``RenderContext`` のメソッドに渡すのと同じ `index:` 引数を渡せば、同じ `ViewPath` になる。
+///   ``ViewVisitor`` に渡した ``View`` の `ViewPath` も同じ規則で決まるので、``RenderContext`` のメソッドに渡すのと同じ引数を渡せば、同じ `ViewPath` になる。
 struct ViewPath: Hashable {
     /// `ViewPath` の 1 段。
     enum Component: Hashable {
-        /// ``RenderContext`` のメソッドか ``ViewVisitor/visit(_:index:)`` に渡した `index:` 引数。
-        case index(Int)
+        /// ``RenderContext`` のメソッドか ``ViewVisitor/visit(_:slot:)`` に渡した `slot` 引数と、同じ `slot` 引数とともに渡した ``ViewList/Element`` の ``View`` どうしを区別する `ViewPath.ElementKey`。
+        case element(slot: Int, key: ElementKey)
+    }
+
+    /// 同じ `slot` 引数とともに渡した ``ViewList/Element`` の ``View`` どうしを区別する値。
+    enum ElementKey: Hashable {
+        /// ``ViewBuilder`` のクロージャで ``View`` を書いた位置。
+        case position([Int])
         /// ``View/id(_:)`` の引数。
-        case key(AnyHashable)
+        case id(AnyHashable)
     }
 
     /// `ViewPath.root` から順に並べた `ViewPath.Component`。
@@ -29,18 +35,19 @@ struct ViewPath: Hashable {
         ViewPath(components: components + [component])
     }
 
-    /// 末尾に、`child` を区別する `ViewPath.Component` を足した `ViewPath` を返す。
+    /// 末尾に、`element` の ``View`` を区別する `ViewPath.Component` を足した `ViewPath` を返す。
     ///
     /// - Parameters:
-    ///   - child: ``RenderContext`` のメソッドか ``ViewVisitor/visit(_:index:)`` に渡す ``View``。
-    ///   - index: `child` とともに渡す `index:` 引数。
-    /// - Returns: `child` が ``View/id(_:)`` で作った ``View`` なら ``View/id(_:)`` の引数を `.key(_:)` として、そうでなければ `index` を `.index(_:)` として、末尾に足した `ViewPath`。
+    ///   - element: ``RenderContext`` のメソッドか ``ViewVisitor/visit(_:slot:)`` に渡す ``ViewList/Element``。
+    ///   - slot: `element` とともに渡す `slot` 引数。
+    /// - Returns: `slot` と、`element` の ``View`` が ``View/id(_:)`` で作った ``View`` なら ``View/id(_:)`` の引数を、そうでなければ書いた位置を `.element(slot:key:)` として、末尾に足した `ViewPath`。
     @MainActor
-    func appending(_ child: some View, index: Int) -> ViewPath {
-        if let identified = child as? any ExplicitlyIdentified {
-            return appending(.key(identified.identityKey))
+    func appending(_ element: ViewList.Element, slot: Int) -> ViewPath {
+        if let identified = element.view as? any ExplicitlyIdentified {
+            // `slot` を捨てて `View.id(_:)` の引数だけで区別したくなるが、そうすると別のプロパティで受け取った `View` に同じ `View.id(_:)` の引数を付けたとき、2 つが同じ `ViewNode` を共有する。
+            return appending(.element(slot: slot, key: .id(identified.identityKey)))
         }
-        return appending(.index(index))
+        return appending(.element(slot: slot, key: .position(element.position)))
     }
 
     /// `other` がこの `ViewPath` で始まるかを返す。
@@ -58,15 +65,28 @@ struct ViewPath: Hashable {
 
 /// 別の ``View`` の ``View/sizeThatFits(_:context:)``・``View/layoutTraits(context:)``・``View/render(into:rect:context:)`` を呼び出すために、``View`` が `context` 引数で受け取る型。
 ///
-/// 別の ``View`` のこれらのメソッドは直接呼び出さず、``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` に `child` 引数として渡して呼び出す。
+/// 別の ``View`` のこれらのメソッドは直接呼び出さず、その ``View`` を持つ ``ViewList/Element`` を、``RenderContext/sizeThatFits(of:slot:proposal:)``・``RenderContext/layoutTraits(of:slot:)``・``RenderContext/render(_:slot:into:rect:)`` に `child` 引数として渡して呼び出す。
+/// ``ViewList/Element`` は、``ViewBuilder`` を付けたクロージャで受け取った ``ViewList`` から取り出す。
 ///
 /// ```swift
-/// func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
-///     context.render(content, index: 0, into: &buffer, rect: rect.inset(by: 1))
+/// struct Boxed: PrimitiveView {
+///     let content: ViewList
+///
+///     init(@ViewBuilder content: () -> ViewList) {
+///         self.content = content()
+///     }
+///
+///     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
+///         for child in content {
+///             context.render(child, slot: 0, into: &buffer, rect: rect.inset(by: 1))
+///         }
+///     }
+///     // sizeThatFits(_:context:) と visitChildren(_:) は省略
 /// }
 /// ```
 ///
-/// - Note: `index` は、`child` 引数として渡す ``View`` どうしを区別する番号で、同じ ``View`` には ``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/layoutTraits(of:index:)``・``RenderContext/render(_:index:into:rect:)`` で同じ番号を渡す。``PrimitiveView/visitChildren(_:)`` で ``ViewVisitor/visit(_:index:)`` に渡す番号も同じにする。``VStack/children`` の並びのように、``View`` の並びの中の位置で決まる値を使う。
+/// - Note: `slot` は、同じ ``RenderContext`` に `child` 引数として渡す ``ViewList/Element`` を、受け取ったプロパティごとに区別する番号。同じプロパティの ``ViewList`` の要素には同じ番号を渡し、``RenderContext/sizeThatFits(of:slot:proposal:)``・``RenderContext/layoutTraits(of:slot:)``・``RenderContext/render(_:slot:into:rect:)`` と ``PrimitiveView/visitChildren(_:)`` の ``ViewVisitor/visit(_:slot:)`` で同じ番号を渡す。``ViewList`` を受け取るプロパティが 1 つだけなら、すべての要素に 0 を渡す。
+/// - Warning: `slot` に、``ViewList`` の中の要素の位置を渡さない。前に置いた `if` の中の ``View`` が現れたり消えたりすると位置がずれ、後ろの ``View`` が別の ``View`` として扱われて、``State`` が初期値に戻る。
 @MainActor
 public struct RenderContext {
     /// この ``RenderContext`` を受け取る ``View`` の `ViewNode`。
@@ -101,7 +121,7 @@ public struct RenderContext {
     ///   - ambiguousWidth: ``Cell`` の数を数えるときに使う ``DisplayWidth/AmbiguousWidth``。
     /// - Precondition: `ambiguousWidth` が描画先の ``Buffer`` の ``Buffer/ambiguousWidth`` と同じ。
     ///   違うと、``View`` が測った幅と、``Buffer`` に置かれる ``Cell`` の数が食い違う。
-    /// - Note: 作るたびに新しい記憶域を使う。前に作った ``RenderContext`` で辿った ``View`` とは、同じ `index:` 引数の並びで渡しても同一性を共有せず、``State`` の記憶域も共有しない。
+    /// - Note: 作るたびに新しい記憶域を使う。前に作った ``RenderContext`` で辿った ``View`` とは、同じ引数の並びで渡しても同一性を共有せず、``State`` の記憶域も共有しない。
     /// - Note: この ``RenderContext`` を直接渡した ``View`` 自身の ``State`` は、記憶域に結び付かず初期値のままになる。
     ///   結び付くのは、この ``RenderContext`` のメソッドに `child` 引数として渡した ``View`` と、その先で ``RenderContext`` のメソッドに `child` 引数として渡された ``View``。
     public init(
@@ -142,15 +162,28 @@ public struct RenderContext {
         self.isEnabled = isEnabled
     }
 
-    /// `child` に渡す ``RenderContext`` を返す。
+    /// `child` の ``View`` に渡す ``RenderContext`` を返す。
+    ///
+    /// - Parameters:
+    ///   - child: ``RenderContext`` を `context` 引数で受け取る ``View`` を持つ ``ViewList/Element``。
+    ///   - slot: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``ViewList/Element`` と、`child` を区別する番号。
+    /// - Returns: `child` の ``View`` の `ViewNode` を持ち、この ``RenderContext`` と同じ ``RenderContext/colors``・``RenderContext/isEnabled`` を持つ ``RenderContext``。
+    func context(for child: ViewList.Element, slot: Int) -> RenderContext {
+        func make(_ view: some View) -> RenderContext {
+            context(for: view, at: path.appending(child, slot: slot))
+        }
+        return make(child.view)
+    }
+
+    /// `ViewPath` を指定して、`child` に渡す ``RenderContext`` を返す。
     ///
     /// - Parameters:
     ///   - child: ``RenderContext`` を `context` 引数で受け取る ``View``。
-    ///   - index: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``View`` と `child` を区別する番号。
-    /// - Returns: `child` の `ViewNode` を持ち、この ``RenderContext`` と同じ ``RenderContext/colors``・``RenderContext/isEnabled`` を持つ ``RenderContext``。`child` が ``View/id(_:)`` で作った ``View`` なら、`ViewPath` には `index` の代わりに ``View/id(_:)`` の引数を `.key(_:)` として足す。
+    ///   - childPath: `child` の `ViewPath`。
+    /// - Returns: `childPath` の `ViewNode` を持ち、この ``RenderContext`` と同じ ``RenderContext/colors``・``RenderContext/isEnabled`` を持つ ``RenderContext``。
     /// - Postcondition: `child` の ``State`` が、`child` の `ViewNode` の記憶域へ結び付いている。
-    func context(for child: some View, index: Int) -> RenderContext {
-        let node = graph.node(at: path.appending(child, index: index), viewType: type(of: child))
+    private func context(for child: some View, at childPath: ViewPath) -> RenderContext {
+        let node = graph.node(at: childPath, viewType: type(of: child))
         graph.bindState(of: child, to: node)
         return RenderContext(
             node: node,
@@ -203,35 +236,44 @@ public struct RenderContext {
         graph.recordCursorPoint(point, of: node)
     }
 
-    /// `child` の ``View/sizeThatFits(_:context:)`` の戻り値を返す。
+    /// `child` の ``View`` の ``View/sizeThatFits(_:context:)`` の戻り値を返す。
     ///
     /// - Parameters:
-    ///   - child: ``View/sizeThatFits(_:context:)`` を呼び出される ``View``。
-    ///   - index: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``View`` と `child` を区別する番号。
-    ///   - proposal: `child` の ``View/sizeThatFits(_:context:)`` に `proposal` 引数として渡す ``Size``。
-    /// - Returns: `child` の ``View/sizeThatFits(_:context:)`` の戻り値。
-    public func sizeThatFits(of child: some View, index: Int, proposal: Size) -> Size {
-        child.sizeThatFits(proposal, context: context(for: child, index: index))
+    ///   - child: ``View/sizeThatFits(_:context:)`` を呼び出される ``View`` を持つ ``ViewList/Element``。
+    ///   - slot: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``ViewList/Element`` と、`child` を区別する番号。
+    ///   - proposal: `child` の ``View`` の ``View/sizeThatFits(_:context:)`` に `proposal` 引数として渡す ``Size``。
+    /// - Returns: `child` の ``View`` の ``View/sizeThatFits(_:context:)`` の戻り値。
+    public func sizeThatFits(of child: ViewList.Element, slot: Int, proposal: Size) -> Size {
+        func measure(_ view: some View) -> Size {
+            view.sizeThatFits(proposal, context: context(for: view, at: path.appending(child, slot: slot)))
+        }
+        return measure(child.view)
     }
 
-    /// `child` の ``LayoutTraits`` を返す。
+    /// `child` の ``View`` の ``LayoutTraits`` を返す。
     ///
     /// - Parameters:
-    ///   - child: ``View/layoutTraits(context:)`` を呼び出される ``View``。
-    ///   - index: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``View`` と `child` を区別する番号。
-    /// - Returns: `child` の ``View/layoutTraits(context:)`` の戻り値。
-    public func layoutTraits(of child: some View, index: Int) -> LayoutTraits {
-        child.layoutTraits(context: context(for: child, index: index))
+    ///   - child: ``View/layoutTraits(context:)`` を呼び出される ``View`` を持つ ``ViewList/Element``。
+    ///   - slot: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``ViewList/Element`` と、`child` を区別する番号。
+    /// - Returns: `child` の ``View`` の ``View/layoutTraits(context:)`` の戻り値。
+    public func layoutTraits(of child: ViewList.Element, slot: Int) -> LayoutTraits {
+        func traits(of view: some View) -> LayoutTraits {
+            view.layoutTraits(context: context(for: view, at: path.appending(child, slot: slot)))
+        }
+        return traits(of: child.view)
     }
 
-    /// `child` を描画する。
+    /// `child` の ``View`` を描画する。
     ///
     /// - Parameters:
-    ///   - child: ``View/render(into:rect:context:)`` を呼び出される ``View``。
-    ///   - index: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``View`` と `child` を区別する番号。
+    ///   - child: ``View/render(into:rect:context:)`` を呼び出される ``View`` を持つ ``ViewList/Element``。
+    ///   - slot: 同じ ``RenderContext`` に `child` 引数として渡すほかの ``ViewList/Element`` と、`child` を区別する番号。
     ///   - buffer: 描画先の ``Buffer``。
-    ///   - rect: `child` を描画する矩形。
-    public func render(_ child: some View, index: Int, into buffer: inout Buffer, rect: Rect) {
-        child.render(into: &buffer, rect: rect, context: context(for: child, index: index))
+    ///   - rect: `child` の ``View`` を描画する矩形。
+    public func render(_ child: ViewList.Element, slot: Int, into buffer: inout Buffer, rect: Rect) {
+        func draw(_ view: some View, into buffer: inout Buffer) {
+            view.render(into: &buffer, rect: rect, context: context(for: view, at: path.appending(child, slot: slot)))
+        }
+        draw(child.view, into: &buffer)
     }
 }

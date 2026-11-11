@@ -23,17 +23,17 @@ public struct DisabledView<Content: View>: PrimitiveView {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``DisabledView/content`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: content, index: 0)
+        context.layoutTraits(of: ViewList.Element(content), slot: 0)
     }
 
     /// ``DisabledView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``DisabledView/content`` の ``View/sizeThatFits(_:context:)`` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: content, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(content), slot: 0, proposal: proposal)
     }
 
     /// ``DisabledView/content`` を描画する。
@@ -48,15 +48,15 @@ public struct DisabledView<Content: View>: PrimitiveView {
         if isDisabled {
             contentContext.isEnabled = false
         }
-        contentContext.render(content, index: 0, into: &buffer, rect: rect)
+        contentContext.render(ViewList.Element(content), slot: 0, into: &buffer, rect: rect)
     }
 
-    /// ``DisabledView/content`` を、`index:` 引数を 0 として `visitor` に渡す。
+    /// ``DisabledView/content`` を、`slot` 引数を 0 として `visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
     public func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(content, index: 0)
+        visitor.visit(ViewList.Element(content), slot: 0)
     }
 }
 

@@ -32,7 +32,7 @@ private struct CallProbe: PrimitiveView {
     /// 呼び出されたことを記録し、幅 1・高さ 1 の `Size` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - proposal: `RenderContext.sizeThatFits(of:slot:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: 幅 1・高さ 1 の `Size`。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
@@ -85,11 +85,11 @@ private struct FirstOnly<First: View, Second: View>: PrimitiveView {
     /// `first` の `View.sizeThatFits(_:context:)` の戻り値を返す。
     ///
     /// - Parameters:
-    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - proposal: `RenderContext.sizeThatFits(of:slot:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: `first` の `View.sizeThatFits(_:context:)` の戻り値。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: first, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(first), slot: 0, proposal: proposal)
     }
 
     /// `first` を描画する。
@@ -99,16 +99,16 @@ private struct FirstOnly<First: View, Second: View>: PrimitiveView {
     ///   - rect: 描画する矩形。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
-        context.render(first, index: 0, into: &buffer, rect: rect)
+        context.render(ViewList.Element(first), slot: 0, into: &buffer, rect: rect)
     }
 
-    /// `first` を `index:` 引数を 0 として、`second` を `index:` 引数を 1 として、`visitor` に渡す。
+    /// `first` を `slot` 引数を 0 として、`second` を `slot` 引数を 1 として、`visitor` に渡す。
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる `View` を受け取る `ViewVisitor`。
     func visitChildren(_ visitor: ViewVisitor) {
-        visitor.visit(first, index: 0)
-        visitor.visit(second, index: 1)
+        visitor.visit(ViewList.Element(first), slot: 0)
+        visitor.visit(ViewList.Element(second), slot: 1)
     }
 }
 
@@ -190,7 +190,7 @@ final class ViewTraversalTests: XCTestCase {
         }
 
         let identified = visited.first { $0.view is IdentifiedView<CallProbe, String> }
-        XCTAssertEqual(identified?.node.path, ViewPath.root.appending(.key("key")))
+        XCTAssertEqual(identified?.node.path, ViewPath.root.appending(.element(slot: 0, key: .id("key"))))
         XCTAssertEqual(visited.first { $0.view is CallProbe }?.node.id, log.renderedNodeIDs["keyed"])
         XCTAssertEqual(graph.nodeCount, nodeCountBeforeRender)
     }
@@ -207,8 +207,8 @@ final class ViewTraversalTests: XCTestCase {
 
         XCTAssertEqual(visited.map(\.node.path), [
             .root,
-            ViewPath.root.appending(.index(0)),
-            ViewPath.root.appending(.index(1)),
+            ViewPath.root.appending(.element(slot: 0, key: .position([]))),
+            ViewPath.root.appending(.element(slot: 1, key: .position([]))),
         ])
         XCTAssertEqual(visited[1].node.id, log.renderedNodeIDs["first"])
         XCTAssertNil(log.renderedNodeIDs["second"])

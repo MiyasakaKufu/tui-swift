@@ -46,13 +46,16 @@
 | `proposal` 引数に渡された `Size` の範囲で、自分の `Size` を返すメソッド | `View.sizeThatFits(_:context:)` | 戻り値は「`View.sizeThatFits(_:context:)` の戻り値」と書く |
 | 自分の `LayoutTraits` を返すメソッド | `View.layoutTraits(context:)` | |
 | `Buffer` の `Cell` に文字と `Style` を書き込むメソッド | `View.render(into:rect:context:)` | |
-| 別の `View` の `View.sizeThatFits(_:context:)`・`View.layoutTraits(context:)`・`View.render(into:rect:context:)` を呼び出すために、`View` が `context` 引数で受け取る型 | `RenderContext` | `View` は、この引数の `RenderContext.sizeThatFits(of:index:proposal:)`・`RenderContext.layoutTraits(of:index:)`・`RenderContext.render(_:index:into:rect:)` に別の `View` を `child` 引数として渡して呼び出す |
-| `Application` が最初にメソッドを呼び出す `View` から、`RenderContext` のメソッドに `child` 引数として渡された `View` か、`ViewVisitor.visit(_:index:)` に渡された `View` を順にたどったときの、`ViewPath.Component` の並び | `ViewPath` | internal。`View.body` の値の `View` には `index:` 引数 0 を使う |
-| `RenderContext` のメソッドか `ViewVisitor.visit(_:index:)` に渡された `index:` 引数（`.index(_:)`）か、`View.id(_:)` の引数（`.key(_:)`） | `ViewPath.Component` | internal |
-| `RenderContext` のメソッドに `child` 引数として渡しうる `View` を、`index:` 引数とともに `ViewVisitor` に渡す、`PrimitiveView` の要件のメソッド | `PrimitiveView.visitChildren(_:)` | `Application.draw()` のたびに、レイアウトの計算と描画より前に呼び出される |
-| `PrimitiveView.visitChildren(_:)` で `View` を受け取る型 | `ViewVisitor` | 受け取るメソッドは `ViewVisitor.visit(_:index:)` |
+| 別の `View` の `View.sizeThatFits(_:context:)`・`View.layoutTraits(context:)`・`View.render(into:rect:context:)` を呼び出すために、`View` が `context` 引数で受け取る型 | `RenderContext` | `View` は、この引数の `RenderContext.sizeThatFits(of:slot:proposal:)`・`RenderContext.layoutTraits(of:slot:)`・`RenderContext.render(_:slot:into:rect:)` に、別の `View` を持つ `ViewList.Element` を `child` 引数として渡して呼び出す。「`child` 引数として渡す `View`」は、`child` 引数の `ViewList.Element` の `View` を指す |
+| `Application` が最初にメソッドを呼び出す `View` から、`RenderContext` のメソッドか `ViewVisitor` に `child` 引数として渡された `ViewList.Element` の `View` を順にたどったときの、`ViewPath.Component` の並び | `ViewPath` | internal。`View.body` の値の `View` は、書いた位置が空の `ViewList.Element` にして `slot` 引数 0 とともに渡す |
+| `RenderContext` のメソッドか `ViewVisitor.visit(_:slot:)` に渡された `slot` 引数と、書いた位置または `View.id(_:)` の引数の組（`.element(slot:key:)`） | `ViewPath.Component` | internal |
+| `RenderContext` のメソッドに `child` 引数として渡しうる `ViewList.Element` を、`slot` 引数とともに `ViewVisitor` に渡す、`PrimitiveView` の要件のメソッド | `PrimitiveView.visitChildren(_:)` | `Application.draw()` のたびに、レイアウトの計算と描画より前に呼び出される |
+| `PrimitiveView.visitChildren(_:)` で `View` を受け取る型 | `ViewVisitor` | 受け取るメソッドは `ViewVisitor.visit(_:slot:)` |
 | `ViewPath` と型が同じ `View` に、`Application.draw()` をまたいで使われ続けるクラス | `ViewNode` | internal。`ViewNode.id` が同じなら、同じ `View` として扱われる |
-| `View.id(_:)` に渡した引数。`ViewPath.Component` の `.key(_:)` になる | `View.id(_:)` の引数 | |
+| `View.id(_:)` に渡した引数。`ViewPath.Component` の `.element(slot:key:)` の `key` に、書いた位置の代わりに入る | `View.id(_:)` の引数 | |
+| `ViewBuilder` が作る、要素ごとに書いた位置を持つ `View` の並び | `ViewList` | 要素は `ViewList.Element`。`ViewList.Element` を作れるのは TUIKit の中だけ |
+| `ViewBuilder` のクロージャで `View` を書いた位置。クロージャに並べた順番、`if`-`else` のどちらの分岐か、`for` の何回目かで決まる | 書いた位置 | internal の `ViewList.Element.position`。`if` と `for` は、中の `View` の数に関わらず、並べた順番を 1 つだけ使う。`View` を 1 つだけ受け取るプロパティの `View` は、書いた位置が空 |
+| `RenderContext` のメソッドか `ViewVisitor.visit(_:slot:)` に、`ViewList.Element` とともに渡す番号。`ViewList.Element` を受け取ったプロパティごとに区別する | `slot` 引数 | 要素の位置は渡さない |
 | `View` か `TerminalApp` に準拠する型の格納プロパティに `@State` として付け、そのプロパティを `Application.draw()` をまたいで残す型 | `State` | プロパティは `ViewNode` が持つ。`$` で得る `Binding` は `State.projectedValue` |
 | `TextField`・`ListView` のうち、`InputEvent` の `.key`・`.paste` を最初に受け取る `View` がそうであること | フォーカス | 端末エミュレータのウィンドウが入力を受け取ること（`.focus`）は「端末エミュレータのフォーカス」と書き、「フォーカス」を単独で使わない |
 | Tab・Shift+Tab・クリック・`@FocusState` を付けたプロパティへの代入でフォーカスが移る `View` | フォーカスを受け取る `View` | 今は `TextField` と `ListView` |
@@ -82,7 +85,7 @@
 | `VStack`・`HStack` が中の `View` に `Size` を配ったあとに残る `Size` を、どの割合で引き取るかを表す整数 | `LayoutTraits.horizontalFlex`・`LayoutTraits.verticalFlex` | `axis` に合う方の 1 つだけを指すときは `LayoutTraits.flex(on:)` の値で書く |
 | `PaddingView.content` の上下左右に空ける長さ（`Cell` の数で表す） | `EdgeInsets`（`View.padding(_: EdgeInsets)` の引数） | |
 | `VStack`・`HStack` が中の `View` に `Size` を配ったあとに残る `Size` | `VStack`・`HStack` が配ったあとに残る `Size` | |
-| `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡し、`child` 引数の `View` の `View.sizeThatFits(_:context:)` へ届く `Size` | `View.sizeThatFits(_:context:)` の `proposal` 引数 | |
+| `RenderContext.sizeThatFits(of:slot:proposal:)` の `proposal` 引数に渡し、`child` 引数の `View` の `View.sizeThatFits(_:context:)` へ届く `Size` | `View.sizeThatFits(_:context:)` の `proposal` 引数 | |
 
 ## ディレクトリ
 
@@ -138,7 +141,7 @@
 | `View.onChange(of:_:)` | `initial:` 引数は無い。比べるのは描画より前にたどったときの値 |
 | `View.sheet(isPresented:content:)` | `content:` を画面の中央に重ねる。表示している間も、どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
 | `View.disabled(_:)` | 見た目が変わるのは `TextField`・`ListView` だけで、文字に `TextAttributes.dim`（SGR 2）を足して描く。`EnvironmentValues.isEnabled` に当たるものは無い。フォーカスを持つ `View` を `.key`・`.mouse`・Tab によるフォーカスの移動の対象から外すと、たどった順で先頭の、外していないフォーカスを受け取る `View` へフォーカスが移る（SwiftUI のドキュメントに記述は無い）。どの `View` も処理しなかった `.key`・`.paste` は `TerminalApp.handle(_:)` へ渡る |
-| `ViewBuilder` | `[any View]` を返す |
+| `ViewBuilder` | `ViewList` を返す。`if`-`else` の 2 つの分岐に書いた `View` は、型が同じでも別の `View` として扱う |
 | `View.foregroundStyle(_: Color)`・`View.foregroundStyle(_:_:)` | 引数は `Color` か `HierarchicalShapeStyle`。`ShapeStyle` は無く、グラデーションなどは渡せない。`foregroundStyle(_:_:_:)` は無い |
 | `HierarchicalShapeStyle` | `.primary` と `.secondary` だけ。セカンダリレベルを `View.foregroundStyle(_:_:)` で決めていなければ、プライマリレベルに `TextAttributes.dim`（SGR 2）を足したものになる |
 | `View.tint(_:)` | 引数は `Color?`。決めていなければ、アクセントカラーではなくプライマリレベルの文字色を使う。使うのは `ProgressBar` の進んだ部分と `ListView` の選択行で、選択行はティントカラーを文字色にして反転（SGR 7）した `Style` で描く |

@@ -55,9 +55,9 @@ public struct LayoutTraits: Hashable, Sendable {
 /// }
 /// ```
 ///
-/// ``View/body`` を持つ ``View`` は ``View/body`` だけを書けばよい。``View/sizeThatFits(_:context:)``・``View/render(into:rect:context:)``・``View/layoutTraits(context:)`` のデフォルトの実装は、``View/body`` を `child` 引数として ``RenderContext`` の同じ名前のメソッド（``RenderContext/sizeThatFits(of:index:proposal:)`` など）に渡す。
+/// ``View/body`` を持つ ``View`` は ``View/body`` だけを書けばよい。``View/sizeThatFits(_:context:)``・``View/render(into:rect:context:)``・``View/layoutTraits(context:)`` のデフォルトの実装は、``View/body`` を ``ViewList/Element`` にして、`child` 引数として ``RenderContext`` の同じ名前のメソッド（``RenderContext/sizeThatFits(of:slot:proposal:)`` など）に渡す。
 ///
-/// 別の ``View`` の ``View/sizeThatFits(_:context:)``・``View/render(into:rect:context:)``・``View/layoutTraits(context:)`` は直接呼び出さない。`context` 引数で受け取った ``RenderContext`` の ``RenderContext/sizeThatFits(of:index:proposal:)``・``RenderContext/render(_:index:into:rect:)``・``RenderContext/layoutTraits(of:index:)`` に、その ``View`` を `child` 引数として渡して呼び出す。
+/// 別の ``View`` の ``View/sizeThatFits(_:context:)``・``View/render(into:rect:context:)``・``View/layoutTraits(context:)`` は直接呼び出さない。`context` 引数で受け取った ``RenderContext`` の ``RenderContext/sizeThatFits(of:slot:proposal:)``・``RenderContext/render(_:slot:into:rect:)``・``RenderContext/layoutTraits(of:slot:)`` に、その ``View`` を持つ ``ViewList/Element`` を `child` 引数として渡して呼び出す。
 @MainActor
 public protocol View {
     /// ``View/body`` が返す ``View`` の型。``View`` に準拠する型が `some View` で書けば推論される。``PrimitiveView`` では `Never`。
@@ -71,7 +71,7 @@ public protocol View {
     /// `proposal` の範囲で、この ``View`` の ``Size`` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: この ``View`` の ``Size``。
     /// - Note: 戻り値は `proposal` を超えてもよい。超えた分は、``VStack``・``HStack``・``ZStack``・``AlignedView`` などが、この ``View`` の ``View/render(into:rect:context:)`` に渡す `rect` 引数の矩形を、自分の `rect` 引数の矩形に収めるときに切り詰める。
@@ -98,11 +98,11 @@ extension View {
     /// ``View/body`` の ``View`` の ``View/sizeThatFits(_:context:)`` の戻り値を返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``View/body`` の ``View`` の ``View/sizeThatFits(_:context:)`` の戻り値。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
-        context.sizeThatFits(of: body, index: 0, proposal: proposal)
+        context.sizeThatFits(of: ViewList.Element(body), slot: 0, proposal: proposal)
     }
 
     /// ``View/body`` の ``View`` を描画する。
@@ -112,7 +112,7 @@ extension View {
     ///   - rect: 描画する矩形。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     public func render(into buffer: inout Buffer, rect: Rect, context: RenderContext) {
-        context.render(body, index: 0, into: &buffer, rect: rect)
+        context.render(ViewList.Element(body), slot: 0, into: &buffer, rect: rect)
     }
 
     /// ``View/body`` の ``View`` の ``LayoutTraits`` を返す。
@@ -121,7 +121,7 @@ extension View {
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``View/body`` の ``View`` の ``View/layoutTraits(context:)`` の戻り値。
     public func layoutTraits(context: RenderContext) -> LayoutTraits {
-        context.layoutTraits(of: body, index: 0)
+        context.layoutTraits(of: ViewList.Element(body), slot: 0)
     }
 }
 
@@ -133,20 +133,22 @@ extension View {
 ///   書かないと、``View/body`` を持つ ``View`` 向けのデフォルトの実装が選ばれ、``View/body`` の値を取得したところでプロセスが終了する。
 @MainActor
 public protocol PrimitiveView: View where Body == Never {
-    /// ``RenderContext`` のメソッドに `child` 引数として渡しうる ``View`` を、それぞれ `visitor` の ``ViewVisitor/visit(_:index:)`` に渡す。
+    /// ``RenderContext`` のメソッドに `child` 引数として渡しうる ``ViewList/Element`` を、それぞれ `visitor` の ``ViewVisitor/visit(_:slot:)`` に渡す。
     ///
     /// `Application.draw()` のたびに、``View/sizeThatFits(_:context:)``・``View/layoutTraits(context:)``・``View/render(into:rect:context:)`` より前に呼び出される。`rect` 引数によっては渡さない ``View`` も含めて、渡しうる ``View`` をすべて渡す。
     /// ``View`` を 1 つも渡さない型では、何もしない。
     ///
     /// ```swift
     /// func visitChildren(_ visitor: ViewVisitor) {
-    ///     visitor.visit(content, index: 0)
+    ///     for child in content {
+    ///         visitor.visit(child, slot: 0)
+    ///     }
     /// }
     /// ```
     ///
     /// - Parameters:
     ///   - visitor: 渡しうる ``View`` を受け取る ``ViewVisitor``。
-    /// - Warning: `index:` 引数には、同じ ``View`` を ``RenderContext`` のメソッドに渡すときと同じ番号を渡す。番号が違うと、ここで渡した ``View`` と ``RenderContext`` のメソッドに渡した ``View`` とで、``State`` の記憶域が別になる。
+    /// - Warning: `slot` 引数には、同じ ``ViewList/Element`` を ``RenderContext`` のメソッドに渡すときと同じ番号を渡す。番号が違うと、ここで渡した ``View`` と ``RenderContext`` のメソッドに渡した ``View`` とで、``State`` の記憶域が別になる。
     func visitChildren(_ visitor: ViewVisitor)
 }
 
@@ -176,7 +178,7 @@ extension Never: PrimitiveView {
     /// `Never` のインスタンスは存在しないので呼び出されない。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``Size`` を返すことはない。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { switch self {} }
@@ -204,7 +206,7 @@ public struct EmptyView: PrimitiveView {
     /// 大きさを持たない。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: 常に `.zero`。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { .zero }
@@ -249,7 +251,7 @@ public struct Fill: PrimitiveView {
     /// `proposal` をそのまま返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: `proposal` と同じサイズ。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size { proposal }
@@ -295,7 +297,7 @@ public struct Spacer: PrimitiveView {
     /// 幅・高さがともに ``Spacer/minLength`` の ``Size`` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: 幅・高さがともに ``Spacer/minLength`` の ``Size``。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
@@ -351,7 +353,7 @@ public struct Divider: PrimitiveView {
     /// ``Divider/axis`` の方向は `proposal` と同じ長さ、もう一方は 1 の ``Size`` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: ``Divider/axis`` が `.horizontal` なら幅が `proposal.width` で高さが 1、`.vertical` なら幅が 1 で高さが `proposal.height` の ``Size``。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {

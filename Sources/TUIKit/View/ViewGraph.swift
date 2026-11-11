@@ -185,7 +185,7 @@ final class ViewGraph {
 
     /// `view` の ``State`` を `node` の記憶域へ結び付けてから、`view` が ``RenderContext`` のメソッドに `child` 引数として渡しうる ``View`` を辿る。
     ///
-    /// ``PrimitiveView`` なら ``PrimitiveView/visitChildren(_:)`` が ``ViewVisitor/visit(_:index:)`` に渡した ``View`` を、そうでなければ ``View/body`` の値の ``View`` を、`index:` 引数を 0 として辿る。
+    /// ``PrimitiveView`` なら ``PrimitiveView/visitChildren(_:)`` が ``ViewVisitor/visit(_:slot:)`` に渡した ``ViewList/Element`` の ``View`` を、そうでなければ ``View/body`` の値の ``View`` を書いた位置が空の ``ViewList/Element`` にし、`slot` 引数を 0 として辿る。
     ///
     /// - Parameters:
     ///   - view: 辿る ``View``。
@@ -198,7 +198,7 @@ final class ViewGraph {
         if let primitive = view as? any PrimitiveView {
             primitive.visitChildren(visitor)
         } else {
-            visitor.visit(view.body, index: 0)
+            visitor.visit(ViewList.Element(view.body), slot: 0)
         }
     }
 

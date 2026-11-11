@@ -46,7 +46,7 @@ public struct ProgressBar: PrimitiveView {
     /// `proposal` の幅いっぱいで、高さが 1 を超えない ``Size`` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: ``RenderContext/sizeThatFits(of:index:proposal:)`` の `proposal` 引数に渡された ``Size``。
+    ///   - proposal: ``RenderContext/sizeThatFits(of:slot:proposal:)`` の `proposal` 引数に渡された ``Size``。
     ///   - context: 別の ``View`` のメソッドを呼び出すための ``RenderContext``。
     /// - Returns: `proposal` の幅と、1 と `proposal.height` の小さい方を高さにした ``Size``。
     public func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {

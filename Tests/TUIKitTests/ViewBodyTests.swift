@@ -46,7 +46,7 @@ private struct NodeProbe: PrimitiveView {
     /// 幅 1・高さ 1 の `Size` を返す。
     ///
     /// - Parameters:
-    ///   - proposal: `RenderContext.sizeThatFits(of:index:proposal:)` の `proposal` 引数に渡された `Size`。
+    ///   - proposal: `RenderContext.sizeThatFits(of:slot:proposal:)` の `proposal` 引数に渡された `Size`。
     ///   - context: 別の `View` のメソッドを呼び出すための `RenderContext`。
     /// - Returns: 幅 1・高さ 1 の `Size`。
     func sizeThatFits(_ proposal: Size, context: RenderContext) -> Size {
@@ -175,7 +175,7 @@ final class ViewBodyTests: XCTestCase {
         XCTAssertNotEqual(log.rendered["p"], before)
     }
 
-    func testConditionalViewShiftsIdentityOfLaterSiblings() async {
+    func testConditionalViewKeepsIdentityOfLaterSiblings() async {
         let graph = ViewGraph()
         let log = NodeLog()
         func view(showsBanner: Bool) -> some View {
@@ -192,7 +192,7 @@ final class ViewBodyTests: XCTestCase {
         let before = log.rendered
         _ = frame(view(showsBanner: true), graph: graph)
 
-        XCTAssertNotEqual(log.rendered["plain"], before["plain"])
+        XCTAssertEqual(log.rendered["plain"], before["plain"])
         XCTAssertEqual(log.rendered["keyed"], before["keyed"])
     }
 

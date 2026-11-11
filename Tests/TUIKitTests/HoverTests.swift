@@ -144,8 +144,7 @@ final class HoverTests: XCTestCase {
                 if showsFirst {
                     Text("a").onHover(perform: self.log.record("a"))
                 }
-                // `View.id(_:)` を外したくなるが、外すと `showsFirst` を切り替えたときに "b" の `ViewPath` が "a" のものと同じになり（#143）、"a" と同じ `ViewNode` として扱われて、どちらのクロージャも呼び出されない。
-                Text("b").onHover(perform: self.log.record("b")).id("b")
+                Text("b").onHover(perform: self.log.record("b"))
             }
         }
         harness.move(to: Point(x: 0, y: 0))
