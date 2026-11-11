@@ -1,9 +1,19 @@
 /// ``ViewBuilder`` が作る、``View`` の並び。
 ///
-/// 要素ごとに、``ViewBuilder`` のクロージャでその ``View`` を書いた位置を持つ。書いた位置は、`if` や `for` の中の ``View`` も含めて、クロージャに書いた ``View`` を順に数えた番号。
-/// 要素を ``RenderContext/render(_:slot:into:rect:)`` などに渡すと、``View`` の同一性は、書いた位置と `slot` 引数で決まる。
+/// 要素ごとに、``ViewBuilder`` のクロージャでその ``View`` を書いた位置を持つ。書いた位置は、クロージャに並べた順番と、`if`-`else` のどちらの分岐か、`for` の何回目かで決まる。`if` や `for` が入れ子になっていれば、外側から順にそれぞれで決まる。
+/// `if` と `for` は、中の ``View`` の数に関わらず、並べた順番を 1 つだけ使う。
+/// 要素を ``RenderContext/render(_:slot:into:rect:)`` などに渡すと、``View`` の同一性は、書いた位置と `slot` 引数で決まる。前に置いた `if` の中の ``View`` が現れたり消えたりしても、後ろの ``View`` の同一性は変わらない。
 ///
-/// - Note: 前に書いた `if` の中の ``View`` が現れたり消えたりすると、後ろの ``View`` の書いた位置が変わり、別の ``View`` として扱われる。変えたくない ``View`` には ``View/id(_:)`` で引数を渡す。
+/// ```swift
+/// VStack {
+///     if showsHint { Text("hint") }   // 並べた順番 0
+///     NameField()                      // 並べた順番 1。showsHint に関わらず変わらない
+/// }
+/// ```
+///
+/// - Note: `if`-`else` の 2 つの分岐に書いた ``View`` は、型が同じでも別の ``View`` として扱われる。分岐が切り替わると、``State`` は初期値に戻り、``View/task(_:)`` のクロージャは呼び出し直される。
+///   2 つの分岐で同じ ``View`` として扱いたいときは、両方に同じ ``View/id(_:)`` の引数を渡す。
+/// - Note: `for` で作った ``View`` の同一性は、何回目かで決まる。並び替えに追従させたい ``View`` には ``View/id(_:)`` で引数を渡す。
 public struct ViewList: RandomAccessCollection {
     /// ``ViewList`` の要素 1 つ分。
     ///

@@ -41,7 +41,7 @@ extension View {
     ///   - id: 同一性を決める、`Hashable` に準拠する型のインスタンス。
     /// - Returns: この ``View`` を ``IdentifiedView/content`` にした ``IdentifiedView``。
     /// - Note: ``View/id(_:)`` を呼び出していない ``View`` の同一性は、``RenderContext`` のメソッドに渡された `slot` 引数と書いた位置で決まる。
-    ///   前に書いた `if` や `for` の中の ``View`` の数が変わると、後ろの ``View`` の書いた位置が変わり、同一性が変わる。変えたくない ``View`` には ``View/id(_:)`` で `id` を付ける。
+    ///   `for` で作った ``View`` は何回目かで決まるので、並び替えると同一性が変わる。変えたくない ``View`` には ``View/id(_:)`` で `id` を付ける。
     /// - Warning: 同じ ``View`` が受け取った ``RenderContext`` のメソッドに、同じ `slot` 引数とともに `child` 引数として渡す 2 つの ``ViewList/Element`` の ``View`` に、同じ ``View/id(_:)`` の引数を付けない。同じ ``View`` として扱われる。
     public func id<ID: Hashable>(_ id: ID) -> IdentifiedView<Self, ID> {
         IdentifiedView(content: self, id: id)

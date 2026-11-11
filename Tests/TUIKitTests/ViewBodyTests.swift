@@ -175,7 +175,7 @@ final class ViewBodyTests: XCTestCase {
         XCTAssertNotEqual(log.rendered["p"], before)
     }
 
-    func testConditionalViewShiftsIdentityOfLaterSiblings() async {
+    func testConditionalViewKeepsIdentityOfLaterSiblings() async {
         let graph = ViewGraph()
         let log = NodeLog()
         func view(showsBanner: Bool) -> some View {
@@ -192,7 +192,7 @@ final class ViewBodyTests: XCTestCase {
         let before = log.rendered
         _ = frame(view(showsBanner: true), graph: graph)
 
-        XCTAssertNotEqual(log.rendered["plain"], before["plain"])
+        XCTAssertEqual(log.rendered["plain"], before["plain"])
         XCTAssertEqual(log.rendered["keyed"], before["keyed"])
     }
 

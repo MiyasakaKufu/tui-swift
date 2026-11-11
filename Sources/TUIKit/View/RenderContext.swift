@@ -86,6 +86,7 @@ struct ViewPath: Hashable {
 /// ```
 ///
 /// - Note: `slot` は、同じ ``RenderContext`` に `child` 引数として渡す ``ViewList/Element`` を、受け取ったプロパティごとに区別する番号。同じプロパティの ``ViewList`` の要素には同じ番号を渡し、``RenderContext/sizeThatFits(of:slot:proposal:)``・``RenderContext/layoutTraits(of:slot:)``・``RenderContext/render(_:slot:into:rect:)`` と ``PrimitiveView/visitChildren(_:)`` の ``ViewVisitor/visit(_:slot:)`` で同じ番号を渡す。``ViewList`` を受け取るプロパティが 1 つだけなら、すべての要素に 0 を渡す。
+/// - Warning: `slot` に、``ViewList`` の中の要素の位置を渡さない。前に置いた `if` の中の ``View`` が現れたり消えたりすると位置がずれ、後ろの ``View`` が別の ``View`` として扱われて、``State`` が初期値に戻る。
 @MainActor
 public struct RenderContext {
     /// この ``RenderContext`` を受け取る ``View`` の `ViewNode`。

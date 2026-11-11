@@ -25,11 +25,9 @@ private struct Form: View {
                 TextField(state: noteState)
                     .focused($focusedField, equals: .note)
             }
-            // `View.id(_:)` を外したくなるが、外すと `showsNote` を切り替えたときに `ListView` の `ViewPath.Component` がずれ（#143）、フォーカスを失う。
             ListView(items: ["a", "b", "c"], selection: $selection, state: listState)
                 .frame(height: 3)
                 .focused($focusedField, equals: .list)
-                .id(Field.list)
         }
         .onKeyPress(.enter) { onEnterInForm?() ?? .ignored }
     }
